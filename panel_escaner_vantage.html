@@ -21,4 +21,69 @@
 <div class="bottom"><span>Vantage Signal Scanner · modo manual</span><button class="btn" id="reset">Ver todos</button></div>
 </main><script>
 const buttons=[...document.querySelectorAll('.filter')],cards=[...document.querySelectorAll('.signal')];function apply(f){buttons.forEach(b=>b.classList.toggle('active',b.dataset.filter===f));cards.forEach(c=>c.hidden=!(f==='Todos'||c.dataset.market===f))}buttons.forEach(b=>b.addEventListener('click',()=>apply(b.dataset.filter)));document.querySelector('#reset').addEventListener('click',()=>apply('Todos'));
+
+const VANTAGE_API = "https://vantage-signal-api-carlos.onrender.com";
+
+async function actualizarPrecios() {
+  const simbolos = {
+    EURUSD: "EUR/USD",
+    XAUUSD: "XAU/USD"
+  };
+
+  const tarjetas = document.querySelectorAll(".signal");
+
+  for (const tarjeta of tarjetas) {
+    const simboloEl = tarjeta.querySelector(".symbol");
+    const subtitulo = tarjeta.querySelector(".sub");
+
+    if (!simboloEl || !subtitulo) continue;
+
+    const codigo = simboloEl.textContent.trim().toUpperCase();
+
+    let etiqueta = tarjeta.querySelector(".live-price");
+
+    if (!etiqueta) {
+      etiqueta = document.createElement("div");
+      etiqueta.className = "live-price";
+      etiqueta.style.cssText =
+        "margin-top:6px;font-size:13px;color:#39d6a0;";
+      subtitulo.insertAdjacentElement("afterend", etiqueta);
+    }
+
+    if (!simbolos[codigo]) {
+      etiqueta.textContent = "Cotización aún no conectada";
+      etiqueta.style.color = "#ffc86b";
+      continue;
+    }
+
+    etiqueta.textContent = "Consultando precio...";
+    etiqueta.style.color = "#91a0b8";
+
+    try {
+      const url = VANTAGE_API + "/api/price?symbol=" +
+        encodeURIComponent(simbolos[codigo]);
+
+      const respuesta = await fetch(url);
+      const datos = await respuesta.json();
+
+      if (!respuesta.ok || typeof datos.price !== "number") {
+        throw new Error("Precio no disponible");
+      }
+
+      etiqueta.textContent = "Precio consultado: " +
+        datos.price.toLocaleString("es-ES", {
+          maximumFractionDigits: 5
+        });
+
+      etiqueta.style.color = "#39d6a0";
+    } catch (error) {
+      etiqueta.textContent = "Precio no disponible; reintenta";
+      etiqueta.style.color = "#ffc86b";
+    }
+  }
+}
+
+actualizarPrecios();
+setInterval(actualizarPrecios, 300000);
+
 </script></body></html>

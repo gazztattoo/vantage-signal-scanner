@@ -43,7 +43,7 @@ def price():
 
     symbol = request.args.get("symbol", "").strip().upper()
 
-    allowed_symbols = ["EUR/USD", "XAU/USD"]
+allowed_symbols = ["EUR/USD", "XAU/USD", "BTC/USD"]
 
     if symbol not in allowed_symbols:
         return jsonify({

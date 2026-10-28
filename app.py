@@ -19,6 +19,12 @@ CORS(
 
 API_KEY = os.environ.get("TWELVE_DATA_API_KEY")
 
+ALLOWED_SYMBOLS = [
+    "EUR/USD",
+    "XAU/USD",
+    "BTC/USD",
+]
+
 
 @app.route("/")
 def home():
@@ -31,7 +37,9 @@ def home():
 
 @app.route("/api/health")
 def health():
-    return jsonify({"status": "ok"})
+    return jsonify({
+        "status": "ok"
+    })
 
 
 @app.route("/api/price")
@@ -41,14 +49,14 @@ def price():
             "error": "Falta configurar la clave de Twelve Data"
         }), 503
 
-    symbol = request.args.get("symbol", "").strip().upper()
+    symbol = request.args.get(
+        "symbol", ""
+    ).strip().upper()
 
-    allowed_symbols = ["EUR/USD", "XAU/USD", "BTC/USD"]
-
-    if symbol not in allowed_symbols:
+    if symbol not in ALLOWED_SYMBOLS:
         return jsonify({
             "error": "Símbolo no permitido",
-            "allowed_symbols": allowed_symbols
+            "allowed_symbols": ALLOWED_SYMBOLS
         }), 400
 
     try:
@@ -63,7 +71,7 @@ def price():
 
         data = response.json()
 
-        if response.status_code != 200 or "price" not in data:
+        if response.status_code != 200:
             return jsonify({
                 "error": data.get(
                     "message",
@@ -71,9 +79,19 @@ def price():
                 )
             }), 502
 
+        if "price" not in data:
+            return jsonify({
+                "error": data.get(
+                    "message",
+                    "El proveedor no devolvió un precio"
+                )
+            }), 502
+
+        price_value = float(data["price"])
+
         return jsonify({
             "symbol": symbol,
-            "price": float(data["price"])
+            "price": price_value
         })
 
     except (requests.RequestException, ValueError):

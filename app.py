@@ -71,7 +71,7 @@ def price():
 
         data = response.json()
 
-        if response.status_code != 200:
+        if response.status_code != 200 or "price" not in data:
             return jsonify({
                 "error": data.get(
                     "message",
@@ -79,19 +79,9 @@ def price():
                 )
             }), 502
 
-        if "price" not in data:
-            return jsonify({
-                "error": data.get(
-                    "message",
-                    "El proveedor no devolvió un precio"
-                )
-            }), 502
-
-        price_value = float(data["price"])
-
         return jsonify({
             "symbol": symbol,
-            "price": price_value
+            "price": float(data["price"])
         })
 
     except (requests.RequestException, ValueError):

@@ -1,11 +1,10 @@
-
 <!doctype html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#080d0b">
-<title>Vantage Signal Scanner</title>
+<title>GLOBAL SIGNAL SCANNER</title>
 
 <style>
 :root{
@@ -27,16 +26,30 @@ body{
   font-family:system-ui,-apple-system,sans-serif
 }
 .wrap{max-width:1100px;margin:auto;padding:22px 14px 38px}
-.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.brand{display:flex;align-items:center;gap:12px}
-.logo{
-  width:45px;height:45px;border-radius:14px;display:grid;
-  place-items:center;background:#11271a;border:1px solid #28543a;
-  color:var(--green);font-size:25px;font-weight:900
+.top{
+  position:relative;
+  display:block;
+  margin-bottom:14px
 }
-.eyebrow{font-size:10px;letter-spacing:2px;color:var(--green);font-weight:800}
-.brand h1{font-size:21px;margin:3px 0}
-.status{border:1px solid var(--line);background:#0d1711;padding:9px 12px;border-radius:99px;font-size:12px;color:var(--muted)}
+.brand-banner{
+  display:block;
+  width:100%;
+  height:auto;
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:#080d0b
+}
+.status{
+  position:absolute;
+  top:12px;
+  right:12px;
+  border:1px solid var(--line);
+  background:rgba(13,23,17,.94);
+  padding:9px 12px;
+  border-radius:99px;
+  font-size:12px;
+  color:var(--muted)
+}
 .dot{display:inline-block;width:8px;height:8px;background:var(--amber);border-radius:50%;margin-right:7px}
 .intro{color:var(--muted);font-size:14px;line-height:1.5;margin:16px 0}
 .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:17px}
@@ -89,7 +102,8 @@ button:disabled{opacity:.45;cursor:not-allowed}
   .grid{grid-template-columns:1fr}
   .wrap{padding:17px 12px}
   .toolbar button{flex:1}
-  .brand h1{font-size:18px}
+  .brand-banner{border-radius:12px}
+  .status{top:8px;right:8px;padding:7px 9px;font-size:10px}
 }
 </style>
 </head>
@@ -98,13 +112,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <main class="wrap">
 
 <header class="top">
-  <div class="brand">
-    <div class="logo">V</div>
-    <div>
-      <div class="eyebrow">TRADING INTELLIGENCE</div>
-      <h1>VANTAGE SIGNAL SCANNER</h1>
-    </div>
-  </div>
+  <img
+    class="brand-banner"
+    src="./global-signal-header.jpg"
+    alt="GLOBAL SIGNAL SCANNER — Trading Intelligence — Forex, Gold, Crypto"
+  >
   <div class="status">
     <span class="dot" id="dot"></span>
     <span id="status">Esperando conexión</span>

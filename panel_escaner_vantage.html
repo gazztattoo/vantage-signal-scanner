@@ -1,89 +1,31 @@
 <!doctype html>
-<html lang="es">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0b1020"><title>Vantage Signal Scanner</title>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#080d0b"><title>Vantage Signal Scanner</title>
 <style>
-:root{color-scheme:dark;--bg:#080c16;--panel:#111827;--line:#263247;--muted:#91a0b8;--text:#f3f6fc;--blue:#65a8ff;--green:#39d6a0;--red:#ff687b;--amber:#ffc86b}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#15233c 0,#080c16 55%);font:15px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text)}.wrap{max-width:1050px;margin:auto;padding:18px 14px 40px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}.brand{font-size:19px;font-weight:800;letter-spacing:.2px}.brand span{color:var(--blue)}.pill{border:1px solid #66522b;background:#302617;color:var(--amber);border-radius:99px;padding:7px 10px;font-size:12px;font-weight:700}.hero{background:linear-gradient(135deg,#17243a,#101725);border:1px solid var(--line);border-radius:18px;padding:19px;margin-bottom:14px}.eyebrow{color:var(--blue);font-size:11px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase}.hero h1{font-size:26px;margin:8px 0}.hero p{color:var(--muted);line-height:1.5;margin:0}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}.metric,.card{background:rgba(17,24,39,.94);border:1px solid var(--line);border-radius:15px;padding:14px}.metric .label{font-size:12px;color:var(--muted)}.metric strong{display:block;font-size:20px;margin-top:7px}.sectionhead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:22px 2px 12px}.sectionhead h2{font-size:17px;margin:0}.controls{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}.filter{border:1px solid var(--line);border-radius:999px;background:#111827;color:#dbe6f8;padding:9px 13px;font-size:13px}.filter.active{background:#1e3d67;border-color:#417bc1;color:white}.note{font-size:12px;color:var(--muted);line-height:1.5}.signals{display:grid;gap:10px}.signal{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:14px}.sighead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.symbol{font-weight:800;font-size:17px}.sub{color:var(--muted);font-size:12px;margin-top:4px}.status{border-radius:99px;padding:6px 9px;font-size:11px;font-weight:800;white-space:nowrap}.wait{color:var(--amber);background:#382c18}.sell{color:var(--red);background:#3b1e2a}.buy{color:var(--green);background:#12362e}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:13px}.kv{background:#0b1220;border-radius:9px;padding:9px}.kv span{display:block;color:var(--muted);font-size:11px}.kv b{display:block;margin-top:5px;font-size:13px;overflow-wrap:anywhere}.empty{padding:24px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:14px}.footer{margin-top:18px;border:1px solid #55472a;background:#211c13;border-radius:13px;padding:13px;color:#e9d6a6;font-size:12px;line-height:1.5}.footer b{color:#ffe5a2}.bottom{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:16px;color:var(--muted);font-size:11px}.btn{border:1px solid var(--line);border-radius:10px;background:#18253a;color:white;padding:10px 12px;font-weight:700}@media(min-width:700px){.signals{grid-template-columns:repeat(2,minmax(0,1fr))}.hero h1{font-size:31px}}@media(max-width:370px){.metrics{grid-template-columns:1fr}.grid{grid-template-columns:repeat(2,1fr)}.hero h1{font-size:23px}}
-</style></head>
-<body><main class="wrap">
-<header class="top"><div class="brand">VANTAGE <span>SCANNER</span></div><div class="pill">● PROTOTIPO · SIN DATOS EN VIVO</div></header>
-<section class="hero"><div class="eyebrow">Panel de señales · versión inicial</div><h1>Escáner mult mercado</h1><p>Vista móvil para revisar señales de Forex, oro y criptomonedas. El panel no está conectado todavía a Vantage MT5 y no envía órdenes.</p></section>
-<section class="metrics"><div class="metric"><div class="label">Mercados configurados</div><strong>Forex · XAU · Crypto</strong></div><div class="metric"><div class="label">Ejecución automática</div><strong style="color:var(--green)">Desactivada</strong></div><div class="metric"><div class="label">Estado de datos</div><strong style="color:var(--amber)">Sin conexión</strong></div></section>
-<div class="sectionhead"><h2>Señales de ejemplo</h2><span class="note">No son recomendaciones operativas</span></div>
-<nav class="controls" aria-label="Filtrar mercado"><button class="filter active" data-filter="Todos">Todos</button><button class="filter" data-filter="Forex">Forex</button><button class="filter" data-filter="Oro">Oro</button><button class="filter" data-filter="Crypto">Cripto</button></nav>
-<section class="signals" id="signals">
-<article class="signal" data-market="Forex"><div class="sighead"><div><div class="symbol">EURUSD</div><div class="sub">Forex · M15 · EJEMPLO</div></div><span class="status wait">ESPERAR</span></div><div class="grid"><div class="kv"><span>Entrada</span><b>—</b></div><div class="kv"><span>Stop Loss</span><b>—</b></div><div class="kv"><span>Take Profit</span><b>—</b></div><div class="kv"><span>EMA 20 / 50</span><b>Sin datos</b></div><div class="kv"><span>RSI 14</span><b>—</b></div><div class="kv"><span>ATR 14</span><b>—</b></div></div></article>
-<article class="signal" data-market="Oro"><div class="sighead"><div><div class="symbol">XAUUSD</div><div class="sub">Oro · M15 · EJEMPLO</div></div><span class="status wait">ESPERAR</span></div><div class="grid"><div class="kv"><span>Entrada</span><b>—</b></div><div class="kv"><span>Stop Loss</span><b>—</b></div><div class="kv"><span>Take Profit</span><b>—</b></div><div class="kv"><span>EMA 20 / 50</span><b>Sin datos</b></div><div class="kv"><span>RSI 14</span><b>—</b></div><div class="kv"><span>ATR 14</span><b>—</b></div></div></article>
-<article class="signal" data-market="Crypto"><div class="sighead"><div><div class="symbol">BTCUSD</div><div class="sub">Criptomoneda · M15 · EJEMPLO</div></div><span class="status wait">ESPERAR</span></div><div class="grid"><div class="kv"><span>Entrada</span><b>—</b></div><div class="kv"><span>Stop Loss</span><b>—</b></div><div class="kv"><span>Take Profit</span><b>—</b></div><div class="kv"><span>EMA 20 / 50</span><b>Sin datos</b></div><div class="kv"><span>RSI 14</span><b>—</b></div><div class="kv"><span>ATR 14</span><b>—</b></div></div></article>
-</section>
-<div class="footer"><b>Importante:</b> esta página es solo una maqueta visual. No consulta cotizaciones, no calcula señales reales ni se actualiza sola. No uses estos ejemplos para operar. La conexión de datos y el motor de análisis son la siguiente etapa.</div>
-<div class="bottom"><span>Vantage Signal Scanner · modo manual</span><button class="btn" id="reset">Ver todos</button></div>
-</main><script>
-const buttons=[...document.querySelectorAll('.filter')],cards=[...document.querySelectorAll('.signal')];function apply(f){buttons.forEach(b=>b.classList.toggle('active',b.dataset.filter===f));cards.forEach(c=>c.hidden=!(f==='Todos'||c.dataset.market===f))}buttons.forEach(b=>b.addEventListener('click',()=>apply(b.dataset.filter)));document.querySelector('#reset').addEventListener('click',()=>apply('Todos'));
-
-const VANTAGE_API = "https://vantage-signal-api-carlos.onrender.com";
-
-async function actualizarPrecios() {
-  const simbolos = {
-    EURUSD: "EUR/USD",
-    XAUUSD: "XAU/USD"
-  };
-
-  const tarjetas = document.querySelectorAll(".signal");
-
-  for (const tarjeta of tarjetas) {
-    const simboloEl = tarjeta.querySelector(".symbol");
-    const subtitulo = tarjeta.querySelector(".sub");
-
-    if (!simboloEl || !subtitulo) continue;
-
-    const codigo = simboloEl.textContent.trim().toUpperCase();
-
-    let etiqueta = tarjeta.querySelector(".live-price");
-
-    if (!etiqueta) {
-      etiqueta = document.createElement("div");
-      etiqueta.className = "live-price";
-      etiqueta.style.cssText =
-        "margin-top:6px;font-size:13px;color:#39d6a0;";
-      subtitulo.insertAdjacentElement("afterend", etiqueta);
-    }
-
-    if (!simbolos[codigo]) {
-      etiqueta.textContent = "Cotización aún no conectada";
-      etiqueta.style.color = "#ffc86b";
-      continue;
-    }
-
-    etiqueta.textContent = "Consultando precio...";
-    etiqueta.style.color = "#91a0b8";
-
-    try {
-      const url = VANTAGE_API + "/api/price?symbol=" +
-        encodeURIComponent(simbolos[codigo]);
-
-      const respuesta = await fetch(url);
-      const datos = await respuesta.json();
-
-      if (!respuesta.ok || typeof datos.price !== "number") {
-        throw new Error("Precio no disponible");
-      }
-
-      etiqueta.textContent = "Precio consultado: " +
-        datos.price.toLocaleString("es-ES", {
-          maximumFractionDigits: 5
-        });
-
-      etiqueta.style.color = "#39d6a0";
-    } catch (error) {
-      etiqueta.textContent = "Precio no disponible; reintenta";
-      etiqueta.style.color = "#ffc86b";
-    }
-  }
-}
-
-actualizarPrecios();
-setInterval(actualizarPrecios, 300000);
-
+:root{color-scheme:dark;--bg:#080d0b;--panel:#101915;--line:#20362a;--text:#edf7ef;--muted:#8fa69a;--green:#58f29a;--red:#ff6978;--amber:#ffc76a}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#14291d,#080d0b 55%);color:var(--text);font-family:system-ui,-apple-system,sans-serif}.wrap{max-width:1100px;margin:auto;padding:22px 14px 38px}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.brand{display:flex;align-items:center;gap:12px}.logo{width:45px;height:45px;border-radius:14px;display:grid;place-items:center;background:#11271a;border:1px solid #28543a;color:var(--green);font-size:25px;font-weight:900}.eyebrow{font-size:10px;letter-spacing:2px;color:var(--green);font-weight:800}.brand h1{font-size:21px;margin:3px 0}.status{border:1px solid var(--line);background:#0d1711;padding:9px 12px;border-radius:99px;font-size:12px;color:var(--muted)}.dot{display:inline-block;width:8px;height:8px;background:var(--amber);border-radius:50%;margin-right:7px}.intro{color:var(--muted);font-size:14px;line-height:1.5;margin:16px 0}.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:17px}label,.hint{font-size:12px;color:var(--muted)}select,button{font:inherit;border-radius:11px;padding:11px 13px;border:1px solid var(--line);background:#101a14;color:var(--text)}button{cursor:pointer;font-weight:800;background:var(--green);color:#06130b;border-color:var(--green)}button:disabled{opacity:.55}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.card{background:linear-gradient(160deg,#121e17,#0c130f);border:1px solid var(--line);border-radius:18px;padding:16px;min-width:0}.cardhead{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.symbol{font-size:17px;font-weight:850}.market{font-size:11px;color:var(--muted);margin-top:3px}.pill{font-size:10px;letter-spacing:.5px;font-weight:900;padding:7px 9px;border-radius:8px;background:#302719;color:var(--amber)}.pill.buy{background:#123b26;color:var(--green)}.pill.sell{background:#3a1820;color:var(--red)}.price{font-size:26px;font-weight:850;margin:20px 0 2px;overflow-wrap:anywhere}.priceLabel{font-size:10px;color:var(--muted);letter-spacing:1px}.reason{font-size:12px;color:var(--muted);line-height:1.5;min-height:32px;margin:12px 0}.levels,.metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.level,.metric{background:#080f0b;border:1px solid #1a2a20;border-radius:10px;padding:9px 7px;min-width:0}.level span,.metric span{display:block;font-size:9px;color:var(--muted);margin-bottom:5px}.level strong,.metric strong{font-size:12px;overflow-wrap:anywhere}.metrics{margin-top:10px}.foot{font-size:10px;color:var(--muted);line-height:1.5;margin-top:12px}.error{color:var(--red)}.bottom{margin-top:20px;padding:14px;border:1px solid var(--line);border-radius:13px;background:#0d1510;color:var(--muted);font-size:11px;line-height:1.6}.bottom strong{color:var(--text)}@media(max-width:760px){.grid{grid-template-columns:1fr}.wrap{padding:17px 12px}.toolbar button{flex:1}.brand h1{font-size:18px}}
+</style></head><body><main class="wrap">
+<header class="top"><div class="brand"><div class="logo">V</div><div><div class="eyebrow">TRADING INTELLIGENCE</div><h1>VANTAGE SIGNAL SCANNER</h1></div></div><div class="status"><span class="dot" id="dot"></span><span id="status">Esperando conexión</span></div></header>
+<p class="intro">Escáner técnico de Forex, oro y cripto. Consulta el motor Vantage y muestra los datos devueltos por la API.</p>
+<section class="toolbar"><label for="interval">Temporalidad</label><select id="interval"><option value="15min">M15 · 15 minutos</option><option value="30min">M30 · 30 minutos</option><option value="1h">H1 · 1 hora</option><option value="4h">H4 · 4 horas</option></select><button id="refresh">↻ Actualizar análisis</button><span class="hint" id="updated">Sin actualizar</span></section>
+<section class="grid" id="cards" aria-live="polite"></section>
+<div class="bottom"><strong>Importante:</strong> señales técnicas experimentales, no recomendaciones financieras. Comprueba los datos en tu plataforma antes de operar. Este panel no envía órdenes a MT5 ni ejecuta operaciones automáticamente.</div></main>
+<script>
+const API_BASE="https://vantage-signal-api-carlos.onrender.com";
+const markets=[{symbol:"EUR/USD",category:"FOREX"},{symbol:"XAU/USD",category:"ORO"},{symbol:"BTC/USD",category:"CRIPTO"}];
+const cards=document.getElementById("cards"),statusEl=document.getElementById("status"),dot=document.getElementById("dot"),button=document.getElementById("refresh"),updated=document.getElementById("updated");
+function esc(v){return String(v??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function fmt(v,d=5){if(v===null||v===undefined||v==="")return "—";const n=Number(v);return Number.isFinite(n)?n.toLocaleString("es-ES",{maximumFractionDigits:d}):esc(v)}
+function first(o,keys){for(const k of keys)if(o&&o[k]!==undefined&&o[k]!==null&&o[k]!=="")return o[k];return null}
+function render(m,d,err){if(err)return `<article class="card"><div class="cardhead"><div><div class="symbol">${m.symbol}</div><div class="market">${m.category}</div></div><span class="pill sell">SIN DATOS</span></div><p class="reason error">${esc(err)}</p><div class="foot">Comprueba que Render esté activo y que la API responda.</div></article>`;
+let raw=String(first(d,["signal","action","recommendation","side"])||"ESPERAR").toUpperCase(),s=raw.includes("COMPRA")||raw.includes("BUY")?{t:"COMPRA",c:"buy"}:raw.includes("VENTA")||raw.includes("SELL")?{t:"VENTA",c:"sell"}:{t:raw.includes("WAIT")?"ESPERAR":raw,c:""};
+let entry=first(d,["entry","price"]),sl=first(d,["stop_loss","stopLoss","sl"]),tp=first(d,["take_profit","takeProfit","tp"]),reason=first(d,["reason","explanation","message","warning","method"])||"Análisis recibido desde la API.";
+return `<article class="card"><div class="cardhead"><div><div class="symbol">${m.symbol}</div><div class="market">${m.category} · ${esc(first(d,["interval"])||document.getElementById("interval").value)}</div></div><span class="pill ${s.c}">${esc(s.t)}</span></div>
+<div class="price">${fmt(first(d,["price","entry"]),8)}</div><div class="priceLabel">PRECIO / ENTRADA DE REFERENCIA</div><p class="reason">${esc(reason)}</p>
+<div class="levels"><div class="level"><span>ENTRADA</span><strong>${fmt(entry,8)}</strong></div><div class="level"><span>STOP LOSS</span><strong>${fmt(sl,8)}</strong></div><div class="level"><span>TAKE PROFIT</span><strong>${fmt(tp,8)}</strong></div></div>
+<div class="metrics"><div class="metric"><span>EMA 20</span><strong>${fmt(first(d,["ema20","ema_20"]),6)}</strong></div><div class="metric"><span>EMA 50</span><strong>${fmt(first(d,["ema50","ema_50"]),6)}</strong></div><div class="metric"><span>RSI 14</span><strong>${fmt(first(d,["rsi14","rsi_14","rsi"]),2)}</strong></div></div>
+<div class="metrics"><div class="metric"><span>ATR 14</span><strong>${fmt(first(d,["atr14","atr_14","atr"]),6)}</strong></div><div class="metric"><span>Vela analizada</span><strong>${esc(first(d,["candle_time","timestamp","time"])||"—")}</strong></div><div class="metric"><span>Método</span><strong>${esc(first(d,["method"])||"Vantage")}</strong></div></div><div class="foot">${esc(first(d,["warning"])||"Señal experimental; confirma los niveles antes de operar.")}</div></article>`}
+async function load(m){const p=new URLSearchParams({symbol:m.symbol,interval:document.getElementById("interval").value});const r=await fetch(`${API_BASE}/api/analysis?${p}`);let d;try{d=await r.json()}catch{throw Error("La API no devolvió JSON válido")}if(!r.ok||d.error)throw Error(d.error||`Error HTTP ${r.status}`);return d}
+async function update(){button.disabled=true;statusEl.textContent="Consultando análisis…";dot.style.background="var(--amber)";cards.innerHTML=markets.map(m=>`<article class="card"><div class="symbol">${m.symbol}</div><p class="reason">Consultando el motor…</p></article>`).join("");
+const out=await Promise.all(markets.map(async m=>{try{return {m,d:await load(m)}}catch(e){return {m,err:e.message||"No se pudo conectar"}}}));
+cards.innerHTML=out.map(x=>render(x.m,x.d,x.err)).join("");const fails=out.filter(x=>x.err).length;statusEl.textContent=fails===0?"Motor conectado":fails===markets.length?"Error de conexión":"Conexión parcial";dot.style.background=fails===0?"var(--green)":"var(--red)";updated.textContent="Actualizado: "+new Date().toLocaleTimeString("es-ES");button.disabled=false}
+button.addEventListener("click",update);document.getElementById("interval").addEventListener("change",update);update();
 </script></body></html>

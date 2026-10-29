@@ -5,7 +5,9 @@
 </style></head><body><main class="wrap">
 <header class="top"><div class="brand"><div class="logo">V</div><div><div class="eyebrow">TRADING INTELLIGENCE</div><h1>VANTAGE SIGNAL SCANNER</h1></div></div><div class="status"><span class="dot" id="dot"></span><span id="status">Esperando conexión</span></div></header>
 <p class="intro">Escáner técnico de Forex, oro y cripto. Consulta el motor Vantage y muestra los datos devueltos por la API.</p>
-<section class="toolbar"><label for="interval">Temporalidad</label><select id="interval"><option value="15min">M15 · 15 minutos</option><option value="30min">M30 · 30 minutos</option><option value="1h">H1 · 1 hora</option><option value="4h">H4 · 4 horas</option></select><button id="refresh">↻ Actualizar análisis</button><span class="hint" id="updated">Sin actualizar</span></section>
+
+<section class="toolbar"><label for="interval">Temporalidad</label><select id="interval"><option value="5min">M5 · 5 minutos</option><option value="15min">M15 · 15 minutos</option><option value="30min">M30 · 30 minutos</option></select><button id="refresh">↻ Actualizar análisis</button><span class="hint" id="updated">Sin actualizar</span></section>
+
 <section class="grid" id="cards" aria-live="polite"></section>
 <div class="bottom"><strong>Importante:</strong> señales técnicas experimentales, no recomendaciones financieras. Comprueba los datos en tu plataforma antes de operar. Este panel no envía órdenes a MT5 ni ejecuta operaciones automáticamente.</div></main>
 <script>

@@ -9,7 +9,7 @@ CORS(app, resources={r"/api/*": {"origins": ["https://gazztattoo.github.io"]}})
 API_KEY = os.environ.get("TWELVE_DATA_API_KEY")
 TWELVE_DATA_URL = "https://api.twelvedata.com"
 ALLOWED_SYMBOLS = {"EUR/USD", "XAU/USD", "BTC/USD"}
-ALLOWED_INTERVALS = {"15min", "1h", "4h"}
+ALLOWED_INTERVALS = {"15min", "30min", "1h", "4h"}
 
 
 def get_symbol(raw):

@@ -1,0 +1,17 @@
+{
+  "id": "./",
+  "name": "GLOBAL SIGNAL SCANNER",
+  "short_name": "GLOBAL SCANNER",
+  "description": "Panel de análisis técnico Forex, oro y criptomonedas.",
+  "lang": "es",
+  "start_url": "./panel_escaner_vantage.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#080d0b",
+  "theme_color": "#080d0b",
+  "icons": [
+    {"src":"./icons/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
+    {"src":"./icons/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any"}
+  ]
+}

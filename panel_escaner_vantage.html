@@ -289,7 +289,15 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .metric span{margin-bottom:5px}
 .foot{font-size:10px;color:var(--muted);line-height:1.5;margin-top:12px}
 .error{color:var(--red);overflow-wrap:anywhere;word-break:break-word}
-.bottom{margin-top:20px;padding:14px;border:1px solid var(--line);border-radius:13px;background:#0d1510;color:var(--muted);font-size:11px;line-height:1.6}
+.bottom{
+  margin-top:20px;
+  padding:0;
+  border:0;
+  background:transparent;
+  border-radius:0;
+  box-shadow:none;
+  overflow:hidden;
+}
 .bottom strong{color:var(--text)}
 @media(max-width:760px){
   .grid{grid-template-columns:1fr}

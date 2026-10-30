@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#080d0b">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icons/icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GLOBAL SCANNER">
 <title>GLOBAL SIGNAL SCANNER</title>
 
 <style>
@@ -760,6 +765,16 @@ async function update(){
 button.addEventListener("click",update);
 document.getElementById("interval").addEventListener("change",update);
 update();
+</script>
+
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js").catch(err =>
+      console.warn("No se pudo registrar el modo app:", err)
+    );
+  });
+}
 </script>
 </body>
 </html>

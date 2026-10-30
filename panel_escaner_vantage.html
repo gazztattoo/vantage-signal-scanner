@@ -90,20 +90,24 @@ button:disabled{opacity:.45;cursor:not-allowed}
   gap:7px;padding:8px;
 }
 .trend-card{
-  min-width:0;padding:9px 8px;border:1px solid var(--line);
+  min-width:0;max-width:100%;overflow:hidden;
+  padding:9px 8px;border:1px solid var(--line);
   border-radius:10px;background:rgba(2,10,6,.48);
 }
 .trend-name{font-size:10px;color:var(--muted);font-weight:750}
 .trend-value-row{
-  display:flex;align-items:center;justify-content:space-between;
-  gap:4px;min-width:0;margin:6px 0 3px
+  display:flex;align-items:center;justify-content:flex-start;
+  gap:5px;min-width:0;max-width:100%;margin:6px 0 3px;
+  overflow:hidden
 }
 .trend-value{
-  min-width:0;font-size:clamp(15px,2vw,21px);
-  font-weight:900;letter-spacing:-.5px;white-space:nowrap
+  display:block;flex:0 1 auto;min-width:0;
+  font-size:clamp(13px,1.7vw,18px);
+  font-weight:900;letter-spacing:-.6px;white-space:nowrap;
+  line-height:1.1
 }
 .ring{
-  --ring:50%;width:27px;height:27px;flex:0 0 27px;border-radius:50%;
+  --ring:50%;width:21px;height:21px;flex:0 0 21px;border-radius:50%;
   display:grid;place-items:center;
   background:conic-gradient(var(--tone,var(--green)) var(--ring),#24352b 0);
   position:relative;
@@ -154,9 +158,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
   .trend-list{gap:4px;padding:5px}
   .trend-card{padding:7px 5px;border-radius:8px}
   .trend-name{font-size:8px}
-  .trend-value-row{gap:3px;margin:5px 0 2px}
-  .trend-value{font-size:clamp(12px,3.5vw,16px);letter-spacing:-.6px}
-  .ring{width:19px;height:19px;flex-basis:19px}
+  .trend-value-row{gap:4px;margin:5px 0 2px;justify-content:flex-start}
+  .trend-value{font-size:13px;letter-spacing:-.65px;flex:0 1 auto}
+  .ring{width:16px;height:16px;flex:0 0 16px}
+  .ring:before{inset:3px}
   .ring:before{inset:4px}
   .trend-state{font-size:8px}
   .trend-note{font-size:7px}
@@ -174,7 +179,8 @@ button:disabled{opacity:.45;cursor:not-allowed}
 }
 @media(min-width:561px) and (max-width:850px){
   .market-overview{grid-template-columns:minmax(0,1.2fr) minmax(220px,.9fr);gap:9px}
-  .trend-value{font-size:18px}
+  .trend-value{font-size:15px}
+  .ring{width:19px;height:19px;flex-basis:19px}
   .gauge{width:72px;height:42px;flex-basis:72px}
   .gauge-arc{width:72px;height:72px}
   .gauge-needle{height:34px}

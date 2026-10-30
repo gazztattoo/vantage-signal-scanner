@@ -1,10 +1,10 @@
-const CACHE_NAME = "global-signal-scanner-shell-v1";
+const CACHE_NAME = "global-signal-scanner-shell-v2";
 const SHELL = [
   "./",
   "./panel_escaner_vantage.html",
   "./manifest.webmanifest",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png",
+  "./icons/icons/icono-192.png",
+  "./icons/icons/icono-512.png",
   "./global-signal-header.jpg"
 ];
 self.addEventListener("install", event => {

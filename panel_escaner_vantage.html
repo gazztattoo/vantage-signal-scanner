@@ -33,8 +33,8 @@ body{
 }
 .brand-banner{
   display:block;
-  width:102%;
-  margin-left:-1%;
+  width:104%;
+  margin-left:-2%;
   height:auto;
   border:1px solid var(--line);
   border-radius:16px;
@@ -60,96 +60,115 @@ button{cursor:pointer;font-weight:800;background:var(--green);color:#06130b;bord
 button:disabled{opacity:.45;cursor:not-allowed}
 .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
 
+
 .market-overview{
   display:grid;
-  grid-template-columns:minmax(0,1.45fr) minmax(280px,1fr);
-  gap:14px;
-  margin:0 0 18px;
+  grid-template-columns:minmax(0,1.45fr) minmax(250px,1fr);
+  gap:12px;
+  margin:0 0 16px;
+  align-items:stretch;
 }
 .overview-panel{
-  min-width:0;
-  overflow:hidden;
-  border:1px solid var(--line);
-  border-radius:17px;
+  min-width:0;overflow:hidden;
+  border:1px solid var(--line);border-radius:15px;
   background:linear-gradient(145deg,rgba(15,39,27,.96),rgba(7,16,11,.98));
 }
 .overview-heading{
-  display:flex;align-items:center;gap:9px;
-  padding:14px 16px;
-  border-bottom:1px solid var(--line);
-  font-size:13px;font-weight:850;letter-spacing:.35px;
+  display:flex;align-items:center;gap:8px;
+  padding:10px 12px;border-bottom:1px solid var(--line);
+  font-size:11px;font-weight:850;letter-spacing:.25px;
+  white-space:nowrap;
 }
-.overview-icon{color:var(--green);font-size:18px}
+.overview-icon{color:var(--green);font-size:15px}
 .trend-list{
-  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;
-  padding:10px;
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:7px;padding:8px;
 }
 .trend-card{
-  min-width:0;padding:12px 10px;border:1px solid var(--line);
-  border-radius:12px;background:rgba(2,10,6,.48);
+  min-width:0;padding:9px 8px;border:1px solid var(--line);
+  border-radius:10px;background:rgba(2,10,6,.48);
 }
-.trend-name{font-size:11px;color:var(--muted);font-weight:750}
-.trend-value-row{display:flex;align-items:center;gap:8px;margin:9px 0 5px}
-.trend-value{font-size:25px;font-weight:900;letter-spacing:-.6px}
+.trend-name{font-size:10px;color:var(--muted);font-weight:750}
+.trend-value-row{display:flex;align-items:center;gap:6px;margin:6px 0 3px}
+.trend-value{font-size:21px;font-weight:900;letter-spacing:-.5px}
 .ring{
-  --ring:50%;
-  width:42px;height:42px;flex:0 0 42px;border-radius:50%;
+  --ring:50%;width:31px;height:31px;flex:0 0 31px;border-radius:50%;
   display:grid;place-items:center;
   background:conic-gradient(var(--tone,var(--green)) var(--ring),#24352b 0);
   position:relative;
 }
 .ring:before{
-  content:"";position:absolute;inset:6px;border-radius:50%;background:#09130d;
+  content:"";position:absolute;inset:5px;border-radius:50%;background:#09130d;
 }
-.trend-state{font-size:11px;font-weight:800}
+.trend-state{font-size:10px;font-weight:800}
 .trend-state.bull{color:var(--green)}
 .trend-state.bear{color:var(--red)}
 .trend-state.neutral{color:var(--amber)}
-.trend-note{font-size:10px;color:var(--muted);margin-top:5px;line-height:1.35}
-.sentiment-content{padding:13px 16px 15px}
-.gauge-wrap{display:flex;align-items:center;justify-content:center;gap:16px;padding:5px 0 14px}
-.gauge{
-  width:148px;height:82px;position:relative;overflow:hidden;flex:0 0 148px;
-}
+.trend-note{font-size:9px;color:var(--muted);margin-top:3px;line-height:1.25}
+.sentiment-content{padding:8px 11px 9px}
+.gauge-wrap{display:flex;align-items:center;justify-content:center;gap:9px;padding:1px 0 7px}
+.gauge{width:88px;height:49px;position:relative;overflow:hidden;flex:0 0 88px}
 .gauge-arc{
-  position:absolute;inset:0 0 auto;width:148px;height:148px;border-radius:50%;
+  position:absolute;inset:0 0 auto;width:88px;height:88px;border-radius:50%;
   background:conic-gradient(from 270deg,var(--red) 0deg,#e6b94d 75deg,var(--green) 180deg,transparent 180deg);
   -webkit-mask:radial-gradient(circle,transparent 0 57%,#000 59%);
   mask:radial-gradient(circle,transparent 0 57%,#000 59%);
 }
 .gauge-needle{
-  position:absolute;bottom:2px;left:50%;width:3px;height:65px;
+  position:absolute;bottom:1px;left:50%;width:2px;height:39px;
   background:var(--text);border-radius:4px;transform-origin:50% 100%;
   transform:translateX(-50%) rotate(0deg);
-  box-shadow:0 0 8px rgba(88,242,154,.45);
+  box-shadow:0 0 6px rgba(88,242,154,.45);
 }
 .gauge-needle:after{
-  content:"";position:absolute;width:11px;height:11px;border-radius:50%;
-  background:var(--green);border:2px solid #07120b;left:50%;bottom:-5px;transform:translateX(-50%);
+  content:"";position:absolute;width:8px;height:8px;border-radius:50%;
+  background:var(--green);border:1px solid #07120b;left:50%;bottom:-4px;transform:translateX(-50%);
 }
-.sentiment-label{text-align:center;min-width:105px}
-.sentiment-label strong{display:block;font-size:19px}
-.sentiment-label span{font-size:11px;color:var(--muted)}
-.sentiment-bars{display:grid;gap:9px}
-.sentiment-row{display:grid;grid-template-columns:76px minmax(40px,1fr) 38px;gap:8px;align-items:center;font-size:11px}
-.sentiment-row .bar{height:9px;border-radius:99px;background:#203329;overflow:hidden}
+.sentiment-label{text-align:left;min-width:0}
+.sentiment-label strong{display:block;font-size:15px;white-space:nowrap}
+.sentiment-label span{font-size:9px;color:var(--muted);white-space:nowrap}
+.sentiment-bars{display:grid;gap:5px}
+.sentiment-row{display:grid;grid-template-columns:58px minmax(24px,1fr) 30px;gap:5px;align-items:center;font-size:9px}
+.sentiment-row .bar{height:6px;border-radius:99px;background:#203329;overflow:hidden}
 .sentiment-row .fill{height:100%;width:0;border-radius:99px;background:var(--green);transition:width .25s}
 .sentiment-row.sell .fill{background:var(--red)}
 .sentiment-row.neutral .fill{background:var(--amber)}
 .sentiment-row b{text-align:right;font-variant-numeric:tabular-nums}
-.overview-foot{padding:0 16px 12px;color:var(--muted);font-size:10px;line-height:1.4}
-@media(max-width:760px){
-  .market-overview{grid-template-columns:1fr;gap:11px}
-  .trend-list{gap:7px;padding:8px}
-  .trend-card{padding:10px 8px}
-  .trend-value{font-size:22px}
-  .ring{width:36px;height:36px;flex-basis:36px}
-  .gauge-wrap{gap:10px}
+.overview-foot{padding:0 11px 8px;color:var(--muted);font-size:8px;line-height:1.3}
+@media(max-width:560px){
+  .market-overview{grid-template-columns:minmax(0,1.15fr) minmax(132px,.85fr);gap:7px;margin-bottom:13px}
+  .overview-panel{border-radius:12px}
+  .overview-heading{padding:8px 8px;font-size:9px;letter-spacing:0;gap:5px}
+  .overview-icon{font-size:12px}
+  .trend-list{gap:4px;padding:5px}
+  .trend-card{padding:7px 5px;border-radius:8px}
+  .trend-name{font-size:8px}
+  .trend-value-row{gap:3px;margin:5px 0 2px}
+  .trend-value{font-size:15px}
+  .ring{width:22px;height:22px;flex-basis:22px}
+  .ring:before{inset:4px}
+  .trend-state{font-size:8px}
+  .trend-note{font-size:7px}
+  .sentiment-content{padding:6px 7px}
+  .gauge-wrap{gap:4px;padding-bottom:5px}
+  .gauge{width:54px;height:31px;flex-basis:54px}
+  .gauge-arc{width:54px;height:54px}
+  .gauge-needle{height:25px}
+  .gauge-needle:after{width:6px;height:6px}
+  .sentiment-label strong{font-size:10px}
+  .sentiment-label span{font-size:7px}
+  .sentiment-row{grid-template-columns:39px minmax(16px,1fr) 22px;gap:3px;font-size:7px}
+  .sentiment-row .bar{height:5px}
+  .overview-foot{font-size:7px;padding:0 7px 6px}
 }
-@media(min-width:761px) and (max-width:1050px){
-  .market-overview{grid-template-columns:1fr}
-  .sentiment-content{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:10px}
+@media(min-width:561px) and (max-width:850px){
+  .market-overview{grid-template-columns:minmax(0,1.2fr) minmax(220px,.9fr);gap:9px}
+  .trend-value{font-size:18px}
+  .gauge{width:72px;height:42px;flex-basis:72px}
+  .gauge-arc{width:72px;height:72px}
+  .gauge-needle{height:34px}
 }
+
 
 .card{background:linear-gradient(160deg,#121e17,#0c130f);border:1px solid var(--line);border-radius:18px;padding:16px;min-width:0}
 .cardhead{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
@@ -215,12 +234,6 @@ button:disabled{opacity:.45;cursor:not-allowed}
     <span id="status">Esperando conexión</span>
   </div>
 </header>
-
-<p class="intro">
-  ANÁLISIS DE MERCADO <span aria-hidden="true">•</span>
-  SEÑALES TÉCNICAS <span aria-hidden="true">•</span>
-  GESTIÓN DE RIESGO
-</p>
 
 <section class="market-overview" aria-label="Resumen técnico del mercado">
   <section class="overview-panel">
@@ -603,7 +616,7 @@ function updateOverview(results){
   document.getElementById("bearPct").textContent=total?bearPct+"%":"—";
   document.getElementById("neutralPct").textContent=total?neutralPct+"%":"—";
   document.getElementById("overviewFoot").textContent=total
-    ?`Cálculo técnico basado en ${total} mercado(s) con EMA 20, EMA 50 y RSI 14. No representa volumen real ni probabilidad de acierto.`
+    ?`Distribución de clasificaciones técnicas según EMA 20, EMA 50 y RSI 14; no representa órdenes reales ni probabilidad de acierto.`
     :"Esperando EMA 20, EMA 50 y RSI 14 válidos para calcular el resumen.";
 }
 
@@ -652,3 +665,4 @@ update();
 </script>
 </body>
 </html>
+

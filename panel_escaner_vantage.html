@@ -33,7 +33,8 @@ body{
 }
 .brand-banner{
   display:block;
-  width:100%;
+  width:102%;
+  margin-left:-1%;
   height:auto;
   border:1px solid var(--line);
   border-radius:16px;
@@ -58,6 +59,98 @@ select,button{font:inherit;border-radius:11px;padding:11px 13px;border:1px solid
 button{cursor:pointer;font-weight:800;background:var(--green);color:#06130b;border-color:var(--green)}
 button:disabled{opacity:.45;cursor:not-allowed}
 .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+
+.market-overview{
+  display:grid;
+  grid-template-columns:minmax(0,1.45fr) minmax(280px,1fr);
+  gap:14px;
+  margin:0 0 18px;
+}
+.overview-panel{
+  min-width:0;
+  overflow:hidden;
+  border:1px solid var(--line);
+  border-radius:17px;
+  background:linear-gradient(145deg,rgba(15,39,27,.96),rgba(7,16,11,.98));
+}
+.overview-heading{
+  display:flex;align-items:center;gap:9px;
+  padding:14px 16px;
+  border-bottom:1px solid var(--line);
+  font-size:13px;font-weight:850;letter-spacing:.35px;
+}
+.overview-icon{color:var(--green);font-size:18px}
+.trend-list{
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;
+  padding:10px;
+}
+.trend-card{
+  min-width:0;padding:12px 10px;border:1px solid var(--line);
+  border-radius:12px;background:rgba(2,10,6,.48);
+}
+.trend-name{font-size:11px;color:var(--muted);font-weight:750}
+.trend-value-row{display:flex;align-items:center;gap:8px;margin:9px 0 5px}
+.trend-value{font-size:25px;font-weight:900;letter-spacing:-.6px}
+.ring{
+  --ring:50%;
+  width:42px;height:42px;flex:0 0 42px;border-radius:50%;
+  display:grid;place-items:center;
+  background:conic-gradient(var(--tone,var(--green)) var(--ring),#24352b 0);
+  position:relative;
+}
+.ring:before{
+  content:"";position:absolute;inset:6px;border-radius:50%;background:#09130d;
+}
+.trend-state{font-size:11px;font-weight:800}
+.trend-state.bull{color:var(--green)}
+.trend-state.bear{color:var(--red)}
+.trend-state.neutral{color:var(--amber)}
+.trend-note{font-size:10px;color:var(--muted);margin-top:5px;line-height:1.35}
+.sentiment-content{padding:13px 16px 15px}
+.gauge-wrap{display:flex;align-items:center;justify-content:center;gap:16px;padding:5px 0 14px}
+.gauge{
+  width:148px;height:82px;position:relative;overflow:hidden;flex:0 0 148px;
+}
+.gauge-arc{
+  position:absolute;inset:0 0 auto;width:148px;height:148px;border-radius:50%;
+  background:conic-gradient(from 270deg,var(--red) 0deg,#e6b94d 75deg,var(--green) 180deg,transparent 180deg);
+  -webkit-mask:radial-gradient(circle,transparent 0 57%,#000 59%);
+  mask:radial-gradient(circle,transparent 0 57%,#000 59%);
+}
+.gauge-needle{
+  position:absolute;bottom:2px;left:50%;width:3px;height:65px;
+  background:var(--text);border-radius:4px;transform-origin:50% 100%;
+  transform:translateX(-50%) rotate(0deg);
+  box-shadow:0 0 8px rgba(88,242,154,.45);
+}
+.gauge-needle:after{
+  content:"";position:absolute;width:11px;height:11px;border-radius:50%;
+  background:var(--green);border:2px solid #07120b;left:50%;bottom:-5px;transform:translateX(-50%);
+}
+.sentiment-label{text-align:center;min-width:105px}
+.sentiment-label strong{display:block;font-size:19px}
+.sentiment-label span{font-size:11px;color:var(--muted)}
+.sentiment-bars{display:grid;gap:9px}
+.sentiment-row{display:grid;grid-template-columns:76px minmax(40px,1fr) 38px;gap:8px;align-items:center;font-size:11px}
+.sentiment-row .bar{height:9px;border-radius:99px;background:#203329;overflow:hidden}
+.sentiment-row .fill{height:100%;width:0;border-radius:99px;background:var(--green);transition:width .25s}
+.sentiment-row.sell .fill{background:var(--red)}
+.sentiment-row.neutral .fill{background:var(--amber)}
+.sentiment-row b{text-align:right;font-variant-numeric:tabular-nums}
+.overview-foot{padding:0 16px 12px;color:var(--muted);font-size:10px;line-height:1.4}
+@media(max-width:760px){
+  .market-overview{grid-template-columns:1fr;gap:11px}
+  .trend-list{gap:7px;padding:8px}
+  .trend-card{padding:10px 8px}
+  .trend-value{font-size:22px}
+  .ring{width:36px;height:36px;flex-basis:36px}
+  .gauge-wrap{gap:10px}
+}
+@media(min-width:761px) and (max-width:1050px){
+  .market-overview{grid-template-columns:1fr}
+  .sentiment-content{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:10px}
+}
+
 .card{background:linear-gradient(160deg,#121e17,#0c130f);border:1px solid var(--line);border-radius:18px;padding:16px;min-width:0}
 .cardhead{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
 .symbol{font-size:17px;font-weight:850}
@@ -124,9 +217,36 @@ button:disabled{opacity:.45;cursor:not-allowed}
 </header>
 
 <p class="intro">
-  Escáner técnico de Forex, oro y cripto. Consulta el motor Vantage
-  y muestra los datos devueltos por la API.
+  ANÁLISIS DE MERCADO <span aria-hidden="true">•</span>
+  SEÑALES TÉCNICAS <span aria-hidden="true">•</span>
+  GESTIÓN DE RIESGO
 </p>
+
+<section class="market-overview" aria-label="Resumen técnico del mercado">
+  <section class="overview-panel">
+    <div class="overview-heading"><span class="overview-icon">▥</span> TENDENCIA GENERAL DEL MERCADO</div>
+    <div class="trend-list" id="trendList">
+      <div class="trend-card"><div class="trend-name">FOREX</div><div class="trend-note">Esperando análisis…</div></div>
+      <div class="trend-card"><div class="trend-name">ORO</div><div class="trend-note">Esperando análisis…</div></div>
+      <div class="trend-card"><div class="trend-name">CRIPTO</div><div class="trend-note">Esperando análisis…</div></div>
+    </div>
+  </section>
+  <section class="overview-panel">
+    <div class="overview-heading"><span class="overview-icon">◉</span> SENTIMIENTO TÉCNICO</div>
+    <div class="sentiment-content">
+      <div class="gauge-wrap">
+        <div class="gauge"><div class="gauge-arc"></div><div class="gauge-needle" id="gaugeNeedle"></div></div>
+        <div class="sentiment-label"><strong id="sentimentState">—</strong><span>FUERZA TÉCNICA: <b id="sentimentStrength">—</b></span></div>
+      </div>
+      <div class="sentiment-bars">
+        <div class="sentiment-row"><span>Alcista</span><div class="bar"><div class="fill" id="bullFill"></div></div><b id="bullPct">—</b></div>
+        <div class="sentiment-row sell"><span>Bajista</span><div class="bar"><div class="fill" id="bearFill"></div></div><b id="bearPct">—</b></div>
+        <div class="sentiment-row neutral"><span>Neutral</span><div class="bar"><div class="fill" id="neutralFill"></div></div><b id="neutralPct">—</b></div>
+      </div>
+    </div>
+    <div class="overview-foot" id="overviewFoot">Se calculará con EMA 20, EMA 50 y RSI 14 cuando llegue el análisis.</div>
+  </section>
+</section>
 
 <section class="toolbar">
   <label for="interval">Temporalidad</label>
@@ -405,6 +525,88 @@ async function load(m){
   return d;
 }
 
+
+function numericIndicator(data, keys){
+  const value=first(data,keys);
+  if(value===null)return null;
+  const number=Number(value);
+  return Number.isFinite(number)?number:null;
+}
+
+function technicalBias(data){
+  const ema20=numericIndicator(data,["ema20","ema_20"]);
+  const ema50=numericIndicator(data,["ema50","ema_50"]);
+  const rsi=numericIndicator(data,["rsi14","rsi_14","rsi"]);
+  if(ema20===null||ema50===null||rsi===null)return null;
+
+  // Score técnico heurístico, no probabilidad ni dato de volumen.
+  let score=50;
+  if(ema20>ema50)score+=25;
+  else if(ema20<ema50)score-=25;
+
+  if(rsi>=55)score+=25;
+  else if(rsi<=45)score-=25;
+
+  score=Math.max(0,Math.min(100,score));
+  const direction=score>=60?"bull":score<=40?"bear":"neutral";
+  const strength=direction==="bull"?score:direction==="bear"?100-score:50;
+  return {score,direction,strength,ema20,ema50,rsi};
+}
+
+function updateOverview(results){
+  const trendList=document.getElementById("trendList");
+  const analyzed=results.map(item=>({
+    market:item.m,
+    bias:item.err?null:technicalBias(item.d)
+  }));
+  const names={FOREX:"FOREX",ORO:"ORO",CRIPTO:"CRIPTO"};
+  trendList.innerHTML=analyzed.map(item=>{
+    const name=names[item.market.category]||item.market.category;
+    const b=item.bias;
+    if(!b){
+      return `<div class="trend-card"><div class="trend-name">${esc(name)}</div>
+        <div class="trend-state neutral">SIN DATOS</div>
+        <div class="trend-note">Indicadores insuficientes</div></div>`;
+    }
+    const state=b.direction==="bull"?"Alcista":b.direction==="bear"?"Bajista":"Neutral";
+    const tone=b.direction==="bull"?"var(--green)":b.direction==="bear"?"var(--red)":"var(--amber)";
+    return `<div class="trend-card">
+      <div class="trend-name">${esc(name)}</div>
+      <div class="trend-value-row">
+        <div class="trend-value">${Math.round(b.strength)}%</div>
+        <div class="ring" style="--ring:${b.strength}%;--tone:${tone}"></div>
+      </div>
+      <div class="trend-state ${b.direction}">${state}</div>
+      <div class="trend-note">Fuerza técnica estimada</div>
+    </div>`;
+  }).join("");
+
+  const valid=analyzed.filter(x=>x.bias);
+  const bulls=valid.filter(x=>x.bias.direction==="bull").length;
+  const bears=valid.filter(x=>x.bias.direction==="bear").length;
+  const neutrals=valid.length-bulls-bears;
+  const total=valid.length;
+  const bullPct=total?Math.round(bulls/total*100):0;
+  const bearPct=total?Math.round(bears/total*100):0;
+  const neutralPct=total?100-bullPct-bearPct:0;
+  const sentiment=total?(bullPct>bearPct?"ALCISTA":bearPct>bullPct?"BAJISTA":"NEUTRAL"):"SIN DATOS";
+  const strength=total?Math.round(Math.max(bullPct,bearPct,neutralPct))+"%":"—";
+  const gaugeValue=total?(bullPct-bearPct)/100:0;
+  const angle= gaugeValue*90;
+  document.getElementById("sentimentState").textContent=sentiment;
+  document.getElementById("sentimentStrength").textContent=strength;
+  document.getElementById("gaugeNeedle").style.transform=`translateX(-50%) rotate(${angle}deg)`;
+  document.getElementById("bullFill").style.width=bullPct+"%";
+  document.getElementById("bearFill").style.width=bearPct+"%";
+  document.getElementById("neutralFill").style.width=neutralPct+"%";
+  document.getElementById("bullPct").textContent=total?bullPct+"%":"—";
+  document.getElementById("bearPct").textContent=total?bearPct+"%":"—";
+  document.getElementById("neutralPct").textContent=total?neutralPct+"%":"—";
+  document.getElementById("overviewFoot").textContent=total
+    ?`Cálculo técnico basado en ${total} mercado(s) con EMA 20, EMA 50 y RSI 14. No representa volumen real ni probabilidad de acierto.`
+    :"Esperando EMA 20, EMA 50 y RSI 14 válidos para calcular el resumen.";
+}
+
 async function update(){
   button.disabled=true;
   statusEl.textContent="Consultando análisis…";
@@ -426,6 +628,7 @@ async function update(){
   }));
 
   cards.innerHTML=out.map(x=>render(x.m,x.d,x.err)).join("");
+  updateOverview(out);
 
   const fails=out.filter(x=>x.err).length;
 

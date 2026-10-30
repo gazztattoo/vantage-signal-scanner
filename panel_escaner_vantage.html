@@ -29,15 +29,20 @@ body{
 .top{
   position:relative;
   display:block;
-  margin-bottom:14px
+  margin-bottom:14px;
+  overflow:hidden;
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:#080d0b
 }
 .brand-banner{
   display:block;
-  width:104%;
-  margin-left:-2%;
+  width:100%;
   height:auto;
-  border:1px solid var(--line);
-  border-radius:16px;
+  transform:scale(1.10);
+  transform-origin:center;
+  border:0;
+  border-radius:0;
   background:#080d0b
 }
 .status{
@@ -89,10 +94,16 @@ button:disabled{opacity:.45;cursor:not-allowed}
   border-radius:10px;background:rgba(2,10,6,.48);
 }
 .trend-name{font-size:10px;color:var(--muted);font-weight:750}
-.trend-value-row{display:flex;align-items:center;gap:6px;margin:6px 0 3px}
-.trend-value{font-size:21px;font-weight:900;letter-spacing:-.5px}
+.trend-value-row{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:4px;min-width:0;margin:6px 0 3px
+}
+.trend-value{
+  min-width:0;font-size:clamp(15px,2vw,21px);
+  font-weight:900;letter-spacing:-.5px;white-space:nowrap
+}
 .ring{
-  --ring:50%;width:31px;height:31px;flex:0 0 31px;border-radius:50%;
+  --ring:50%;width:27px;height:27px;flex:0 0 27px;border-radius:50%;
   display:grid;place-items:center;
   background:conic-gradient(var(--tone,var(--green)) var(--ring),#24352b 0);
   position:relative;
@@ -144,8 +155,8 @@ button:disabled{opacity:.45;cursor:not-allowed}
   .trend-card{padding:7px 5px;border-radius:8px}
   .trend-name{font-size:8px}
   .trend-value-row{gap:3px;margin:5px 0 2px}
-  .trend-value{font-size:15px}
-  .ring{width:22px;height:22px;flex-basis:22px}
+  .trend-value{font-size:clamp(12px,3.5vw,16px);letter-spacing:-.6px}
+  .ring{width:19px;height:19px;flex-basis:19px}
   .ring:before{inset:4px}
   .trend-state{font-size:8px}
   .trend-note{font-size:7px}
@@ -207,15 +218,16 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .metrics{margin-top:10px}
 .metric span{margin-bottom:5px}
 .foot{font-size:10px;color:var(--muted);line-height:1.5;margin-top:12px}
-.error{color:var(--red)}
+.error{color:var(--red);overflow-wrap:anywhere;word-break:break-word}
 .bottom{margin-top:20px;padding:14px;border:1px solid var(--line);border-radius:13px;background:#0d1510;color:var(--muted);font-size:11px;line-height:1.6}
 .bottom strong{color:var(--text)}
 @media(max-width:760px){
   .grid{grid-template-columns:1fr}
   .wrap{padding:17px 12px}
   .toolbar button{flex:1}
-  .brand-banner{border-radius:12px}
-  .status{top:8px;right:8px;padding:7px 9px;font-size:10px}
+  .top{border-radius:12px}
+  .brand-banner{transform:scale(1.10)}
+  .status{top:8px;right:8px;padding:7px 9px;font-size:10px;z-index:2}
 }
 </style>
 </head>
@@ -665,4 +677,3 @@ update();
 </script>
 </body>
 </html>
-

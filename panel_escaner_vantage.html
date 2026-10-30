@@ -97,17 +97,17 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .trend-name{font-size:10px;color:var(--muted);font-weight:750}
 .trend-value-row{
   display:flex;align-items:center;justify-content:flex-start;
-  gap:5px;min-width:0;max-width:100%;margin:6px 0 3px;
-  overflow:hidden
+  gap:0;min-width:0;max-width:100%;margin:7px 0 3px;
+  overflow:visible
 }
 .trend-value{
   display:block;flex:0 1 auto;min-width:0;
-  font-size:clamp(13px,1.7vw,18px);
+  font-size:clamp(17px,2vw,23px);
   font-weight:900;letter-spacing:-.6px;white-space:nowrap;
   line-height:1.1
 }
 .ring{
-  --ring:50%;width:21px;height:21px;flex:0 0 21px;border-radius:50%;
+  --ring:50%;width:23px;height:23px;flex:0 0 23px;border-radius:50%;
   display:grid;place-items:center;
   background:conic-gradient(var(--tone,var(--green)) var(--ring),#24352b 0);
   position:relative;
@@ -120,6 +120,12 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .trend-state.bear{color:var(--red)}
 .trend-state.neutral{color:var(--amber)}
 .trend-note{font-size:9px;color:var(--muted);margin-top:3px;line-height:1.25}
+.trend-ring-row{
+  display:flex;align-items:center;justify-content:center;
+  width:100%;margin-top:8px;padding-top:6px;
+  border-top:1px solid rgba(143,166,154,.14)
+}
+.trend-ring-row .ring{width:22px;height:22px;flex-basis:22px}
 .sentiment-content{padding:8px 11px 9px}
 .gauge-wrap{display:flex;align-items:center;justify-content:center;gap:9px;padding:1px 0 7px}
 .gauge{width:88px;height:49px;position:relative;overflow:hidden;flex:0 0 88px}
@@ -158,10 +164,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
   .trend-list{gap:4px;padding:5px}
   .trend-card{padding:7px 5px;border-radius:8px}
   .trend-name{font-size:8px}
-  .trend-value-row{gap:4px;margin:5px 0 2px;justify-content:flex-start}
-  .trend-value{font-size:13px;letter-spacing:-.65px;flex:0 1 auto}
-  .ring{width:16px;height:16px;flex:0 0 16px}
-  .ring:before{inset:3px}
+  .trend-value-row{gap:0;margin:5px 0 2px;justify-content:flex-start}
+  .trend-value{font-size:clamp(16px,4.2vw,20px);letter-spacing:-.65px;flex:0 1 auto}
+  .trend-ring-row{margin-top:7px;padding-top:5px}
+  .trend-ring-row .ring{width:19px;height:19px;flex-basis:19px}
+  .trend-ring-row .ring:before{inset:3px}
   .ring:before{inset:4px}
   .trend-state{font-size:8px}
   .trend-note{font-size:7px}
@@ -179,8 +186,8 @@ button:disabled{opacity:.45;cursor:not-allowed}
 }
 @media(min-width:561px) and (max-width:850px){
   .market-overview{grid-template-columns:minmax(0,1.2fr) minmax(220px,.9fr);gap:9px}
-  .trend-value{font-size:15px}
-  .ring{width:19px;height:19px;flex-basis:19px}
+  .trend-value{font-size:19px}
+  .trend-ring-row .ring{width:21px;height:21px;flex-basis:21px}
   .gauge{width:72px;height:42px;flex-basis:72px}
   .gauge-arc{width:72px;height:72px}
   .gauge-needle{height:34px}
@@ -605,10 +612,12 @@ function updateOverview(results){
       <div class="trend-name">${esc(name)}</div>
       <div class="trend-value-row">
         <div class="trend-value">${Math.round(b.strength)}%</div>
-        <div class="ring" style="--ring:${b.strength}%;--tone:${tone}"></div>
       </div>
       <div class="trend-state ${b.direction}">${state}</div>
       <div class="trend-note">Fuerza técnica estimada</div>
+      <div class="trend-ring-row">
+        <div class="ring" style="--ring:${b.strength}%;--tone:${tone}" aria-label="Fuerza ${Math.round(b.strength)} por ciento"></div>
+      </div>
     </div>`;
   }).join("");
 

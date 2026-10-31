@@ -24,17 +24,16 @@ ACCESS_TOKEN_SECRET = os.environ.get("ACCESS_TOKEN_SECRET", "")
 TOKEN_MAX_AGE_SECONDS = 12 * 60 * 60
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
-SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+SUPABASE_SECRET_KEY = os.environ.get("SUPABASE_SECRET_KEY", "")
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
 VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "mailto:admin@example.com")
 
 def supabase_headers():
-    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+    if not SUPABASE_URL or not SUPABASE_SECRET_KEY:
         raise RuntimeError("El almacenamiento de notificaciones no está configurado.")
     return {
-        "apikey": SUPABASE_SERVICE_ROLE_KEY,
-        "Authorization": "Bearer " + SUPABASE_SERVICE_ROLE_KEY,
+        "apikey": SUPABASE_SECRET_KEY,
         "Content-Type": "application/json",
     }
 

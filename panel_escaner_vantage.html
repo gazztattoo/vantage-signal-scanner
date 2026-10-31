@@ -24,6 +24,7 @@
   --amber:#ffc76a
 }
 *{box-sizing:border-box}
+.access-gate{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;padding:20px;background:rgba(3,8,5,.96);backdrop-filter:blur(12px)}.access-gate[hidden]{display:none}.access-box{width:min(100%,390px);padding:26px;border:1px solid #28543a;border-radius:18px;background:linear-gradient(160deg,#14231a,#09110c);text-align:center}.access-box h1{margin:0 0 8px;font-size:21px;color:#58f29a}.access-box p{color:#8fa69a;font-size:13px;line-height:1.5}.access-box input{width:100%;margin:12px 0;padding:13px;border:1px solid #28543a;border-radius:10px;background:#080f0b;color:#edf7ef;font:inherit;text-align:center}.access-box button{width:100%;padding:13px}.access-error{min-height:20px;color:#ff6978!important;font-size:12px!important}
 body{
   margin:0;
   background:radial-gradient(ellipse at top,#14291d,#080d0b 55%);
@@ -311,6 +312,8 @@ button:disabled{opacity:.45;cursor:not-allowed}
 </head>
 
 <body>
+
+<section class="access-gate" id="accessGate" aria-label="Acceso privado"><form class="access-box" id="accessForm"><h1>GLOBAL SIGNAL SCANNER</h1><p>Plataforma de acceso privado. Introduce el código que te compartió el administrador.</p><input id="accessCode" type="password" autocomplete="current-password" placeholder="Código de acceso" required><button id="accessSubmit" type="submit">ENTRAR AL SCANNER</button><p class="access-error" id="accessError" role="alert"></p></form></section>
 <main class="wrap">
 
 <header class="top">
@@ -376,6 +379,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
 
 <script>
 const API_BASE="https://vantage-signal-api-carlos.onrender.com";
+let accessToken=sessionStorage.getItem("gss_access_token")||"";
+const accessGate=document.getElementById("accessGate"), accessForm=document.getElementById("accessForm"), accessCodeInput=document.getElementById("accessCode"), accessError=document.getElementById("accessError"), accessSubmit=document.getElementById("accessSubmit");
+function showAccessGate(){accessGate.hidden=false;} function hideAccessGate(){accessGate.hidden=true;}
+async function requestAccess(code){const response=await fetch(API_BASE+"/api/access",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code})});const data=await response.json().catch(()=>({}));if(!response.ok||!data.token)throw new Error(data.error||"No se pudo validar el código.");accessToken=data.token;sessionStorage.setItem("gss_access_token",accessToken);}
+accessForm.addEventListener("submit",async event=>{event.preventDefault();accessSubmit.disabled=true;accessError.textContent="Verificando acceso…";try{await requestAccess(accessCodeInput.value);accessCodeInput.value="";hideAccessGate();update();}catch(error){accessError.textContent=error.message||"Código incorrecto.";}finally{accessSubmit.disabled=false;}});
 
 const markets=[
   {symbol:"EUR/USD",category:"FOREX"},
@@ -633,7 +641,7 @@ async function load(m){
     interval:document.getElementById("interval").value
   });
 
-  const r=await fetch(`${API_BASE}/api/analysis?${p}`);
+  const r=await fetch(`${API_BASE}/api/analysis?${p}`,{headers:{"Authorization":"Bearer "+accessToken}});
 
   let d;
   try{
@@ -774,7 +782,7 @@ async function update(){
 
 button.addEventListener("click",update);
 document.getElementById("interval").addEventListener("change",update);
-update();
+if(accessToken){hideAccessGate();update();}else{showAccessGate();statusEl.textContent="Acceso requerido";}
 </script>
 
 <script>

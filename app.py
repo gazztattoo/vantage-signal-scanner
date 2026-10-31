@@ -69,6 +69,8 @@ def create_access_token():
 
 @app.before_request
 def protect_signal_endpoints():
+    if request.method == "OPTIONS":
+        return None
     if request.path not in ("/api/analysis", "/api/price", "/api/push/subscribe", "/api/push/test", "/api/push/unsubscribe"):
         return None
     if not ACCESS_TOKEN_SECRET:

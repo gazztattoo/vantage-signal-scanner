@@ -5,15 +5,58 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+import hmac
 
 app = Flask(__name__)
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["https://gazztattoo.github.io"]
+        "origins": ["https://gazztattoo.github.io"],
+        "allow_headers": ["Content-Type", "Authorization"],
+        "methods": ["GET", "POST", "OPTIONS"]
     }
 })
 
 API_KEY = os.environ.get("TWELVE_DATA_API_KEY")
+PANEL_ACCESS_CODE = os.environ.get("PANEL_ACCESS_CODE", "")
+ACCESS_TOKEN_SECRET = os.environ.get("ACCESS_TOKEN_SECRET", "")
+TOKEN_MAX_AGE_SECONDS = 12 * 60 * 60
+
+def access_serializer():
+    if not ACCESS_TOKEN_SECRET:
+        raise RuntimeError("Falta configurar ACCESS_TOKEN_SECRET en Render")
+    return URLSafeTimedSerializer(ACCESS_TOKEN_SECRET, salt="global-signal-panel-access-v1")
+
+
+@app.route("/api/access", methods=["POST"])
+def create_access_token():
+    if not PANEL_ACCESS_CODE or not ACCESS_TOKEN_SECRET:
+        return jsonify({"error": "El acceso privado aún no está configurado en el servidor."}), 503
+    payload = request.get_json(silent=True) or {}
+    supplied_code = str(payload.get("code", ""))
+    if not hmac.compare_digest(supplied_code, PANEL_ACCESS_CODE):
+        return jsonify({"error": "Código de acceso incorrecto."}), 401
+    token = access_serializer().dumps({"access": True})
+    return jsonify({"token": token, "expires_in": TOKEN_MAX_AGE_SECONDS})
+
+
+@app.before_request
+def protect_signal_endpoints():
+    if request.path not in ("/api/analysis", "/api/price"):
+        return None
+    if not ACCESS_TOKEN_SECRET:
+        return jsonify({"error": "El acceso privado no está configurado."}), 503
+    authorization = request.headers.get("Authorization", "")
+    if not authorization.startswith("Bearer "):
+        return jsonify({"error": "Acceso requerido. Introduce el código del panel."}), 401
+    token = authorization[7:].strip()
+    try:
+        data = access_serializer().loads(token, max_age=TOKEN_MAX_AGE_SECONDS)
+        if data.get("access") is not True:
+            raise BadSignature("Token no válido")
+    except (BadSignature, SignatureExpired, RuntimeError):
+        return jsonify({"error": "Sesión caducada o no válida. Vuelve a introducir el código."}), 401
+    return None
 TWELVE_DATA_URL = "https://api.twelvedata.com"
 
 ALLOWED_SYMBOLS = {"EUR/USD", "XAU/USD", "BTC/USD"}

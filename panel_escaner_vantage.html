@@ -764,6 +764,23 @@ async function update(){
   cards.innerHTML=out.map(x=>render(x.m,x.d,x.err)).join("");
   updateOverview(out);
 
+  const authExpired=out.some(x=>x.err && (
+    x.err.includes("Sesión caducada") ||
+    x.err.includes("Acceso requerido") ||
+    x.err.includes("Introduce el código")
+  ));
+
+  if(authExpired){
+    accessToken="";
+    sessionStorage.removeItem("gss_access_token");
+    showAccessGate();
+    accessError.textContent="Tu sesión ha caducado. Introduce de nuevo el código de acceso.";
+    statusEl.textContent="Acceso requerido";
+    dot.style.background="var(--amber)";
+    button.disabled=false;
+    return;
+  }
+
   const fails=out.filter(x=>x.err).length;
 
   statusEl.textContent=

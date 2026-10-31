@@ -5,36 +5,66 @@ const SHELL = [
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png",
-  "./global-signal-header.jpg",
-  "./global_signal_scanner_footer.png"
+  "./global-signal-header.jpg"
 ];
 
 self.addEventListener("install", event => {
-  event.waitUntil((async () => {
-    const cache = await caches.open(CACHE_NAME);
-    // Cachea cada recurso por separado: un archivo opcional ausente
-    // no debe impedir la instalación completa del Service Worker.
-    await Promise.all(SHELL.map(async path => {
-      try {
-        const response = await fetch(path, { cache: "reload" });
-        if (response.ok) await cache.put(path, response);
-        else console.warn("No se pudo precargar:", path, response.status);
-      } catch (error) {
-        console.warn("No se pudo precargar:", path, error);
-      }
-    }));
-    await self.skipWaiting();
-  })());
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL))
+  );
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", event => {
-  event.waitUntil((async () => {
-    const keys = await caches.keys();
-    await Promise.all(
+  event.waitUntil(
+    caches.keys().then(keys => Promise.all(
       keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
-    );
-    await self.clients.claim();
-  })());
+    ))
+  );
+  self.clients.claim();
+});
+
+// Recibe avisos enviados por el servidor mediante Web Push.
+self.addEventListener("push", event => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = { body: event.data ? event.data.text() : "" };
+  }
+
+  const title = payload.title || "GLOBAL SIGNAL SCANNER";
+  const options = {
+    body: payload.body || "Hay una actualización de análisis disponible.",
+    icon: "./icon-192.png",
+    badge: "./icon-192.png",
+    tag: payload.tag || "global-signal-scanner",
+    renotify: Boolean(payload.renotify),
+    data: {
+      url: payload.url || "./panel_escaner_vantage.html"
+    }
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  const targetUrl = new URL(
+    event.notification.data?.url || "./panel_escaner_vantage.html",
+    self.location.origin
+  ).href;
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(clients => {
+      for (const client of clients) {
+        if (client.url.startsWith(self.location.origin) && "focus" in client) {
+          return client.navigate(targetUrl).then(() => client.focus());
+        }
+      }
+      return self.clients.openWindow(targetUrl);
+    })
+  );
 });
 
 self.addEventListener("fetch", event => {
@@ -42,33 +72,30 @@ self.addEventListener("fetch", event => {
   const url = new URL(request.url);
 
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
+  if (url.hostname.includes("onrender.com")) return;
 
   if (request.mode === "navigate" || url.pathname.endsWith(".html")) {
-    event.respondWith((async () => {
-      try {
-        const response = await fetch(request);
-        if (response.ok) {
-          const cache = await caches.open(CACHE_NAME);
-          await cache.put(request, response.clone());
-        }
+    event.respondWith(
+      fetch(request).then(response => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
         return response;
-      } catch {
-        return (await caches.match(request))
-          || (await caches.match("./panel_escaner_vantage.html"));
-      }
-    })());
+      }).catch(() =>
+        caches.match(request).then(
+          cached => cached || caches.match("./panel_escaner_vantage.html")
+        )
+      )
+    );
     return;
   }
 
-  event.respondWith((async () => {
-    const cached = await caches.match(request);
-    if (cached) return cached;
-
-    const response = await fetch(request);
-    if (response.ok) {
-      const cache = await caches.open(CACHE_NAME);
-      await cache.put(request, response.clone());
-    }
-    return response;
-  })());
+  event.respondWith(
+    caches.match(request).then(cached => cached || fetch(request).then(response => {
+      if (response.ok) {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+      }
+      return response;
+    }))
+  );
 });

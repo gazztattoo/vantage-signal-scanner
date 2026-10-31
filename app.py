@@ -1,5 +1,6 @@
 
 import os
+import json
 import requests
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
@@ -11,7 +12,7 @@ import hmac
 app = Flask(__name__)
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["https://gazztattoo.github.io"],
+        "origins": ["https://gazztattoo.github.io", "https://global-signal-push-test-panel.onrender.com"],
         "allow_headers": ["Content-Type", "Authorization"],
         "methods": ["GET", "POST", "OPTIONS"]
     }
@@ -21,6 +22,33 @@ API_KEY = os.environ.get("TWELVE_DATA_API_KEY")
 PANEL_ACCESS_CODE = os.environ.get("PANEL_ACCESS_CODE", "")
 ACCESS_TOKEN_SECRET = os.environ.get("ACCESS_TOKEN_SECRET", "")
 TOKEN_MAX_AGE_SECONDS = 12 * 60 * 60
+
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
+VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "mailto:admin@example.com")
+
+def supabase_headers():
+    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        raise RuntimeError("El almacenamiento de notificaciones no está configurado.")
+    return {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": "Bearer " + SUPABASE_SERVICE_ROLE_KEY,
+        "Content-Type": "application/json",
+    }
+
+def send_web_push(subscription, payload):
+    if not VAPID_PUBLIC_KEY or not VAPID_PRIVATE_KEY:
+        raise RuntimeError("Las claves Web Push aún no están configuradas.")
+    from pywebpush import webpush
+    return webpush(
+        subscription_info=subscription,
+        data=json.dumps(payload, ensure_ascii=False),
+        vapid_private_key=VAPID_PRIVATE_KEY,
+        vapid_claims={"sub": VAPID_SUBJECT},
+    )
+
 
 def access_serializer():
     if not ACCESS_TOKEN_SECRET:
@@ -42,7 +70,7 @@ def create_access_token():
 
 @app.before_request
 def protect_signal_endpoints():
-    if request.path not in ("/api/analysis", "/api/price"):
+    if request.path not in ("/api/analysis", "/api/price", "/api/push/subscribe", "/api/push/test", "/api/push/unsubscribe"):
         return None
     if not ACCESS_TOKEN_SECRET:
         return jsonify({"error": "El acceso privado no está configurado."}), 503
@@ -457,6 +485,102 @@ def analysis():
         return jsonify({
             "error": "No se pudieron procesar los datos recibidos"
         }), 502
+
+
+
+@app.route("/api/push/public-key", methods=["GET"])
+def push_public_key():
+    if not VAPID_PUBLIC_KEY:
+        return jsonify({"error": "Las notificaciones aún no están configuradas."}), 503
+    return jsonify({"public_key": VAPID_PUBLIC_KEY})
+
+
+@app.route("/api/push/subscribe", methods=["POST"])
+def push_subscribe():
+    payload = request.get_json(silent=True) or {}
+    subscription = payload.get("subscription")
+    if not isinstance(subscription, dict) or not subscription.get("endpoint"):
+        return jsonify({"error": "Suscripción no válida."}), 400
+    try:
+        response = requests.post(
+            SUPABASE_URL + "/rest/v1/push_subscriptions?on_conflict=endpoint",
+            headers={**supabase_headers(), "Prefer": "resolution=merge-duplicates,return=minimal"},
+            json={"endpoint": subscription["endpoint"], "subscription": subscription},
+            timeout=15,
+        )
+        if response.status_code not in (200, 201, 204):
+            return jsonify({"error": "No se pudo guardar la suscripción."}), 502
+        return jsonify({"ok": True})
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
+    except requests.RequestException:
+        return jsonify({"error": "No se pudo conectar con el almacenamiento."}), 502
+
+
+@app.route("/api/push/unsubscribe", methods=["POST"])
+def push_unsubscribe():
+    payload = request.get_json(silent=True) or {}
+    endpoint = payload.get("endpoint")
+    if not isinstance(endpoint, str) or not endpoint:
+        return jsonify({"error": "Endpoint no válido."}), 400
+    try:
+        response = requests.delete(
+            SUPABASE_URL + "/rest/v1/push_subscriptions?endpoint=eq." + requests.utils.quote(endpoint, safe=""),
+            headers=supabase_headers(),
+            timeout=15,
+        )
+        if response.status_code not in (200, 204):
+            return jsonify({"error": "No se pudo eliminar la suscripción."}), 502
+        return jsonify({"ok": True})
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
+    except requests.RequestException:
+        return jsonify({"error": "No se pudo conectar con el almacenamiento."}), 502
+
+
+@app.route("/api/push/test", methods=["POST"])
+def push_test():
+    try:
+        response = requests.get(
+            SUPABASE_URL + "/rest/v1/push_subscriptions?select=subscription",
+            headers=supabase_headers(),
+            timeout=15,
+        )
+        if response.status_code != 200:
+            return jsonify({"error": "No se pudieron consultar las suscripciones."}), 502
+        subscriptions = response.json()
+        sent = 0
+        expired = []
+        for row in subscriptions:
+            subscription = row.get("subscription")
+            if not isinstance(subscription, dict):
+                continue
+            try:
+                send_web_push(subscription, {
+                    "title": "GLOBAL SIGNAL SCANNER",
+                    "body": "¡Perfecto! Las notificaciones push están funcionando en este dispositivo.",
+                    "tag": "gss-push-test",
+                    "url": "https://global-signal-push-test-panel.onrender.com/panel_escaner_vantage.html",
+                })
+                sent += 1
+            except Exception as exc:
+                status = getattr(getattr(exc, "response", None), "status_code", None)
+                if status in (404, 410):
+                    expired.append(subscription.get("endpoint", ""))
+        for endpoint in expired:
+            if endpoint:
+                requests.delete(
+                    SUPABASE_URL + "/rest/v1/push_subscriptions?endpoint=eq." + requests.utils.quote(endpoint, safe=""),
+                    headers=supabase_headers(),
+                    timeout=10,
+                )
+        if sent == 0:
+            return jsonify({"error": "No hay suscripciones activas para enviar la prueba."}), 404
+        return jsonify({"ok": True, "sent": sent})
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
+    except requests.RequestException:
+        return jsonify({"error": "No se pudo conectar con el almacenamiento."}), 502
 
 
 if __name__ == "__main__":

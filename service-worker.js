@@ -57,11 +57,18 @@ self.addEventListener("notificationclick", event => {
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(clients => {
-      for (const client of clients) {
-        if (client.url.startsWith(self.location.origin) && "focus" in client) {
-          return client.navigate(targetUrl).then(() => client.focus());
+      const targetOrigin = new URL(targetUrl).origin;
+
+      // WindowClient.navigate solo debe usarse para destinos del mismo origen.
+      // Para el panel original (otro dominio), abrir una ventana nueva.
+      if (targetOrigin === self.location.origin) {
+        for (const client of clients) {
+          if (client.url.startsWith(self.location.origin) && "focus" in client) {
+            return client.navigate(targetUrl).then(() => client.focus());
+          }
         }
       }
+
       return self.clients.openWindow(targetUrl);
     })
   );

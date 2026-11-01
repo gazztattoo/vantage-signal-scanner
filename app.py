@@ -709,7 +709,7 @@ def lab_status():
                 headers={**supabase_headers(), "Prefer": "count=exact", "Range": "0-0"},
                 timeout=15,
             )
-            if response.status_code != 200:
+            if response.status_code not in (200, 206):
                 raise RuntimeError("No se pudo consultar el estado del laboratorio.")
             content_range = response.headers.get("Content-Range", "")
             total = content_range.rsplit("/", 1)[-1]

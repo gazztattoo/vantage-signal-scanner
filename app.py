@@ -11,7 +11,7 @@ import hmac
 app = Flask(__name__)
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["https://gazztattoo.github.io"],
+        "origins": ["https://gazztattoo.github.io", "https://vantage-signal-scanner.onrender.com"],
         "allow_headers": ["Content-Type", "Authorization"],
         "methods": ["GET", "POST", "OPTIONS"]
     }
@@ -20,7 +20,18 @@ CORS(app, resources={
 API_KEY = os.environ.get("TWELVE_DATA_API_KEY")
 PANEL_ACCESS_CODE = os.environ.get("PANEL_ACCESS_CODE", "")
 ACCESS_TOKEN_SECRET = os.environ.get("ACCESS_TOKEN_SECRET", "")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
+SUPABASE_SECRET_KEY = os.environ.get("SUPABASE_SECRET_KEY", "")
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
+VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "mailto:admin@example.com")
 TOKEN_MAX_AGE_SECONDS = 12 * 60 * 60
+
+def supabase_headers():
+    if not SUPABASE_URL or not SUPABASE_SECRET_KEY:
+        raise RuntimeError("Las notificaciones aún no están configuradas en el servidor.")
+    return {"apikey": SUPABASE_SECRET_KEY, "Authorization": "Bearer " + SUPABASE_SECRET_KEY, "Content-Type": "application/json"}
+
 
 def access_serializer():
     if not ACCESS_TOKEN_SECRET:
@@ -42,7 +53,7 @@ def create_access_token():
 
 @app.before_request
 def protect_signal_endpoints():
-    if request.path not in ("/api/analysis", "/api/price"):
+    if request.path not in ("/api/analysis", "/api/price", "/api/push/subscribe", "/api/push/unsubscribe"):
         return None
     if not ACCESS_TOKEN_SECRET:
         return jsonify({"error": "El acceso privado no está configurado."}), 503
@@ -57,6 +68,58 @@ def protect_signal_endpoints():
     except (BadSignature, SignatureExpired, RuntimeError):
         return jsonify({"error": "Sesión caducada o no válida. Vuelve a introducir el código."}), 401
     return None
+
+@app.route("/api/push/public-key", methods=["GET"])
+def push_public_key():
+    key = os.environ.get("VAPID_PUBLIC_KEY", "")
+    if not key:
+        return jsonify({"error": "Las notificaciones aún no están configuradas."}), 503
+    return jsonify({"public_key": key})
+
+
+@app.route("/api/push/subscribe", methods=["POST"])
+def push_subscribe():
+    payload = request.get_json(silent=True) or {}
+    subscription = payload.get("subscription")
+    if not isinstance(subscription, dict) or not isinstance(subscription.get("endpoint"), str):
+        return jsonify({"error": "Suscripción no válida."}), 400
+    try:
+        response = requests.post(
+            SUPABASE_URL + "/rest/v1/push_subscriptions?on_conflict=endpoint",
+            headers={**supabase_headers(), "Prefer": "resolution=merge-duplicates,return=minimal"},
+            json={"endpoint": subscription["endpoint"], "subscription": subscription},
+            timeout=15,
+        )
+        if response.status_code not in (200, 201, 204):
+            return jsonify({"error": "No se pudo guardar la suscripción."}), 502
+        return jsonify({"ok": True})
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
+    except requests.RequestException:
+        return jsonify({"error": "No se pudo conectar con el almacenamiento."}), 502
+
+
+@app.route("/api/push/unsubscribe", methods=["POST"])
+def push_unsubscribe():
+    payload = request.get_json(silent=True) or {}
+    endpoint = payload.get("endpoint")
+    if not isinstance(endpoint, str) or not endpoint:
+        return jsonify({"error": "Endpoint no válido."}), 400
+    try:
+        response = requests.delete(
+            SUPABASE_URL + "/rest/v1/push_subscriptions?endpoint=eq." + requests.utils.quote(endpoint, safe=""),
+            headers=supabase_headers(),
+            timeout=15,
+        )
+        if response.status_code not in (200, 204):
+            return jsonify({"error": "No se pudo eliminar la suscripción."}), 502
+        return jsonify({"ok": True})
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
+    except requests.RequestException:
+        return jsonify({"error": "No se pudo conectar con el almacenamiento."}), 502
+
+
 TWELVE_DATA_URL = "https://api.twelvedata.com"
 
 ALLOWED_SYMBOLS = {"EUR/USD", "XAU/USD", "BTC/USD"}

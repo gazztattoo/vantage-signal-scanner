@@ -232,22 +232,51 @@ def bollinger(values, period=20, deviations=2.0):
     return middle + width, middle, middle - width
 
 def adx(candles, period=14):
-    if len(candles) < period * 2 + 1: return None
+    """ADX con suavizado de Wilder para TR, +DM, -DM y DX."""
+    if len(candles) < (period * 2 + 1):
+        return None
+
     trs, plus_dm, minus_dm = [], [], []
     for i in range(1, len(candles)):
-        cur, prev = candles[i], candles[i-1]
-        up, down = cur['high']-prev['high'], prev['low']-cur['low']
-        plus_dm.append(up if up > down and up > 0 else 0.0)
-        minus_dm.append(down if down > up and down > 0 else 0.0)
-        trs.append(max(cur['high']-cur['low'], abs(cur['high']-prev['close']), abs(cur['low']-prev['close'])))
-    dx = []
-    for end in range(period, len(trs)+1):
-        total = sum(trs[end-period:end])
-        if total <= 0: continue
-        p = 100*sum(plus_dm[end-period:end])/total
-        m = 100*sum(minus_dm[end-period:end])/total
-        dx.append(100*abs(p-m)/(p+m) if p+m else 0.0)
-    return sum(dx[-period:])/period if len(dx) >= period else None
+        cur, prev = candles[i], candles[i - 1]
+        up_move = cur["high"] - prev["high"]
+        down_move = prev["low"] - cur["low"]
+        plus_dm.append(up_move if up_move > down_move and up_move > 0 else 0.0)
+        minus_dm.append(down_move if down_move > up_move and down_move > 0 else 0.0)
+        trs.append(max(
+            cur["high"] - cur["low"],
+            abs(cur["high"] - prev["close"]),
+            abs(cur["low"] - prev["close"]),
+        ))
+
+    smoothed_tr = sum(trs[:period])
+    smoothed_plus = sum(plus_dm[:period])
+    smoothed_minus = sum(minus_dm[:period])
+    dx_values = []
+
+    for i in range(period - 1, len(trs)):
+        if i >= period:
+            smoothed_tr = smoothed_tr - smoothed_tr / period + trs[i]
+            smoothed_plus = smoothed_plus - smoothed_plus / period + plus_dm[i]
+            smoothed_minus = smoothed_minus - smoothed_minus / period + minus_dm[i]
+
+        if smoothed_tr <= 0:
+            continue
+        plus_di = 100.0 * smoothed_plus / smoothed_tr
+        minus_di = 100.0 * smoothed_minus / smoothed_tr
+        denominator = plus_di + minus_di
+        dx_values.append(
+            100.0 * abs(plus_di - minus_di) / denominator
+            if denominator > 0 else 0.0
+        )
+
+    if len(dx_values) < period:
+        return None
+
+    adx_value = sum(dx_values[:period]) / period
+    for dx_value in dx_values[period:]:
+        adx_value = ((adx_value * (period - 1)) + dx_value) / period
+    return adx_value
 
 def parse_candle_time(raw_time):
     """Convierte la fecha de la vela a hora consciente de zona horaria."""
@@ -336,14 +365,24 @@ def fetch_candles(symbol, interval):
         candles.append(candle)
         valid_times.append(candle_time)
 
-    if len(candles) < 55:
+    # Excluir siempre la vela que todavía está formándose.
+    # Twelve Data entrega datetime como hora de apertura de cada vela.
+    now = datetime.now(timezone.utc)
+    interval_seconds = INTERVAL_MINUTES[interval] * 60
+    closed = [
+        (candle, candle_time)
+        for candle, candle_time in zip(candles, valid_times)
+        if candle_time.astimezone(timezone.utc).timestamp() + interval_seconds <= now.timestamp()
+    ]
+    if len(closed) < 55:
         raise RuntimeError(
-            "Datos insuficientes para calcular EMA 50 "
-            f"({len(candles)} velas válidas)"
+            "Datos insuficientes después de excluir la vela en curso "
+            f"({len(closed)} velas cerradas)"
         )
+    candles = [item[0] for item in closed]
+    valid_times = [item[1] for item in closed]
 
     latest_time = valid_times[-1]
-    now = datetime.now(timezone.utc)
 
     age_seconds = (
         now - latest_time.astimezone(timezone.utc)

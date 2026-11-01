@@ -58,7 +58,7 @@ class PushTestDeviceScopeTests(unittest.TestCase):
                 json={"endpoint": "https://push.example.test/unknown"},
                 headers=self.auth(),
             )
-        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.status_code, 404)
         send.assert_not_called()
 
 

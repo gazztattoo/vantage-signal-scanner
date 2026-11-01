@@ -760,7 +760,22 @@ async function update(){
     </article>
   `).join("");
 
+  let marketState={};
+  try{
+    const marketResponse=await fetch(API_BASE+"/api/market-status");
+    if(marketResponse.ok){
+      const marketData=await marketResponse.json();
+      marketState=marketData.markets||{};
+    }
+  }catch(error){
+    console.warn("No se pudo consultar el horario de mercado",error);
+  }
+
   const out=await Promise.all(markets.map(async m=>{
+    const session=marketState[m.symbol];
+    if(session && !session.open){
+      return {m,err:"MERCADO CERRADO · No se generan señales ni alertas fuera de la sesión habitual."};
+    }
     try{
       return {m,d:await load(m)};
     }catch(e){

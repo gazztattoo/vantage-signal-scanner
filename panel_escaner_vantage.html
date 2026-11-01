@@ -458,7 +458,25 @@ function instrumentIdentity(m){
   return `<span class="instrument-mark">${esc(m.symbol.slice(0,1))}</span>`;
 }
 
-function render(m,d,err){
+function render(m,d,err,marketClosed=false){
+  if(marketClosed){
+    return `
+      <article class="card">
+        <div class="cardhead">
+          <div class="instrument-id">
+            ${instrumentIdentity(m)}
+            <div class="instrument-copy">
+              <div class="symbol">${m.symbol}</div>
+              <div class="market">${m.category}</div>
+            </div>
+          </div>
+          <span class="pill">MERCADO CERRADO</span>
+        </div>
+        <p class="reason">Este mercado está fuera de su horario habitual. Los análisis y las alertas se reanudarán cuando vuelva a abrir.</p>
+        <div class="foot">No es un error de conexión ni de datos.</div>
+      </article>
+    `;
+  }
   if(err){
     return `
       <article class="card">
@@ -774,7 +792,7 @@ async function update(){
   const out=await Promise.all(markets.map(async m=>{
     const session=marketState[m.symbol];
     if(session && !session.open){
-      return {m,err:"MERCADO CERRADO · No se generan señales ni alertas fuera de la sesión habitual."};
+      return {m,marketClosed:true,err:"MERCADO CERRADO · No se generan señales ni alertas fuera de la sesión habitual."};
     }
     try{
       return {m,d:await load(m)};
@@ -783,7 +801,7 @@ async function update(){
     }
   }));
 
-  cards.innerHTML=out.map(x=>render(x.m,x.d,x.err)).join("");
+  cards.innerHTML=out.map(x=>render(x.m,x.d,x.err,!!x.marketClosed)).join("");
   updateOverview(out);
 
   const authExpired=out.some(x=>x.err && (

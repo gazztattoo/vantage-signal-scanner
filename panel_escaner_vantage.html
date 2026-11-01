@@ -944,6 +944,7 @@ function switchView(name){
   if(name==="lab")loadLabStatus();
 }
 viewButtons.forEach(button=>button.addEventListener("click",()=>switchView(button.dataset.view)));
+if(new URLSearchParams(window.location.search).get("view")==="history") switchView("history");
 
 async function loadTechnicalAnalysis(){
   const message=document.getElementById("analysisMessage");
@@ -1016,11 +1017,14 @@ async function loadHistory(){
   const list=document.getElementById("historyList");
   message.textContent="Consultando historial…";list.innerHTML="";
   const params=new URLSearchParams({limit:"100"});
-  const symbol=document.getElementById("historySymbol").value;
-  const timeframe=document.getElementById("historyTimeframe").value;
+  const deepLink=new URLSearchParams(window.location.search);
+  const symbol=deepLink.get("symbol")||document.getElementById("historySymbol").value;
+  const timeframe=deepLink.get("timeframe")||document.getElementById("historyTimeframe").value;
+  const candleTime=deepLink.get("candle_time")||"";
   const state=document.getElementById("historyStatus").value;
-  if(symbol)params.set("symbol",symbol);
-  if(timeframe)params.set("timeframe",timeframe);
+  if(symbol){params.set("symbol",symbol);document.getElementById("historySymbol").value=symbol;}
+  if(timeframe){params.set("timeframe",timeframe);document.getElementById("historyTimeframe").value=timeframe;}
+  if(candleTime)params.set("candle_time",candleTime);
   if(state)params.set("status",state);
   try{
     const response=await fetch(API_BASE+"/api/history?"+params,{headers:authHeaders()});
@@ -1028,7 +1032,7 @@ async function loadHistory(){
     if(response.status===401){message.textContent="Sesión caducada. Vuelve a entrar al panel.";showAccessGate();return;}
     if(!response.ok)throw new Error(data.error||"No se pudo cargar el historial.");
     const rows=data.signals||[];
-    message.textContent=rows.length+" señal(es) encontrada(s).";
+    message.textContent=deepLink.has("candle_time")?"Señal de la notificación · "+rows.length+" registro(s) exacto(s).":rows.length+" señal(es) encontrada(s).";
     if(!rows.length){list.innerHTML='<div class="empty-state">Todavía no hay señales guardadas con estos filtros.<br>Cuando aparezca una nueva señal COMPRA o VENTA, se registrará aquí.</div>';return;}
     list.innerHTML=rows.map(row=>{
       const date=row.signal_at?new Date(row.signal_at).toLocaleString("es-ES"):"—";

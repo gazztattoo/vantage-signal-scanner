@@ -1,8 +1,10 @@
 # Global Signal Scanner — Read-only MCP integration
 
 ## Status
-Design-only checkpoint. This document does not add a server, credentials, routes,
-database policies, Render services, or deployment configuration.
+Read-only API authorization draft prepared on branch `mcp-readonly-auth-test`.
+The changes are not deployed and have not been run against the TEST service.
+Auth0 resource/M2M configuration and private environment variables are still
+pending. Review the code and test diff before any deployment.
 
 Target branch: `mcp-readonly-test`
 Baseline: `8019244f244b06c3b5153a38aa56763899f4953a`
@@ -45,7 +47,7 @@ The current protected TEST API endpoints use the panel's general bearer token.
 That token is not least-privilege: it may authorize routes beyond GET-only reads.
 The MCP service must not obtain or mint that token.
 
-### Recommended two-token boundary (design only; not implemented)
+### Recommended two-token boundary (MCP leg still design-only)
 Use two independently validated authorization legs:
 1. **ChatGPT → MCP:** ChatGPT presents an access token whose audience is the MCP
    resource server. MCP validates its signature, issuer, audience, expiry and
@@ -61,12 +63,12 @@ approved, belongs only in the MCP service's private environment configuration;
 never in GitHub, tool arguments, logs, or chat. The Auth0 M2M application and
 TEST API audience/scope still need to be created and configured deliberately.
 
-### TEST API authorization behavior required
+### TEST API authorization behavior implemented in the draft branch
 - Preserve the existing panel-token path for the panel; do not weaken it.
-- Add a distinct read-only JWT verification path only for the exact allowlisted
-  GET data routes.
-- Require the expected Auth0 issuer, exact TEST API audience, RS256 signature,
-  unexpired token and `scanner:read` scope.
+- Draft adds a distinct read-only JWT verification path only for the exact
+  allowlisted GET data routes in `app.py`, backed by `readonly_auth.py`.
+- Verifier requires the configured Auth0 issuer, exact TEST API audience,
+  RS256 signature, expiry/issued-at claims and `scanner:read` scope.
 - Reject the read-only token on every POST/PUT/PATCH/DELETE route, including
   `/api/access`, all `/api/push/*` routes and `/api/push/scan`.
 - Reject query parameters outside each tool's explicit schema and bounds.
@@ -108,6 +110,18 @@ The Supabase service-role key must never be placed in the MCP service.
   supports the client-registration method ChatGPT expects (Dynamic Client
   Registration or Client ID Metadata Documents). Do not assume the Regular Web
   application by itself completes MCP OAuth.
+
+### Draft implementation details
+- New environment settings expected by the API: `AUTH0_READONLY_ISSUER`,
+  `AUTH0_READONLY_AUDIENCE`, and `AUTH0_READONLY_SCOPE=scanner:read`.
+- New dependency: `PyJWT[crypto]` (major version 2).
+- The existing panel signed-token path remains available for the panel.
+- The read-only credential is checked only for GET on the five existing private
+  data routes. Push endpoints remain panel-token-only.
+- Added mocked unit tests under `tests/`. They are authored but have NOT been
+  executed in this environment; a passing result must not be assumed.
+- Query-parameter schema hardening is not added to the Flask API draft yet;
+  MCP tool wrappers must validate arguments before making upstream requests.
 
 ## Current verified API boundary
 - `/api/health` and `/api/market-status` are public GET endpoints.

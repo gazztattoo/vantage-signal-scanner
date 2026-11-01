@@ -1215,72 +1215,72 @@ def push_scan():
                             })
                             continue
 
-                            # Solo se notifica una transición nueva a COMPRA o VENTA.
-                            price_digits = 5 if symbol == "EUR/USD" else 2
+                        # Solo se notifica una transición nueva a COMPRA o VENTA.
+                        price_digits = 5 if symbol == "EUR/USD" else 2
 
-                            def display_price(value):
-                                return f"{float(value):,.{price_digits}f}" if value is not None else "—"
+                        def display_price(value):
+                            return f"{float(value):,.{price_digits}f}" if value is not None else "—"
 
-                            short_interval = {
-                                "5min": "M5", "15min": "M15", "30min": "M30"
-                            }.get(interval, interval)
-                            alert_body = (
-                                f"{symbol} · {short_interval} | "
-                                f"Entrada {display_price(data.get('entry'))} · "
-                                f"SL {display_price(data.get('stop_loss'))} · "
-                                f"TP {display_price(data.get('take_profit'))}"
-                            )
+                        short_interval = {
+                            "5min": "M5", "15min": "M15", "30min": "M30"
+                        }.get(interval, interval)
+                        alert_body = (
+                            f"{symbol} · {short_interval} | "
+                            f"Entrada {display_price(data.get('entry'))} · "
+                            f"SL {display_price(data.get('stop_loss'))} · "
+                            f"TP {display_price(data.get('take_profit'))}"
+                        )
 
-                            subs_response = requests.get(
-                                SUPABASE_URL + "/rest/v1/push_subscriptions?select=subscription",
-                                headers=supabase_headers(), timeout=15,
-                            )
-                            if subs_response.status_code != 200:
-                                results.append({
-                                    "symbol": symbol, "interval": interval,
-                                    "status": "subscription_read_error"
-                                })
-                            else:
-                                subscriptions = subs_response.json()
-                                delivered = 0
-                                expired = []
-                                for row in subscriptions:
-                                    subscription = row.get("subscription")
-                                    if not isinstance(subscription, dict):
-                                        continue
-                                    try:
-                                        send_web_push(subscription, {
-                                            "title": f"GLOBAL SIGNAL · {direction}",
-                                            "body": alert_body,
-                                            "tag": "gss-" + symbol.replace("/", "") + "-" + interval,
-                                            "url": ("https://global-signal-push-test-panel.onrender.com/panel_escaner_vantage.html?view=scanner&symbol=" + requests.utils.quote(symbol, safe="") + "&timeframe=" + requests.utils.quote(interval, safe="")),
-                                            "data": {
-                                                "symbol": symbol, "interval": interval,
-                                                "direction": direction,
-                                                "entry": data.get("entry"),
-                                                "stop_loss": data.get("stop_loss"),
-                                                "take_profit": data.get("take_profit"),
-                                            },
-                                        })
-                                        delivered += 1
-                                    except Exception as exc:
-                                        response_obj = getattr(exc, "response", None)
-                                        if getattr(response_obj, "status_code", None) in (404, 410):
-                                            expired.append(subscription.get("endpoint", ""))
+                        subs_response = requests.get(
+                            SUPABASE_URL + "/rest/v1/push_subscriptions?select=subscription",
+                            headers=supabase_headers(), timeout=15,
+                        )
+                        if subs_response.status_code != 200:
+                            results.append({
+                                "symbol": symbol, "interval": interval,
+                                "status": "subscription_read_error"
+                            })
+                        else:
+                            subscriptions = subs_response.json()
+                            delivered = 0
+                            expired = []
+                            for row in subscriptions:
+                                subscription = row.get("subscription")
+                                if not isinstance(subscription, dict):
+                                    continue
+                                try:
+                                    send_web_push(subscription, {
+                                        "title": f"GLOBAL SIGNAL · {direction}",
+                                        "body": alert_body,
+                                        "tag": "gss-" + symbol.replace("/", "") + "-" + interval,
+                                        "url": ("https://global-signal-push-test-panel.onrender.com/panel_escaner_vantage.html?view=scanner&symbol=" + requests.utils.quote(symbol, safe="") + "&timeframe=" + requests.utils.quote(interval, safe="")),
+                                        "data": {
+                                            "symbol": symbol, "interval": interval,
+                                            "direction": direction,
+                                            "entry": data.get("entry"),
+                                            "stop_loss": data.get("stop_loss"),
+                                            "take_profit": data.get("take_profit"),
+                                        },
+                                    })
+                                    delivered += 1
+                                except Exception as exc:
+                                    response_obj = getattr(exc, "response", None)
+                                    if getattr(response_obj, "status_code", None) in (404, 410):
+                                        expired.append(subscription.get("endpoint", ""))
 
-                                for endpoint in expired:
-                                    if endpoint:
-                                        requests.delete(
-                                            SUPABASE_URL + "/rest/v1/push_subscriptions?endpoint=eq." + requests.utils.quote(endpoint, safe=""),
-                                            headers=supabase_headers(), timeout=10,
-                                        )
+                            for endpoint in expired:
+                                if endpoint:
+                                    requests.delete(
+                                        SUPABASE_URL + "/rest/v1/push_subscriptions?endpoint=eq." + requests.utils.quote(endpoint, safe=""),
+                                        headers=supabase_headers(), timeout=10,
+                                    )
 
-                                sent_total += delivered
-                                results.append({
-                                    "symbol": symbol, "interval": interval,
-                                    "status": "new_signal_notified" if delivered else "new_signal_no_delivery",
-                                    "devices": delivered
-                                })
+                            sent_total += delivered
+                            results.append({
+                                "symbol": symbol, "interval": interval,
+                                "status": "new_signal_notified" if delivered else "new_signal_no_delivery",
+                                "devices": delivered
+                            })
             if index < 8:
                 time.sleep(8)
 

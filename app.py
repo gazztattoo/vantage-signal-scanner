@@ -78,7 +78,7 @@ def create_access_token():
 def protect_signal_endpoints():
     if request.method == "OPTIONS":
         return None
-    if request.path not in ("/api/analysis", "/api/price", "/api/push/subscribe", "/api/push/test", "/api/push/unsubscribe"):
+    if request.path not in ("/api/analysis", "/api/price", "/api/history", "/api/performance", "/api/push/subscribe", "/api/push/test", "/api/push/unsubscribe"):
         return None
     if not ACCESS_TOKEN_SECRET:
         return jsonify({"error": "El acceso privado no está configurado."}), 503
@@ -604,6 +604,93 @@ def analysis():
             "error": "No se pudieron procesar los datos recibidos"
         }), 502
 
+
+
+@app.route("/api/history", methods=["GET"])
+def signal_history():
+    """Devuelve el historial real de señales registradas por el escáner."""
+    try:
+        limit = min(max(int(request.args.get("limit", "50")), 1), 200)
+    except ValueError:
+        return jsonify({"error": "El límite debe ser un número."}), 400
+
+    params = {
+        "select": "id,symbol,timeframe,direction,entry_price,stop_loss,take_profit,signal_at,candle_time,status,exit_price,closed_at,result_r,result_source,indicators",
+        "order": "signal_at.desc",
+        "limit": str(limit),
+    }
+    for query_name, column in (("symbol", "symbol"), ("timeframe", "timeframe"), ("status", "status")):
+        value = (request.args.get(query_name) or "").strip()
+        if value:
+            allowed = {
+                "symbol": ALLOWED_SYMBOLS,
+                "timeframe": ALLOWED_INTERVALS,
+                "status": {"PENDIENTE", "TP", "SL", "CADUCADA", "CANCELADA"},
+            }[query_name]
+            if value not in allowed:
+                return jsonify({"error": "Filtro no permitido: " + query_name}), 400
+            params[column] = "eq." + value
+
+    try:
+        response = requests.get(
+            SUPABASE_URL + "/rest/v1/signal_history",
+            params=params,
+            headers=supabase_headers(),
+            timeout=15,
+        )
+        if response.status_code != 200:
+            return jsonify({"error": "No se pudo consultar el historial."}), 502
+        rows = response.json()
+        return jsonify({"count": len(rows), "signals": rows})
+    except (RuntimeError, requests.RequestException):
+        return jsonify({"error": "No se pudo conectar con el historial."}), 502
+
+
+@app.route("/api/performance", methods=["GET"])
+def signal_performance():
+    """Calcula estadísticas solo con operaciones cerradas y resultados guardados."""
+    try:
+        response = requests.get(
+            SUPABASE_URL + "/rest/v1/signal_history",
+            params={
+                "select": "symbol,timeframe,direction,status,result_r,closed_at",
+                "status": "in.(TP,SL)",
+                "order": "closed_at.desc",
+                "limit": "1000",
+            },
+            headers=supabase_headers(),
+            timeout=15,
+        )
+        if response.status_code != 200:
+            return jsonify({"error": "No se pudieron consultar los resultados."}), 502
+
+        rows = response.json()
+        wins = sum(1 for row in rows if row.get("status") == "TP")
+        losses = sum(1 for row in rows if row.get("status") == "SL")
+        closed = wins + losses
+        r_values = [
+            float(row["result_r"]) for row in rows
+            if row.get("result_r") is not None
+        ]
+        breakdown = {}
+        for row in rows:
+            key = row["symbol"] + " · " + row["timeframe"]
+            item = breakdown.setdefault(key, {"wins": 0, "losses": 0, "closed": 0})
+            item["wins" if row.get("status") == "TP" else "losses"] += 1
+            item["closed"] += 1
+
+        return jsonify({
+            "closed_trades": closed,
+            "wins": wins,
+            "losses": losses,
+            "win_rate": round((wins / closed) * 100, 2) if closed else None,
+            "average_r": round(sum(r_values) / len(r_values), 4) if r_values else None,
+            "pending_and_unresolved_excluded": True,
+            "breakdown": breakdown,
+            "note": "Solo incluye operaciones cerradas con estado TP o SL; no representa rentabilidad garantizada.",
+        })
+    except (RuntimeError, requests.RequestException, ValueError, TypeError):
+        return jsonify({"error": "No se pudieron calcular las estadísticas."}), 502
 
 
 @app.route("/api/push/public-key", methods=["GET"])

@@ -5,7 +5,7 @@ These tests mock key discovery and token decoding; they do not call Auth0,
 Render, Supabase, Twelve Data, notification providers, or trading services.
 """
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import readonly_auth
 

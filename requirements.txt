@@ -5,3 +5,4 @@ gunicorn
 flask-cors
 itsdangerous
 pywebpush==2.0.3
+PyJWT[crypto]>=2.10,<3

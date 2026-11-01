@@ -51,7 +51,7 @@ body{
   border-radius:0;
   background:#080d0b
 }
-.status.ok{border-color:#28543a}.status.partial{border-color:#80602b}.status.error{border-color:#71323b}\n.status{
+.status{
   position:absolute;
   top:12px;
   right:12px;
@@ -349,7 +349,7 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
     src="./global-signal-header.jpg"
     alt="GLOBAL SIGNAL SCANNER — Trading Intelligence — Forex, Gold, Crypto"
   >
-  <div class="status" id="connectionStatus">
+  <div class="status">
     <span class="dot" id="dot"></span>
     <span id="status">Esperando conexión</span>
   </div>
@@ -915,25 +915,16 @@ async function update(){
     return;
   }
 
-  const connected=out.filter(x=>!x.marketClosed && !x.err);
-  const totalMarkets=out.length;
-  const connectedCount=connected.length;
-  const statusBox=document.getElementById("connectionStatus");
+  const fails=out.filter(x=>x.err).length;
 
-  statusBox.classList.remove("ok","partial","error");
-  if(connectedCount===totalMarkets && totalMarkets>0){
-    statusEl.textContent="Todos conectados";
-    statusBox.classList.add("ok");
-    dot.style.background="var(--green)";
-  }else if(connectedCount>0){
-    statusEl.textContent="Conexión parcial";
-    statusBox.classList.add("partial");
-    dot.style.background="var(--amber)";
-  }else{
-    statusEl.textContent="Sin conexión";
-    statusBox.classList.add("error");
-    dot.style.background="var(--red)";
-  }
+  statusEl.textContent=
+    fails===0
+      ?"Motor conectado"
+      :fails===markets.length
+        ?"Error de conexión"
+        :"Conexión parcial";
+
+  dot.style.background=fails===0?"var(--green)":"var(--red)";
   updated.textContent="Actualizado: "+
     new Date().toLocaleTimeString("es-ES");
 

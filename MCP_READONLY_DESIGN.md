@@ -6,7 +6,8 @@ The changes are not deployed and have not been run against the TEST service.
 Auth0 resource/M2M configuration and private environment variables are still
 pending. Review the code and test diff before any deployment.
 
-Target branch: `mcp-readonly-test`
+Target branch: `mcp-readonly-auth-test`
+Design parent branch: `mcp-readonly-test`
 Baseline: `8019244f244b06c3b5153a38aa56763899f4953a`
 
 ## Non-negotiable boundaries

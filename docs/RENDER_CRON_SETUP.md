@@ -26,3 +26,15 @@ Create a Cron Job in the same workspace and Frankfurt region as the production A
 - Never run this script manually against production during validation; use TEST with an explicitly authorized test window.
 - The scanner does not place broker orders. It only analyzes market data, records simulated signals, resolves simulated TP/SL outcomes, and sends alerts.
 - Monitor Twelve Data quota, Render job duration, Supabase errors and push delivery before increasing frequency.
+
+
+## Push delivery reliability
+
+- New signal events enqueue one outbox row per currently registered device.
+- The unique key `(event_fingerprint, endpoint)` prevents duplicate queue rows for the same event/device.
+- The scanner drains due pending rows after each scan cycle.
+- Transient failures retry with exponential backoff (5 minutes, doubling to a 6-hour cap), up to 8 attempts.
+- HTTP 404/410 marks a delivery dead and removes the expired subscription.
+- Successful deliveries are marked sent and are not selected again.
+- Delivery is at-least-once: if a push provider accepts a message but the subsequent database acknowledgement fails, a later retry can produce a duplicate. This is an unavoidable uncertain-delivery window without provider-side idempotency.
+- Apply migration `202611010003_push_delivery_outbox.sql` before enabling the scanner after approval.

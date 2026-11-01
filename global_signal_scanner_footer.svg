@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="340" viewBox="0 0 1600 340">
+<defs>
+ <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#06150d"/><stop offset=".48" stop-color="#020906"/><stop offset="1" stop-color="#0b2415"/></linearGradient>
+ <linearGradient id="edge" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#18c96c"/><stop offset=".48" stop-color="#83ffb4"/><stop offset="1" stop-color="#15994e"/></linearGradient>
+ <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f5fff8"/><stop offset=".18" stop-color="#8dffb8"/><stop offset=".42" stop-color="#159b54"/><stop offset=".68" stop-color="#eafff1"/><stop offset="1" stop-color="#08743b"/></linearGradient>
+ <linearGradient id="greenText" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#aaffc7"/><stop offset=".5" stop-color="#20e878"/><stop offset="1" stop-color="#00a94f"/></linearGradient>
+ <radialGradient id="glow"><stop stop-color="#31ff8b" stop-opacity=".65"/><stop offset="1" stop-color="#31ff8b" stop-opacity="0"/></radialGradient>
+ <filter id="soft"><feGaussianBlur stdDeviation="13"/></filter>
+ <filter id="shine"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+ <pattern id="dots" width="18" height="18" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="2" fill="#39e987" opacity=".45"/></pattern>
+</defs>
+<rect width="1600" height="340" rx="28" fill="url(#bg)"/>
+<ellipse cx="1000" cy="160" rx="430" ry="220" fill="url(#glow)" opacity=".23" filter="url(#soft)"/>
+<path d="M0 22Q0 0 28 0H1572Q1600 0 1600 28V312Q1600 340 1572 340H28Q0 340 0 312Z" fill="none" stroke="url(#edge)" stroke-width="4"/>
+<path d="M990 0H1240L1050 340H800Z" fill="#0d3c22" opacity=".22"/>
+<path d="M1090 0H1190L1000 340H900Z" fill="#19dc70" opacity=".13"/>
+<path d="M1145 0H1170L980 340H955Z" fill="#4cff9a" opacity=".8" filter="url(#shine)"/>
+<path d="M1210 0H1590V340H1010Z" fill="url(#dots)" opacity=".22"/>
+<path d="M0 300H1600" stroke="#0d5830" stroke-width="1" opacity=".5"/>
+<!-- metallic monogram -->
+<g transform="translate(58 43)" filter="url(#shine)">
+ <path d="M198 55C174 23 137 10 100 17C47 27 14 71 14 127C14 186 57 232 115 238C156 242 191 224 211 195L211 137H130V169H174C162 192 143 204 117 204C77 204 50 173 50 127C50 84 76 51 114 51C137 51 157 61 171 78Z" fill="url(#metal)" stroke="#d8ffe5" stroke-width="3"/>
+ <path d="M118 116H221V218H187V150H118Z" fill="#06150d" stroke="#6dffac" stroke-width="5"/>
+ <path d="M118 116H220L197 140H142V184H118Z" fill="url(#metal)"/>
+</g>
+<text x="315" y="132" fill="#f2fff6" font-family="Arial,Helvetica,sans-serif" font-size="54" font-weight="800" letter-spacing="-.8">GLOBAL</text>
+<text x="520" y="132" fill="url(#greenText)" font-family="Arial,Helvetica,sans-serif" font-size="54" font-weight="900" letter-spacing="-.8">SIGNAL SCANNER</text>
+<text x="320" y="187" fill="#b6d8c3" font-family="Arial,Helvetica,sans-serif" font-size="25" letter-spacing="10">TRADING INTELLIGENCE</text>
+<text x="320" y="245" fill="#e8fff0" font-family="Arial,Helvetica,sans-serif" font-size="28" letter-spacing="7">FOREX</text>
+<circle cx="458" cy="235" r="8" fill="#27f17f"/>
+<text x="490" y="245" fill="#e8fff0" font-family="Arial,Helvetica,sans-serif" font-size="28" letter-spacing="7">GOLD</text>
+<circle cx="625" cy="235" r="8" fill="#27f17f"/>
+<text x="660" y="245" fill="#e8fff0" font-family="Arial,Helvetica,sans-serif" font-size="28" letter-spacing="7">CRYPTO</text>
+<path d="M1000 170H1070" stroke="#36ff91" stroke-width="3" filter="url(#shine)"/>
+<circle cx="1067" cy="170" r="13" fill="#4cff98" filter="url(#shine)"/>
+<text x="1540" y="92" text-anchor="end" fill="#e9fff1" font-family="Arial,Helvetica,sans-serif" font-size="24" font-weight="600">Análisis técnico</text>
+<text x="1540" y="130" text-anchor="end" fill="#e9fff1" font-family="Arial,Helvetica,sans-serif" font-size="24">Datos en tiempo real</text>
+<text x="1540" y="168" text-anchor="end" fill="#e9fff1" font-family="Arial,Helvetica,sans-serif" font-size="24">Uso educativo</text>
+<rect x="1215" y="213" width="325" height="64" rx="32" fill="#07170d" stroke="#1f9f58" stroke-width="2"/>
+<circle cx="1258" cy="245" r="14" fill="#39f58b" filter="url(#shine)"/>
+<text x="1290" y="254" fill="#f1fff5" font-family="Arial,Helvetica,sans-serif" font-size="25">Sistema operativo</text>
+</svg>

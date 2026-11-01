@@ -41,10 +41,17 @@ def send_web_push(subscription, payload):
     if not VAPID_PUBLIC_KEY or not VAPID_PRIVATE_KEY:
         raise RuntimeError("Las claves Web Push aún no están configuradas.")
     from pywebpush import webpush
+    from py_vapid import Vapid
+    # Render guarda la clave privada como PEM en una variable de entorno.
+    # Convertirla a un objeto Vapid evita que pywebpush la interprete como DER.
+    if "-----BEGIN" in VAPID_PRIVATE_KEY:
+        vapid_key = Vapid.from_pem(VAPID_PRIVATE_KEY.encode("utf-8"))
+    else:
+        vapid_key = Vapid.from_string(VAPID_PRIVATE_KEY)
     return webpush(
         subscription_info=subscription,
         data=json.dumps(payload, ensure_ascii=False),
-        vapid_private_key=VAPID_PRIVATE_KEY,
+        vapid_private_key=vapid_key,
         vapid_claims={"sub": VAPID_SUBJECT},
     )
 

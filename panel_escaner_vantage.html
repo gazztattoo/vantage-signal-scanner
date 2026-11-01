@@ -1190,11 +1190,14 @@ enablePushButton.addEventListener("click",async()=>{
     if(!response.ok)throw new Error(result.error||"No se pudo guardar la suscripción.");
     pushStatus.textContent="Notificaciones activadas en este dispositivo";
     enablePushButton.textContent="🔔 Notificaciones activas";
+    enablePushButton.disabled=true;
+    disablePushButton.disabled=false;
     testPushButton.disabled=false;
   }catch(error){
     pushStatus.textContent=error.message||"No se pudieron activar las notificaciones.";
     await restorePushState();
   }finally{
+    await restorePushState();
     enablePushButton.disabled=false;
   }
 });

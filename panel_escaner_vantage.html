@@ -304,6 +304,8 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .app-nav{display:flex;gap:8px;overflow:visible;padding:9px;margin:0;border:1px solid #294536;border-radius:18px;background:rgba(5,14,9,.96);position:fixed;left:50%;bottom:calc(12px + env(safe-area-inset-bottom));transform:translateX(-50%);width:min(680px,calc(100% - 24px));z-index:1000;box-shadow:0 10px 35px rgba(0,0,0,.55),0 0 18px rgba(88,242,154,.08);backdrop-filter:blur(18px)}
 .app-nav button{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:9px 6px;background:transparent;color:var(--muted);border:1px solid transparent;border-radius:12px;font-size:11px}
 .app-nav button.active{background:#123b26;color:var(--green);border-color:#28543a}
+.app-nav .nav-icon{font-size:19px;line-height:1.05}
+.app-nav button span:last-child{font-size:10px}
 .app-view[hidden]{display:none!important}
 body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 .wrap{padding-bottom:calc(112px + env(safe-area-inset-bottom))}
@@ -354,9 +356,11 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 </header>
 
 <nav class="app-nav" aria-label="Navegación principal">
-  <button type="button" class="active" data-view="scanner"><span aria-hidden="true">◉</span><span>Scanner</span></button>
-  <button type="button" data-view="history"><span aria-hidden="true">▤</span><span>Historial</span></button>
-  <button type="button" data-view="performance"><span aria-hidden="true">↗</span><span>Rendimiento</span></button>
+  <button type="button" class="active" data-view="scanner"><span class="nav-icon" aria-hidden="true">⌗</span><span>Scanner</span></button>
+  <button type="button" data-view="analysis"><span class="nav-icon" aria-hidden="true">⌁</span><span>Análisis</span></button>
+  <button type="button" data-view="performance"><span class="nav-icon" aria-hidden="true">◷</span><span>Rendimiento</span></button>
+  <button type="button" data-view="history"><span class="nav-icon" aria-hidden="true">◴</span><span>Historial</span></button>
+  <button type="button" data-view="lab"><span class="nav-icon" aria-hidden="true">⚗</span><span>Lab</span></button>
 </nav>
 
 <div class="app-view" id="viewScanner">
@@ -438,6 +442,37 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
     <div id="performanceMessage" class="hint" style="margin-bottom:12px">Cargando estadísticas…</div>
     <div id="performanceStats" class="stat-grid"></div>
     <div id="performanceBreakdown" class="data-list" style="margin-top:12px"></div>
+  </div>
+</section>
+
+<section class="app-view" id="viewAnalysis" hidden>
+  <div class="data-panel">
+    <h2>Análisis técnico</h2>
+    <p>Consulta los indicadores del motor para un mercado y temporalidad. Los datos son análisis técnicos experimentales, no una garantía de resultado.</p>
+    <div class="data-toolbar">
+      <select id="analysisSymbol"><option value="EUR/USD">EUR/USD</option><option value="XAU/USD">XAU/USD</option><option value="BTC/USD">BTC/USD</option></select>
+      <select id="analysisTimeframe"><option value="5min">M5</option><option value="15min">M15</option><option value="30min">M30</option></select>
+      <button id="analysisRefresh" type="button">Analizar</button>
+    </div>
+    <div id="analysisMessage" class="hint" style="margin-bottom:12px">Selecciona un mercado para consultar sus indicadores.</div>
+    <div id="analysisResult" class="stat-grid"></div>
+  </div>
+</section>
+
+<section class="app-view" id="viewLab" hidden>
+  <div class="data-panel">
+    <h2>Signal Lab</h2>
+    <p>Laboratorio experimental del motor de confluencia. Aquí mostramos qué filtros utiliza el análisis; no se ejecutan operaciones ni se presentan resultados hipotéticos como rendimiento real.</p>
+    <div class="stat-grid">
+      <div class="stat-box"><span>Tendencia</span><strong>EMA 20 / 50</strong></div>
+      <div class="stat-box"><span>Momentum</span><strong>RSI 14 + MACD</strong></div>
+      <div class="stat-box"><span>Volatilidad</span><strong>ATR 14 + Bollinger</strong></div>
+      <div class="stat-box"><span>Fuerza</span><strong>ADX 14</strong></div>
+    </div>
+    <div class="empty-state" style="margin-top:12px">
+      <strong>Motor experimental</strong><br>
+      La señal exige confluencia de indicadores y filtros de fuerza. Las reglas todavía necesitan validación histórica y seguimiento de operaciones cerradas antes de considerar cualquier ventaja estadística demostrada.
+    </div>
   </div>
 </section>
 
@@ -900,13 +935,50 @@ async function update(){
 const viewButtons=[...document.querySelectorAll("[data-view]")];
 function switchView(name){
   viewButtons.forEach(button=>button.classList.toggle("active",button.dataset.view===name));
-  ["scanner","history","performance"].forEach(view=>{
+  ["scanner","analysis","performance","history","lab"].forEach(view=>{
     document.getElementById("view"+view[0].toUpperCase()+view.slice(1)).hidden=view!==name;
   });
   if(name==="history")loadHistory();
   if(name==="performance")loadPerformance();
+  if(name==="analysis")loadTechnicalAnalysis();
 }
 viewButtons.forEach(button=>button.addEventListener("click",()=>switchView(button.dataset.view)));
+
+async function loadTechnicalAnalysis(){
+  const message=document.getElementById("analysisMessage");
+  const result=document.getElementById("analysisResult");
+  const symbol=document.getElementById("analysisSymbol").value;
+  const interval=document.getElementById("analysisTimeframe").value;
+  message.textContent="Consultando indicadores…";result.innerHTML="";
+  try{
+    const params=new URLSearchParams({symbol,interval});
+    const response=await fetch(API_BASE+"/api/analysis?"+params,{headers:authHeaders()});
+    const data=await response.json().catch(()=>({}));
+    if(response.status===401){message.textContent="Sesión caducada. Vuelve a entrar al panel.";showAccessGate();return;}
+    if(!response.ok||data.error)throw new Error(data.error||"No se pudo obtener el análisis.");
+    const fields=[
+      ["Señal",first(data,["signal","direction","recommendation"])||"—"],
+      ["Precio",fmt(first(data,["price","entry"]),8)],
+      ["EMA 20",fmt(first(data,["ema20","ema_20"]),6)],
+      ["EMA 50",fmt(first(data,["ema50","ema_50"]),6)],
+      ["RSI 14",fmt(first(data,["rsi14","rsi_14","rsi"]),2)],
+      ["ADX 14",fmt(first(data,["adx14","adx_14"]),2)],
+      ["MACD",fmt(first(data,["macd"]),6)],
+      ["MACD histograma",fmt(first(data,["macd_histogram"]),6)],
+      ["Bollinger superior",fmt(first(data,["bb_upper","bollinger_upper"]),6)],
+      ["Bollinger media",fmt(first(data,["bb_middle","bollinger_middle"]),6)],
+      ["Bollinger inferior",fmt(first(data,["bb_lower","bollinger_lower"]),6)],
+      ["ATR 14",fmt(first(data,["atr14","atr_14","atr"]),6)],
+      ["Stop Loss",fmt(first(data,["stop_loss","sl"]),8)],
+      ["Take Profit",fmt(first(data,["take_profit","tp"]),8)]
+    ];
+    result.innerHTML=fields.map(([label,value])=>'<div class="stat-box"><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong></div>').join("");
+    message.textContent=symbol+" · "+({"5min":"M5","15min":"M15","30min":"M30"})[interval]+" · Datos recibidos del motor.";
+  }catch(error){message.textContent=error.message||"Error al consultar el análisis.";}
+}
+document.getElementById("analysisRefresh").addEventListener("click",loadTechnicalAnalysis);
+document.getElementById("analysisSymbol").addEventListener("change",loadTechnicalAnalysis);
+document.getElementById("analysisTimeframe").addEventListener("change",loadTechnicalAnalysis);
 
 function authHeaders(){return {"Authorization":"Bearer "+accessToken};}
 function statusClass(status){return status==="TP"?"tp":status==="SL"?"sl":"";}

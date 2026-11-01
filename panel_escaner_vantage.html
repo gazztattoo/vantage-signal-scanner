@@ -51,10 +51,17 @@ body{
   border-radius:0;
   background:#080d0b
 }
-.status{position:absolute;top:12px;right:12px;max-width:min(68%,300px);border:1px solid var(--line);background:rgba(13,23,17,.96);padding:8px 11px;border-radius:13px;font-size:12px;color:var(--muted);backdrop-filter:blur(10px)}
-.status-main{display:flex;align-items:center;gap:1px;font-weight:800;color:var(--text)}
-.status-detail{display:block;margin:4px 0 0 15px;font-size:10px;line-height:1.35;color:var(--muted);overflow-wrap:anywhere}
-.status.ok{border-color:#28543a}.status.partial{border-color:#80602b}.status.error{border-color:#71323b}
+.status{
+  position:absolute;
+  top:12px;
+  right:12px;
+  border:1px solid var(--line);
+  background:rgba(13,23,17,.94);
+  padding:9px 12px;
+  border-radius:99px;
+  font-size:12px;
+  color:var(--muted)
+}
 .dot{display:inline-block;width:8px;height:8px;background:var(--amber);border-radius:50%;margin-right:7px}
 .intro{color:var(--muted);font-size:14px;line-height:1.5;margin:16px 0}
 .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:17px}
@@ -326,7 +333,7 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
   .toolbar button{flex:1}
   .top{border-radius:12px}
   .brand-banner{transform:scale(1.22)}
-  .status{top:8px;right:8px;padding:7px 9px;font-size:10px;z-index:2;max-width:72%}.status-detail{font-size:9px}
+  .status{top:8px;right:8px;padding:7px 9px;font-size:10px;z-index:2}
 }
 </style>
 </head>
@@ -342,9 +349,9 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
     src="./global-signal-header.jpg"
     alt="GLOBAL SIGNAL SCANNER — Trading Intelligence — Forex, Gold, Crypto"
   >
-  <div class="status" id="connectionStatus" role="status" aria-live="polite">
-    <div class="status-main"><span class="dot" id="dot"></span><span id="status">Esperando conexión</span></div>
-    <span class="status-detail" id="statusDetail">Comprobando proveedores y sesiones</span>
+  <div class="status">
+    <span class="dot" id="dot"></span>
+    <span id="status">Esperando conexión</span>
   </div>
 </header>
 
@@ -911,7 +918,6 @@ async function update(){
   const closed=out.filter(x=>x.marketClosed).map(x=>x.m.symbol);
   const failures=out.filter(x=>!x.marketClosed && x.err);
   const active=out.filter(x=>!x.marketClosed && !x.err).map(x=>x.m.symbol);
-  const statusDetail=document.getElementById("statusDetail");
   const statusBox=document.getElementById("connectionStatus");
 
   statusBox.classList.remove("ok","partial","error");
@@ -922,13 +928,11 @@ async function update(){
     const parts=[];
     if(active.length)parts.push("Datos activos: "+active.join(", "));
     if(closed.length)parts.push("Mercados cerrados: "+closed.join(", "));
-    statusDetail.textContent=parts.join(" · ")||"Proveedores respondiendo correctamente";
   }else{
     statusEl.textContent=active.length?"Conexión parcial":"Error de conexión";
     statusBox.classList.add(active.length?"partial":"error");
     dot.style.background=active.length?"var(--amber)":"var(--red)";
     const failedNames=failures.map(x=>x.m.symbol);
-    statusDetail.textContent="Sin datos: "+failedNames.join(", ")+(closed.length?" · Cerrados: "+closed.join(", "):"");
   }
   updated.textContent="Actualizado: "+
     new Date().toLocaleTimeString("es-ES");

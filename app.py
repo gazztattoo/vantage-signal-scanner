@@ -2,7 +2,7 @@
 import os
 import json
 import requests
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -99,26 +99,84 @@ ALLOWED_SYMBOLS = {"EUR/USD", "XAU/USD", "BTC/USD"}
 ALLOWED_INTERVALS = {"5min", "15min", "30min"}
 
 CANARY_TZ = ZoneInfo("Atlantic/Canary")
+NEW_YORK_TZ = ZoneInfo("America/New_York")
+
+
+def vantage_server_time(now):
+    """Convierte UTC a la hora del servidor Vantage (GMT+2/GMT+3 por DST de EE. UU.)."""
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    utc_now = now.astimezone(timezone.utc)
+    new_york_dst = utc_now.astimezone(NEW_YORK_TZ).dst()
+    server_offset = 3 if new_york_dst and new_york_dst.total_seconds() else 2
+    server_tz = timezone(timedelta(hours=server_offset))
+    return utc_now.astimezone(server_tz), server_offset
 
 
 def market_session(symbol, now=None):
-    """Horario semanal orientativo de los mercados spot; BTC opera 24/7."""
+    """Comprueba las sesiones MT5 observadas para los símbolos Vantage del panel."""
     now = now or datetime.now(timezone.utc)
+    server_now, server_offset = vantage_server_time(now)
+    server_time_label = server_now.isoformat()
+
     if symbol == "BTC/USD":
-        return {"open": True, "status": "ABIERTO", "reason": "Mercado cripto 24/7"}
-    # Forex y oro spot: sesión habitual domingo 22:00 UTC a viernes 22:00 UTC.
-    # El horario exacto puede variar según el bróker y los festivos.
-    weekday = now.weekday()  # lunes=0, domingo=6
-    minute = now.hour * 60 + now.minute
-    open_now = (
-        (weekday == 6 and minute >= 22 * 60)
-        or (0 <= weekday <= 3)
-        or (weekday == 4 and minute < 22 * 60)
+        return {
+            "open": True,
+            "status": "ABIERTO",
+            "reason": (
+                "MT5 muestra sesiones de cotización 00:00-24:00 todos los días; "
+                "la captura no separa una sesión de trading."
+            ),
+            "server_time": server_time_label,
+            "server_utc_offset": f"UTC+{server_offset}",
+        }
+
+    schedules = {
+        # (hora de apertura, cierre lun-jue, cierre viernes), en minutos del servidor.
+        "EUR/USD": (1, 23 * 60 + 58, 23 * 60 + 57),
+        "XAU/USD": (61, 23 * 60 + 58, 23 * 60 + 57),
+    }
+    if symbol not in schedules:
+        return {
+            "open": False,
+            "status": "MERCADO CERRADO",
+            "reason": "Símbolo sin horario Vantage configurado.",
+            "server_time": server_time_label,
+            "server_utc_offset": f"UTC+{server_offset}",
+        }
+
+    weekday = server_now.weekday()  # lunes=0, domingo=6
+    if weekday >= 5:
+        return {
+            "open": False,
+            "status": "MERCADO CERRADO",
+            "reason": "Fin de semana según la sesión MT5 de Vantage.",
+            "server_time": server_time_label,
+            "server_utc_offset": f"UTC+{server_offset}",
+        }
+
+    start_minute, weekday_close, friday_close = schedules[symbol]
+    close_minute = friday_close if weekday == 4 else weekday_close
+    seconds_since_midnight = (
+        server_now.hour * 3600 + server_now.minute * 60 + server_now.second
     )
+    is_open = (
+        start_minute * 60 <= seconds_since_midnight < close_minute * 60
+    )
+
+    if is_open:
+        reason = "Dentro de la sesión de trading mostrada en MT5 Vantage."
+    elif seconds_since_midnight < start_minute * 60:
+        reason = "Pausa diaria: todavía no ha comenzado la sesión MT5."
+    else:
+        reason = "Pausa diaria o cierre semanal: la sesión MT5 ya terminó."
+
     return {
-        "open": open_now,
-        "status": "ABIERTO" if open_now else "MERCADO CERRADO",
-        "reason": "Sesión semanal habitual; confirma el horario de tu bróker"
+        "open": is_open,
+        "status": "ABIERTO" if is_open else "MERCADO CERRADO",
+        "reason": reason,
+        "server_time": server_time_label,
+        "server_utc_offset": f"UTC+{server_offset}",
     }
 
 

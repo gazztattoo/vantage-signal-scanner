@@ -304,7 +304,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .app-nav{display:flex;gap:8px;overflow:visible;padding:9px;margin:0;border:1px solid #294536;border-radius:18px;background:rgba(5,14,9,.96);position:fixed;left:50%;bottom:calc(12px + env(safe-area-inset-bottom));transform:translateX(-50%);width:min(680px,calc(100% - 24px));z-index:1000;box-shadow:0 10px 35px rgba(0,0,0,.55),0 0 18px rgba(88,242,154,.08);backdrop-filter:blur(18px)}
 .app-nav button{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:9px 6px;background:transparent;color:var(--muted);border:1px solid transparent;border-radius:12px;font-size:11px}
 .app-nav button.active{background:#123b26;color:var(--green);border-color:#28543a}
-.app-nav .nav-icon{font-size:19px;line-height:1.05}
+.app-nav .nav-icon{width:23px;height:23px;display:grid;place-items:center;color:currentColor;opacity:.88}.app-nav .nav-icon svg{display:block;width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.app-nav button.active .nav-icon{opacity:1}.app-nav button{transition:background .18s,border-color .18s,color .18s,transform .18s}.app-nav button:active{transform:scale(.96)}
 .app-nav button span:last-child{font-size:10px}
 .app-view[hidden]{display:none!important}
 body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
@@ -325,7 +325,7 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 .stat-box span{display:block;color:var(--muted);font-size:10px}
 .stat-box strong{display:block;font-size:22px;margin-top:5px}
 .empty-state{padding:22px 12px;text-align:center;border:1px dashed #31503d;border-radius:12px;color:var(--muted);font-size:12px;line-height:1.6}
-@media(max-width:560px){.app-nav{gap:2px;padding:6px}.app-nav button{min-width:0;padding:8px 2px;font-size:9px}.app-nav .nav-icon{font-size:18px}.app-nav button span:last-child{font-size:9px}.data-row{grid-template-columns:1fr 1fr}.data-row>div:last-child{grid-column:1/-1}.stat-box strong{font-size:19px}}
+@media(max-width:560px){.app-nav{gap:2px;padding:6px}.app-nav button{min-width:0;padding:8px 2px;font-size:9px}.app-nav .nav-icon{width:21px;height:21px}.app-nav .nav-icon svg{width:20px;height:20px}.app-nav button span:last-child{font-size:9px}.data-row{grid-template-columns:1fr 1fr}.data-row>div:last-child{grid-column:1/-1}.stat-box strong{font-size:19px}}
 
 @media(max-width:760px){
   .grid{grid-template-columns:1fr}
@@ -356,11 +356,11 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 </header>
 
 <nav class="app-nav" aria-label="Navegación principal">
-  <button type="button" class="active" data-view="scanner"><span class="nav-icon" aria-hidden="true">⌗</span><span>Scanner</span></button>
-  <button type="button" data-view="analysis"><span class="nav-icon" aria-hidden="true">⌁</span><span>Análisis</span></button>
-  <button type="button" data-view="performance"><span class="nav-icon" aria-hidden="true">◷</span><span>Rendimiento</span></button>
-  <button type="button" data-view="history"><span class="nav-icon" aria-hidden="true">◴</span><span>Historial</span></button>
-  <button type="button" data-view="lab"><span class="nav-icon" aria-hidden="true">⚗</span><span>Lab</span></button>
+  <button type="button" class="active" data-view="scanner" aria-label="Scanner"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></span><span>Scanner</span></button>
+  <button type="button" data-view="analysis" aria-label="Análisis"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 3v18M20 3v18M4 7h4v6H4zM10 5h4v11h-4zM16 9h4v7h-4z"/></svg></span><span>Análisis</span></button>
+  <button type="button" data-view="performance" aria-label="Rendimiento"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 20h18M5 16l5-5 3 2 6-7"/><path d="M14 6h5v5"/><path d="M5 20V17M10 20v-3M15 20v-5M20 20v-8"/></svg></span><span>Rendimiento</span></button>
+  <button type="button" data-view="history" aria-label="Historial"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"/><path d="M3 3v5h5M12 7v5l3.5 2"/></svg></span><span>Historial</span></button>
+  <button type="button" data-view="lab" aria-label="Lab"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5.5 9.2A2 2 0 0 0 6.2 21h11.6a2 2 0 0 0 1.7-2.8L14 9V3"/><path d="M8 15h8M10 12h4"/></svg></span><span>Lab</span></button>
 </nav>
 
 <div class="app-view" id="viewScanner">

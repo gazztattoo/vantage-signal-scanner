@@ -835,12 +835,14 @@ enablePushButton.addEventListener("click",async()=>{
     const keyData=await keyResponse.json();
     if(!keyResponse.ok||!keyData.public_key)throw new Error(keyData.error||"No se pudo obtener la clave pública.");
     let subscription=await registration.pushManager.getSubscription();
-    if(!subscription){
-      subscription=await registration.pushManager.subscribe({
-        userVisibleOnly:true,
-        applicationServerKey:urlBase64ToUint8Array(keyData.public_key)
-      });
+    if(subscription){
+      await subscription.unsubscribe();
+      subscription=null;
     }
+    subscription=await registration.pushManager.subscribe({
+      userVisibleOnly:true,
+      applicationServerKey:urlBase64ToUint8Array(keyData.public_key)
+    });
     const response=await fetch(PUSH_API+"/subscribe",{
       method:"POST",
       headers:{"Content-Type":"application/json","Authorization":"Bearer "+accessToken},

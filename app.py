@@ -27,7 +27,7 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_SECRET_KEY = os.environ.get("SUPABASE_SECRET_KEY", "")
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
-VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "mailto:admin@example.com")
+VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "").strip()
 
 def supabase_headers():
     if not SUPABASE_URL or not SUPABASE_SECRET_KEY:
@@ -38,8 +38,8 @@ def supabase_headers():
     }
 
 def send_web_push(subscription, payload):
-    if not VAPID_PUBLIC_KEY or not VAPID_PRIVATE_KEY:
-        raise RuntimeError("Las claves Web Push aún no están configuradas.")
+    if not VAPID_PUBLIC_KEY or not VAPID_PRIVATE_KEY or not VAPID_SUBJECT:
+        raise RuntimeError("Falta configurar VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY o VAPID_SUBJECT.")
     from pywebpush import webpush
     from py_vapid import Vapid
     # Render guarda la clave privada como PEM en una variable de entorno.
@@ -944,6 +944,8 @@ def push_test():
         if response.status_code != 200:
             return jsonify({"error": "No se pudieron consultar las suscripciones."}), 502
         subscriptions = response.json()
+        if not subscriptions:
+            return jsonify({"error": "Este dispositivo no tiene una suscripción push guardada."}), 404
         sent = 0
         expired = []
         failures = []
@@ -1325,7 +1327,7 @@ def push_scan():
                                     send_web_push(subscription, {
                                         "title": f"GLOBAL SIGNAL · {direction}",
                                         "body": alert_body,
-                                        "tag": "gss-" + symbol.replace("/", "") + "-" + interval,
+                                        "tag": "gss-" + symbol.replace("/", "") + "-" + interval + "-" + requests.utils.quote(candle_time, safe=""),
                                         "url": ("https://vantage-signal-scanner.onrender.com/panel_escaner_vantage.html?view=scanner&symbol=" + requests.utils.quote(symbol, safe="") + "&timeframe=" + requests.utils.quote(interval, safe="")),
                                         "data": {
                                             "symbol": symbol, "interval": interval,

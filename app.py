@@ -1105,6 +1105,84 @@ def resolve_pending_signal_outcomes(symbol, interval, recent_candles):
 
 SIGNAL_CRON_SECRET = os.environ.get("SIGNAL_CRON_SECRET", "")
 
+def process_pending_push_deliveries(limit=100):
+    """Envía la cola pendiente por dispositivo sin repetir entregas confirmadas."""
+    summary = {"sent": 0, "retrying": 0, "dead": 0, "errors": 0}
+    try:
+        response = requests.get(
+            SUPABASE_URL + "/rest/v1/push_delivery_outbox",
+            params={
+                "select": "id,endpoint,subscription,payload,attempts",
+                "status": "eq.pending",
+                "next_attempt_at": "lte." + datetime.now(timezone.utc).isoformat(),
+                "order": "created_at.asc",
+                "limit": str(limit),
+            },
+            headers=supabase_headers(),
+            timeout=15,
+        )
+        if response.status_code != 200:
+            summary["errors"] += 1
+            return summary
+        for item in response.json():
+            row_id = item.get("id")
+            endpoint = item.get("endpoint")
+            attempts = int(item.get("attempts") or 0) + 1
+            try:
+                send_web_push(item.get("subscription") or {}, item.get("payload") or {})
+                update = {
+                    "status": "sent",
+                    "attempts": attempts,
+                    "delivered_at": datetime.now(timezone.utc).isoformat(),
+                    "last_error": None,
+                }
+                summary["sent"] += 1
+            except Exception as exc:
+                response_obj = getattr(exc, "response", None)
+                status_code = getattr(response_obj, "status_code", None)
+                if status_code in (404, 410):
+                    update = {
+                        "status": "dead", "attempts": attempts,
+                        "last_error": "Suscripción caducada (HTTP %s)." % status_code,
+                    }
+                    summary["dead"] += 1
+                    if endpoint:
+                        requests.delete(
+                            SUPABASE_URL + "/rest/v1/push_subscriptions",
+                            params={"endpoint": "eq." + endpoint},
+                            headers=supabase_headers(), timeout=10,
+                        )
+                elif attempts >= 8:
+                    update = {
+                        "status": "dead", "attempts": attempts,
+                        "last_error": "Máximo de 8 intentos alcanzado: " + str(exc)[:500],
+                    }
+                    summary["dead"] += 1
+                else:
+                    delay_minutes = min(5 * (2 ** (attempts - 1)), 360)
+                    update = {
+                        "status": "pending", "attempts": attempts,
+                        "next_attempt_at": (
+                            datetime.now(timezone.utc) + timedelta(minutes=delay_minutes)
+                        ).isoformat(),
+                        "last_error": str(exc)[:500],
+                    }
+                    summary["retrying"] += 1
+            saved = requests.patch(
+                SUPABASE_URL + "/rest/v1/push_delivery_outbox",
+                params={"id": "eq." + str(row_id)},
+                headers={**supabase_headers(), "Prefer": "return=minimal"},
+                json=update,
+                timeout=15,
+            )
+            if saved.status_code not in (200, 204):
+                summary["errors"] += 1
+        return summary
+    except (RuntimeError, requests.RequestException, ValueError, TypeError):
+        summary["errors"] += 1
+        return summary
+
+
 @app.route("/api/push/scan", methods=["POST"])
 def push_scan():
     supplied = request.headers.get("X-Scanner-Cron-Secret", "")
@@ -1297,86 +1375,86 @@ def push_scan():
                             f"TP {display_price(data.get('take_profit'))}"
                         )
 
+                        # Crear una entrega independiente por dispositivo. La clave única
+                        # (event_fingerprint, endpoint) hace idempotente la cola.
                         subs_response = requests.get(
-                            SUPABASE_URL + "/rest/v1/push_subscriptions?select=subscription",
+                            SUPABASE_URL + "/rest/v1/push_subscriptions?select=endpoint,subscription",
                             headers=supabase_headers(), timeout=15,
                         )
                         if subs_response.status_code != 200:
-                            # Quitar el estado provisional para permitir reintento
-                            # en el siguiente ciclo si falla la lectura de dispositivos.
-                            requests.delete(
-                                SUPABASE_URL + "/rest/v1/signal_alerts",
-                                params={"market": "eq." + symbol, "timeframe": "eq." + interval,
-                                        "fingerprint": "eq." + fingerprint},
-                                headers=supabase_headers(), timeout=10,
-                            )
                             results.append({
                                 "symbol": symbol, "interval": interval,
                                 "status": "subscription_read_error"
                             })
                         else:
                             subscriptions = subs_response.json()
-                            delivered = 0
-                            failed = 0
-                            expired = []
+                            price_digits = 5 if symbol == "EUR/USD" else 2
+
+                            def display_price(value):
+                                return f"{float(value):,.{price_digits}f}" if value is not None else "—"
+
+                            short_interval = {
+                                "5min": "M5", "15min": "M15", "30min": "M30"
+                            }.get(interval, interval)
+                            alert_body = (
+                                f"{symbol} · {short_interval} | "
+                                f"Entrada {display_price(data.get('entry'))} · "
+                                f"SL {display_price(data.get('stop_loss'))} · "
+                                f"TP {display_price(data.get('take_profit'))}"
+                            )
+                            queued = 0
                             for row in subscriptions:
+                                endpoint = row.get("endpoint")
                                 subscription = row.get("subscription")
-                                if not isinstance(subscription, dict):
+                                if not endpoint or not isinstance(subscription, dict):
                                     continue
-                                try:
-                                    send_web_push(subscription, {
-                                        "title": f"GLOBAL SIGNAL · {direction}",
-                                        "body": alert_body,
-                                        "tag": "gss-" + symbol.replace("/", "") + "-" + interval + "-" + requests.utils.quote(candle_time, safe=""),
-                                        "url": ("https://vantage-signal-scanner.onrender.com/panel_escaner_vantage.html?view=scanner&symbol=" + requests.utils.quote(symbol, safe="") + "&timeframe=" + requests.utils.quote(interval, safe="")),
-                                        "data": {
-                                            "symbol": symbol, "interval": interval,
-                                            "direction": direction,
-                                            "entry": data.get("entry"),
-                                            "stop_loss": data.get("stop_loss"),
-                                            "take_profit": data.get("take_profit"),
-                                        },
-                                    })
-                                    delivered += 1
-                                except Exception as exc:
-                                    failed += 1
-                                    response_obj = getattr(exc, "response", None)
-                                    if getattr(response_obj, "status_code", None) in (404, 410):
-                                        expired.append(subscription.get("endpoint", ""))
-
-                            for endpoint in expired:
-                                if endpoint:
-                                    requests.delete(
-                                        SUPABASE_URL + "/rest/v1/push_subscriptions?endpoint=eq." + requests.utils.quote(endpoint, safe=""),
-                                        headers=supabase_headers(), timeout=10,
-                                    )
-
-                            # Si había dispositivos pero todos rechazaron el envío,
-                            # borrar el estado provisional permite reintentar en el próximo ciclo.
-                            # Si al menos un dispositivo recibió el aviso, se conserva para
-                            # evitar duplicarlo en los dispositivos que sí lo recibieron.
-                            if subscriptions and delivered == 0 and failed > 0:
-                                requests.delete(
-                                    SUPABASE_URL + "/rest/v1/signal_alerts",
-                                    params={"market": "eq." + symbol, "timeframe": "eq." + interval,
-                                            "fingerprint": "eq." + fingerprint},
-                                    headers=supabase_headers(), timeout=10,
+                                payload = {
+                                    "title": f"GLOBAL SIGNAL · {direction}",
+                                    "body": alert_body,
+                                    "tag": "gss-" + symbol.replace("/", "") + "-" + interval + "-" + requests.utils.quote(candle_time, safe=""),
+                                    "url": ("https://vantage-signal-scanner.onrender.com/panel_escaner_vantage.html?view=scanner&symbol=" + requests.utils.quote(symbol, safe="") + "&timeframe=" + requests.utils.quote(interval, safe="")),
+                                    "data": {
+                                        "symbol": symbol, "interval": interval,
+                                        "direction": direction,
+                                        "entry": data.get("entry"),
+                                        "stop_loss": data.get("stop_loss"),
+                                        "take_profit": data.get("take_profit"),
+                                    },
+                                }
+                                queue_response = requests.post(
+                                    SUPABASE_URL + "/rest/v1/push_delivery_outbox?on_conflict=event_fingerprint,endpoint",
+                                    headers={
+                                        **supabase_headers(),
+                                        "Prefer": "resolution=ignore-duplicates,return=minimal",
+                                    },
+                                    json={
+                                        "event_fingerprint": fingerprint,
+                                        "endpoint": endpoint,
+                                        "subscription": subscription,
+                                        "payload": payload,
+                                        "status": "pending",
+                                    },
+                                    timeout=15,
                                 )
-
-                            sent_total += delivered
+                                if queue_response.status_code in (200, 201, 204):
+                                    queued += 1
                             results.append({
                                 "symbol": symbol, "interval": interval,
-                                "status": (
-                                    "new_signal_notified" if delivered
-                                    else ("new_signal_retry_scheduled" if failed else "new_signal_no_delivery")
-                                ),
-                                "devices": delivered,
-                                "failed_devices": failed
+                                "status": "delivery_queued" if queued else "new_signal_no_subscribers",
+                                "devices_queued": queued
                             })
+
             if index < 8:
                 time.sleep(8)
 
-    return jsonify({"ok": True, "alerts_sent": sent_total, "checks": results})
+    delivery_summary = process_pending_push_deliveries()
+    sent_total += delivery_summary["sent"]
+    return jsonify({
+        "ok": True,
+        "alerts_sent": sent_total,
+        "delivery_queue": delivery_summary,
+        "checks": results
+    })
 
 
 if __name__ == "__main__":

@@ -1046,8 +1046,10 @@ async function loadHistory(){
   if(timeframe){params.set("timeframe",timeframe);document.getElementById("historyTimeframe").value=timeframe;}
   if(candleTime)params.set("candle_time",candleTime);
   if(state)params.set("status",state);
+  const controller=new AbortController();
+  const timeoutId=setTimeout(()=>controller.abort(),60000);
   try{
-    const response=await fetch(API_BASE+"/api/history?"+params,{headers:authHeaders()});
+    const response=await fetch(API_BASE+"/api/history?"+params,{headers:authHeaders(),signal:controller.signal});
     const data=await response.json().catch(()=>({}));
     if(response.status===401){message.textContent="Sesión caducada. Vuelve a entrar al panel.";showAccessGate();return;}
     if(!response.ok)throw new Error(data.error||"No se pudo cargar el historial.");
@@ -1059,7 +1061,14 @@ async function loadHistory(){
       const timeframeLabel=({"5min":"M5","15min":"M15","30min":"M30"})[row.timeframe]||row.timeframe;
       return '<article class="data-row"><div><span>Mercado · '+esc(timeframeLabel)+'</span><strong>'+esc(row.symbol)+' · '+esc(row.direction)+'</strong><span>'+esc(date)+'</span></div><div><span>Entrada</span><strong>'+fmt(row.entry_price,8)+'</strong><span>SL '+fmt(row.stop_loss,8)+'</span></div><div><span>Take profit</span><strong>'+fmt(row.take_profit,8)+'</strong><span class="data-status '+statusClass(row.status)+'">'+esc(row.status)+'</span></div></article>';
     }).join("");
-  }catch(error){message.textContent=error.message||"Error al consultar el historial.";list.innerHTML="";}
+  }catch(error){
+    message.textContent=error.name==="AbortError"
+      ?"El servidor tardó demasiado en responder. Pulsa Actualizar para intentarlo de nuevo."
+      :(error.message||"Error al consultar el historial.");
+    list.innerHTML="";
+  }finally{
+    clearTimeout(timeoutId);
+  }
 }
 async function loadPerformance(){
   const message=document.getElementById("performanceMessage");

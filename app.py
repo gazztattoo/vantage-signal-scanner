@@ -718,7 +718,7 @@ def push_scan():
                         # Registrar el cambio de estado ANTES del push para impedir
                         # que el siguiente ciclo vuelva a enviar la misma alerta.
                         insert_response = requests.post(
-                            SUPABASE_URL + "/rest/v1/signal_alerts?on_conflict=fingerprint",
+                            SUPABASE_URL + "/rest/v1/signal_alerts?on_conflict=market,timeframe,fingerprint",
                             headers={
                                 **supabase_headers(),
                                 "Prefer": "resolution=ignore-duplicates,return=representation",

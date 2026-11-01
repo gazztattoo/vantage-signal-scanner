@@ -100,6 +100,37 @@ ALLOWED_INTERVALS = {"5min", "15min", "30min"}
 
 CANARY_TZ = ZoneInfo("Atlantic/Canary")
 
+
+def market_session(symbol, now=None):
+    """Horario semanal orientativo de los mercados spot; BTC opera 24/7."""
+    now = now or datetime.now(timezone.utc)
+    if symbol == "BTC/USD":
+        return {"open": True, "status": "ABIERTO", "reason": "Mercado cripto 24/7"}
+    # Forex y oro spot: sesión habitual domingo 22:00 UTC a viernes 22:00 UTC.
+    # El horario exacto puede variar según el bróker y los festivos.
+    weekday = now.weekday()  # lunes=0, domingo=6
+    minute = now.hour * 60 + now.minute
+    open_now = (
+        (weekday == 6 and minute >= 22 * 60)
+        or (0 <= weekday <= 3)
+        or (weekday == 4 and minute < 22 * 60)
+    )
+    return {
+        "open": open_now,
+        "status": "ABIERTO" if open_now else "MERCADO CERRADO",
+        "reason": "Sesión semanal habitual; confirma el horario de tu bróker"
+    }
+
+
+@app.route("/api/market-status", methods=["GET"])
+def market_status():
+    now = datetime.now(timezone.utc)
+    return jsonify({
+        "checked_at": now.isoformat(),
+        "markets": {symbol: market_session(symbol, now) for symbol in sorted(ALLOWED_SYMBOLS)}
+    })
+
+
 INTERVAL_MINUTES = {
     "5min": 5,
     "15min": 15,
@@ -620,6 +651,17 @@ def push_scan():
         for index, (symbol, interval) in enumerate(
             (pair for interval in intervals for pair in [(s, interval) for s in symbols])
         ):
+            session = market_session(symbol)
+            if not session["open"]:
+                results.append({
+                    "symbol": symbol, "interval": interval,
+                    "status": "market_closed",
+                    "detail": "Mercado cerrado: no se analiza ni se envían alertas."
+                })
+                if index < 8:
+                    time.sleep(8)
+                continue
+
             response = client.get(
                 "/api/analysis",
                 query_string={"symbol": symbol, "interval": interval},

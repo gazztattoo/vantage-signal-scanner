@@ -636,6 +636,12 @@ def signal_history():
                 return jsonify({"error": "Filtro no permitido: " + query_name}), 400
             params[column] = "eq." + value
 
+    candle_time = (request.args.get("candle_time") or "").strip()
+    if candle_time:
+        if len(candle_time) > 64:
+            return jsonify({"error": "Fecha de vela no válida."}), 400
+        params["candle_time"] = "eq." + candle_time
+
     try:
         response = requests.get(
             SUPABASE_URL + "/rest/v1/signal_history",

@@ -1148,7 +1148,7 @@ def push_scan():
                                             "title": f"GLOBAL SIGNAL · {direction}",
                                             "body": alert_body,
                                             "tag": "gss-" + symbol.replace("/", "") + "-" + interval,
-                                            "url": "https://vantage-signal-scanner.onrender.com/",
+                                            "url": ("https://global-signal-push-test-panel.onrender.com/panel_escaner_vantage.html?view=history&symbol=" + requests.utils.quote(symbol, safe="") + "&timeframe=" + requests.utils.quote(interval, safe="") + "&candle_time=" + requests.utils.quote(str(data.get("candle_time") or ""), safe="")),
                                             "data": {
                                                 "symbol": symbol, "interval": interval,
                                                 "direction": direction,

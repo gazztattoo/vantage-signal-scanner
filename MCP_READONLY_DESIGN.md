@@ -57,3 +57,31 @@ The Supabase service-role key must never be placed in the MCP service.
 - Static scan confirming no secrets are committed.
 - Review the complete diff and deployment plan with the user.
 - Keep the MCP service separate from the existing panel and API services.
+
+
+## OAuth role clarification (verified against MCP SDK v2 docs)
+- Auth0 is the external authorization server / identity provider.
+- The MCP service is an OAuth resource server. It validates bearer access tokens;
+  it must not issue tokens or run a custom login/token endpoint.
+- The MCP service must publish Protected Resource Metadata (RFC 9728) and
+  advertise its Auth0 issuer and the read-only scope.
+- The Auth0 application created in the dashboard is not yet configured:
+  callback/logout/origin fields must remain blank until the public MCP URL and
+  the exact OAuth client-registration approach are confirmed.
+- Do not reveal or copy the Auth0 Client Secret into chat or commit it to GitHub.
+- Before completing Auth0 setup, verify that the selected Auth0 tenant supports
+  the client-registration method ChatGPT expects (Dynamic Client Registration
+  or Client ID Metadata Documents). Do not assume the Regular Web application
+  by itself completes MCP OAuth.
+
+## Current verified API boundary
+- `/api/health` and `/api/market-status` are public GET endpoints.
+- `/api/analysis`, `/api/price`, `/api/history`, `/api/performance`,
+  and `/api/lab-status` are behind the same signed panel bearer token.
+- The current API access middleware also protects push subscribe/test/unsubscribe
+  routes with that same token. Therefore the token is broader than read-only.
+- The MCP service must not call `/api/access`, because that would require the
+  panel access code and mint the broad panel token.
+- No MCP implementation should be connected to the protected routes until a
+  separate read-only credential/authorization boundary is implemented and tested
+  in TEST, with no access to push or mutation routes.

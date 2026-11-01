@@ -405,6 +405,7 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 
 <section class="toolbar" aria-label="Notificaciones">
   <button id="enablePush" type="button">🔔 Activar notificaciones</button>
+  <button id="disablePush" type="button" disabled>🔕 Desactivar notificaciones</button>
   <button id="testPush" type="button" disabled>Enviar notificación de prueba</button>
   <span class="hint" id="pushStatus">Notificaciones desactivadas</span>
 </section>
@@ -1108,6 +1109,7 @@ if(accessToken){hideAccessGate();update();}else{showAccessGate();statusEl.textCo
 
 const pushStatus=document.getElementById("pushStatus");
 const enablePushButton=document.getElementById("enablePush");
+const disablePushButton=document.getElementById("disablePush");
 const testPushButton=document.getElementById("testPush");
 const PUSH_API=API_BASE+"/api/push";
 
@@ -1125,18 +1127,27 @@ async function restorePushState(){
         ?"Notificaciones bloqueadas en los ajustes del dispositivo"
         :"Notificaciones desactivadas";
       testPushButton.disabled=true;
+      enablePushButton.disabled=false;
+      disablePushButton.disabled=true;
       return;
     }
     if(subscription){
       pushStatus.textContent="Notificaciones activadas en este dispositivo";
       enablePushButton.textContent="🔔 Notificaciones activas";
+      enablePushButton.disabled=true;
+      disablePushButton.disabled=false;
       testPushButton.disabled=false;
     }else{
       pushStatus.textContent="Permiso concedido, pero falta activar la suscripción";
+      enablePushButton.textContent="🔔 Activar notificaciones";
+      enablePushButton.disabled=false;
+      disablePushButton.disabled=true;
       testPushButton.disabled=true;
     }
   }catch(error){
     pushStatus.textContent="No se pudo comprobar el estado de las notificaciones";
+    enablePushButton.disabled=false;
+    disablePushButton.disabled=true;
     testPushButton.disabled=true;
   }
 }
@@ -1185,6 +1196,32 @@ enablePushButton.addEventListener("click",async()=>{
     await restorePushState();
   }finally{
     enablePushButton.disabled=false;
+  }
+});
+
+disablePushButton.addEventListener("click",async()=>{
+  disablePushButton.disabled=true;
+  pushStatus.textContent="Desactivando notificaciones en este dispositivo…";
+  try{
+    if(!accessToken)throw new Error("Primero debes entrar al scanner.");
+    const registration=await navigator.serviceWorker.ready;
+    const subscription=await registration.pushManager.getSubscription();
+    if(!subscription)throw new Error("No hay una suscripción activa en este dispositivo.");
+    const response=await fetch(PUSH_API+"/unsubscribe",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+accessToken},
+      body:JSON.stringify({endpoint:subscription.endpoint})
+    });
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(result.error||"No se pudo eliminar la suscripción del servidor.");
+    await subscription.unsubscribe();
+    pushStatus.textContent="Notificaciones desactivadas en este dispositivo.";
+    enablePushButton.textContent="🔔 Activar notificaciones";
+    testPushButton.disabled=true;
+  }catch(error){
+    pushStatus.textContent=error.message||"No se pudieron desactivar las notificaciones.";
+  }finally{
+    await restorePushState();
   }
 });
 

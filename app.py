@@ -659,48 +659,109 @@ def signal_history():
 
 @app.route("/api/performance", methods=["GET"])
 def signal_performance():
-    """Calcula estadísticas solo con operaciones cerradas y resultados guardados."""
+    """Estadísticas de señales simuladas, basadas exclusivamente en resultados guardados."""
     try:
-        response = requests.get(
-            SUPABASE_URL + "/rest/v1/signal_history",
-            params={
-                "select": "symbol,timeframe,direction,status,result_r,closed_at",
-                "status": "in.(TP,SL)",
-                "order": "closed_at.desc",
-                "limit": "1000",
-            },
-            headers=supabase_headers(),
-            timeout=15,
-        )
-        if response.status_code != 200:
-            return jsonify({"error": "No se pudieron consultar los resultados."}), 502
+        rows = []
+        page_size = 1000
+        offset = 0
+        # Paginar para que el crecimiento del historial no corte silenciosamente
+        # la muestra en el límite por defecto de PostgREST.
+        while offset < 20000:
+            response = requests.get(
+                SUPABASE_URL + "/rest/v1/signal_history",
+                params={
+                    "select": "symbol,timeframe,direction,status,result_r,closed_at",
+                    "order": "signal_at.asc",
+                    "limit": str(page_size),
+                    "offset": str(offset),
+                },
+                headers=supabase_headers(),
+                timeout=20,
+            )
+            if response.status_code != 200:
+                return jsonify({"error": "No se pudo consultar el historial de señales."}), 502
+            batch = response.json()
+            rows.extend(batch)
+            if len(batch) < page_size:
+                break
+            offset += page_size
 
-        rows = response.json()
         wins = sum(1 for row in rows if row.get("status") == "TP")
         losses = sum(1 for row in rows if row.get("status") == "SL")
+        pending = sum(1 for row in rows if row.get("status") == "PENDIENTE")
+        expired = sum(1 for row in rows if row.get("status") == "CADUCADA")
+        cancelled = sum(1 for row in rows if row.get("status") == "CANCELADA")
         closed = wins + losses
         r_values = [
             float(row["result_r"]) for row in rows
-            if row.get("result_r") is not None
+            if row.get("status") in ("TP", "SL") and row.get("result_r") is not None
         ]
+        positive_r = sum(value for value in r_values if value > 0)
+        negative_r = abs(sum(value for value in r_values if value < 0))
+        average_r = (sum(r_values) / len(r_values)) if r_values else None
         breakdown = {}
+        direction_breakdown = {}
         for row in rows:
+            status = row.get("status")
             key = row["symbol"] + " · " + row["timeframe"]
-            item = breakdown.setdefault(key, {"wins": 0, "losses": 0, "closed": 0})
-            item["wins" if row.get("status") == "TP" else "losses"] += 1
-            item["closed"] += 1
+            item = breakdown.setdefault(key, {
+                "total": 0, "pending": 0, "wins": 0, "losses": 0,
+                "expired": 0, "cancelled": 0, "closed": 0
+            })
+            item["total"] += 1
+            if status == "PENDIENTE":
+                item["pending"] += 1
+            elif status == "TP":
+                item["wins"] += 1
+                item["closed"] += 1
+            elif status == "SL":
+                item["losses"] += 1
+                item["closed"] += 1
+            elif status == "CADUCADA":
+                item["expired"] += 1
+            elif status == "CANCELADA":
+                item["cancelled"] += 1
 
+            direction = row.get("direction") or "SIN DIRECCIÓN"
+            side = direction_breakdown.setdefault(direction, {
+                "total": 0, "wins": 0, "losses": 0, "closed": 0
+            })
+            side["total"] += 1
+            if status == "TP":
+                side["wins"] += 1
+                side["closed"] += 1
+            elif status == "SL":
+                side["losses"] += 1
+                side["closed"] += 1
+
+        sample_size = len(r_values)
+        sample_note = (
+            "Muestra inicial: todavía hacen falta más resultados cerrados para valorar la estrategia."
+            if sample_size < 30 else
+            "Muestra en desarrollo: conviene acumular al menos 100 resultados y comprobar estabilidad por mercado."
+            if sample_size < 100 else
+            "Muestra de 100 o más resultados; sigue siendo necesario validar por mercado y en distintos periodos."
+        )
         return jsonify({
+            "total_signals": len(rows),
             "closed_trades": closed,
+            "pending": pending,
+            "expired": expired,
+            "cancelled": cancelled,
             "wins": wins,
             "losses": losses,
             "win_rate": round((wins / closed) * 100, 2) if closed else None,
-            "average_r": round(sum(r_values) / len(r_values), 4) if r_values else None,
-            "pending_and_unresolved_excluded": True,
+            "average_r": round(average_r, 4) if average_r is not None else None,
+            "expectancy_r": round(average_r, 4) if average_r is not None else None,
+            "profit_factor": round(positive_r / negative_r, 4) if negative_r > 0 else (None if positive_r == 0 else "inf"),
+            "sample_size": sample_size,
+            "sample_note": sample_note,
             "breakdown": breakdown,
-            "note": "Solo incluye operaciones cerradas con estado TP o SL; no representa rentabilidad garantizada.",
+            "direction_breakdown": direction_breakdown,
+            "note": "Estadísticas de señales simuladas del scanner. TP/SL se evalúan con velas OHLC cerradas; no son operaciones reales ni garantizan rentabilidad.",
+            "truncated": len(rows) >= 20000,
         })
-    except (RuntimeError, requests.RequestException, ValueError, TypeError):
+    except (RuntimeError, requests.RequestException, ValueError, TypeError, KeyError):
         return jsonify({"error": "No se pudieron calcular las estadísticas."}), 502
 
 

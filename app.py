@@ -924,9 +924,9 @@ def push_test():
 
 
 def resolve_pending_signal_outcomes(symbol, interval, recent_candles):
-    """Cierra señales del escáner usando velas cerradas posteriores a la vela de señal."""
+    """Cierra TP/SL o caduca señales tras 24 velas cerradas posteriores."""
     if not recent_candles:
-        return {"resolved": 0, "errors": 0}
+        return {"resolved": 0, "expired": 0, "errors": 0}
 
     response = requests.get(
         SUPABASE_URL + "/rest/v1/signal_history",
@@ -941,12 +941,14 @@ def resolve_pending_signal_outcomes(symbol, interval, recent_candles):
         headers=supabase_headers(), timeout=15,
     )
     if response.status_code != 200:
-        return {"resolved": 0, "errors": 1}
+        return {"resolved": 0, "expired": 0, "errors": 1}
 
     pending = response.json()
     resolved = 0
+    expired = 0
     errors = 0
     interval_seconds = INTERVAL_MINUTES[interval] * 60
+    max_lifetime_candles = 24
 
     for signal in pending:
         try:
@@ -955,13 +957,15 @@ def resolve_pending_signal_outcomes(symbol, interval, recent_candles):
             target = float(signal["take_profit"])
             direction = signal["direction"]
             outcome = None
-            exit_price = None
             closing_candle = None
+            candles_elapsed = 0
 
             for candle in recent_candles:
                 candle_time = datetime.fromisoformat(str(candle["time"]).replace("Z", "+00:00"))
                 if candle_time <= signal_time:
                     continue
+
+                candles_elapsed += 1
                 high = float(candle["high"])
                 low = float(candle["low"])
                 if direction == "COMPRA":
@@ -974,41 +978,65 @@ def resolve_pending_signal_outcomes(symbol, interval, recent_candles):
                 # Si ambos niveles aparecen tocados en la misma vela OHLC,
                 # se aplica el criterio conservador: SL primero.
                 if hit_sl:
-                    outcome, exit_price, closing_candle = "SL", stop, candle
+                    outcome, closing_candle = "SL", candle
                     break
                 if hit_tp:
-                    outcome, exit_price, closing_candle = "TP", target, candle
+                    outcome, closing_candle = "TP", candle
+                    break
+                if candles_elapsed >= max_lifetime_candles:
+                    closing_candle = candle
+                    outcome = "CADUCADA"
                     break
 
             if not outcome:
                 continue
 
             close_time = datetime.fromisoformat(str(closing_candle["time"]).replace("Z", "+00:00"))
-            closed_at = (close_time.timestamp() + interval_seconds)
-            closed_iso = datetime.fromtimestamp(closed_at, timezone.utc).isoformat()
+            closed_at = datetime.fromtimestamp(
+                close_time.timestamp() + interval_seconds, timezone.utc
+            ).isoformat()
+            close_high = float(closing_candle["high"])
+            close_low = float(closing_candle["low"])
+            close_price = float(closing_candle["close"])
+            is_expired = outcome == "CADUCADA"
+
+            patch_data = {
+                "status": outcome,
+                "exit_price": None if is_expired else (stop if outcome == "SL" else target),
+                "closed_at": closed_at,
+                "result_r": None if is_expired else (2.0 if outcome == "TP" else -1.0),
+                "result_source": (
+                    "CADUCADA tras 24 velas cerradas posteriores a la señal; "
+                    "sin tocar TP ni SL."
+                    if is_expired else
+                    "Velas OHLC cerradas posteriores a la señal; "
+                    "si TP y SL coinciden en una vela, se cuenta SL primero."
+                ),
+                "closing_candle_time": close_time.astimezone(timezone.utc).isoformat(),
+                "closing_candle_high": close_high,
+                "closing_candle_low": close_low,
+                "closing_candle_close": close_price,
+                "candles_to_resolution": candles_elapsed,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
             patch = requests.patch(
                 SUPABASE_URL + "/rest/v1/signal_history",
                 params={"id": "eq." + str(signal["id"]), "status": "eq.PENDIENTE"},
                 headers={**supabase_headers(), "Prefer": "return=minimal"},
-                json={
-                    "status": outcome,
-                    "exit_price": exit_price,
-                    "closed_at": closed_iso,
-                    "result_r": 2.0 if outcome == "TP" else -1.0,
-                    "result_source": "Velas OHLC cerradas posteriores a la señal; si TP y SL coinciden en una vela, se cuenta SL primero.",
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
-                },
+                json=patch_data,
                 timeout=15,
             )
             if patch.status_code in (200, 204):
-                resolved += 1
+                if is_expired:
+                    expired += 1
+                else:
+                    resolved += 1
             else:
                 errors += 1
         except (KeyError, TypeError, ValueError, requests.RequestException):
             errors += 1
 
-    return {"resolved": resolved, "errors": errors}
-
+    return {"resolved": resolved, "expired": expired, "errors": errors}
 
 SIGNAL_CRON_SECRET = os.environ.get("SIGNAL_CRON_SECRET", "")
 

@@ -1,7 +1,8 @@
 
 import os
+import json
 import requests
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -20,15 +21,39 @@ CORS(app, resources={
 API_KEY = os.environ.get("TWELVE_DATA_API_KEY")
 PANEL_ACCESS_CODE = os.environ.get("PANEL_ACCESS_CODE", "")
 ACCESS_TOKEN_SECRET = os.environ.get("ACCESS_TOKEN_SECRET", "")
+TOKEN_MAX_AGE_SECONDS = 12 * 60 * 60
+
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_SECRET_KEY = os.environ.get("SUPABASE_SECRET_KEY", "")
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
-TOKEN_MAX_AGE_SECONDS = 12 * 60 * 60
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
+VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "mailto:admin@example.com")
 
 def supabase_headers():
     if not SUPABASE_URL or not SUPABASE_SECRET_KEY:
-        raise RuntimeError("Las notificaciones aún no están configuradas en el servidor.")
-    return {"apikey": SUPABASE_SECRET_KEY, "Authorization": "Bearer " + SUPABASE_SECRET_KEY, "Content-Type": "application/json"}
+        raise RuntimeError("El almacenamiento de notificaciones no está configurado.")
+    return {
+        "apikey": SUPABASE_SECRET_KEY,
+        "Content-Type": "application/json",
+    }
+
+def send_web_push(subscription, payload):
+    if not VAPID_PUBLIC_KEY or not VAPID_PRIVATE_KEY:
+        raise RuntimeError("Las claves Web Push aún no están configuradas.")
+    from pywebpush import webpush
+    from py_vapid import Vapid
+    # Render guarda la clave privada como PEM en una variable de entorno.
+    # Convertirla a un objeto Vapid evita que pywebpush la interprete como DER.
+    if "-----BEGIN" in VAPID_PRIVATE_KEY:
+        vapid_key = Vapid.from_pem(VAPID_PRIVATE_KEY.encode("utf-8"))
+    else:
+        vapid_key = Vapid.from_string(VAPID_PRIVATE_KEY)
+    return webpush(
+        subscription_info=subscription,
+        data=json.dumps(payload, ensure_ascii=False),
+        vapid_private_key=vapid_key,
+        vapid_claims={"sub": VAPID_SUBJECT},
+    )
 
 
 def access_serializer():
@@ -51,7 +76,9 @@ def create_access_token():
 
 @app.before_request
 def protect_signal_endpoints():
-    if request.path not in ("/api/analysis", "/api/price", "/api/push/subscribe", "/api/push/unsubscribe"):
+    if request.method == "OPTIONS":
+        return None
+    if request.path not in ("/api/analysis", "/api/price", "/api/history", "/api/performance", "/api/lab-status", "/api/push/subscribe", "/api/push/test", "/api/push/unsubscribe"):
         return None
     if not ACCESS_TOKEN_SECRET:
         return jsonify({"error": "El acceso privado no está configurado."}), 503
@@ -66,64 +93,101 @@ def protect_signal_endpoints():
     except (BadSignature, SignatureExpired, RuntimeError):
         return jsonify({"error": "Sesión caducada o no válida. Vuelve a introducir el código."}), 401
     return None
-
-@app.route("/api/push/public-key", methods=["GET"])
-def push_public_key():
-    key = os.environ.get("VAPID_PUBLIC_KEY", "")
-    if not key:
-        return jsonify({"error": "Las notificaciones aún no están configuradas."}), 503
-    return jsonify({"public_key": key})
-
-
-@app.route("/api/push/subscribe", methods=["POST"])
-def push_subscribe():
-    payload = request.get_json(silent=True) or {}
-    subscription = payload.get("subscription")
-    if not isinstance(subscription, dict) or not isinstance(subscription.get("endpoint"), str):
-        return jsonify({"error": "Suscripción no válida."}), 400
-    try:
-        response = requests.post(
-            SUPABASE_URL + "/rest/v1/push_subscriptions?on_conflict=endpoint",
-            headers={**supabase_headers(), "Prefer": "resolution=merge-duplicates,return=minimal"},
-            json={"endpoint": subscription["endpoint"], "subscription": subscription},
-            timeout=15,
-        )
-        if response.status_code not in (200, 201, 204):
-            return jsonify({"error": "No se pudo guardar la suscripción."}), 502
-        return jsonify({"ok": True})
-    except RuntimeError as exc:
-        return jsonify({"error": str(exc)}), 503
-    except requests.RequestException:
-        return jsonify({"error": "No se pudo conectar con el almacenamiento."}), 502
-
-
-@app.route("/api/push/unsubscribe", methods=["POST"])
-def push_unsubscribe():
-    payload = request.get_json(silent=True) or {}
-    endpoint = payload.get("endpoint")
-    if not isinstance(endpoint, str) or not endpoint:
-        return jsonify({"error": "Endpoint no válido."}), 400
-    try:
-        response = requests.delete(
-            SUPABASE_URL + "/rest/v1/push_subscriptions?endpoint=eq." + requests.utils.quote(endpoint, safe=""),
-            headers=supabase_headers(),
-            timeout=15,
-        )
-        if response.status_code not in (200, 204):
-            return jsonify({"error": "No se pudo eliminar la suscripción."}), 502
-        return jsonify({"ok": True})
-    except RuntimeError as exc:
-        return jsonify({"error": str(exc)}), 503
-    except requests.RequestException:
-        return jsonify({"error": "No se pudo conectar con el almacenamiento."}), 502
-
-
 TWELVE_DATA_URL = "https://api.twelvedata.com"
 
 ALLOWED_SYMBOLS = {"EUR/USD", "XAU/USD", "BTC/USD"}
 ALLOWED_INTERVALS = {"5min", "15min", "30min"}
 
 CANARY_TZ = ZoneInfo("Atlantic/Canary")
+NEW_YORK_TZ = ZoneInfo("America/New_York")
+
+
+def vantage_server_time(now):
+    """Convierte UTC a la hora del servidor Vantage (GMT+2/GMT+3 por DST de EE. UU.)."""
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    utc_now = now.astimezone(timezone.utc)
+    new_york_dst = utc_now.astimezone(NEW_YORK_TZ).dst()
+    server_offset = 3 if new_york_dst and new_york_dst.total_seconds() else 2
+    server_tz = timezone(timedelta(hours=server_offset))
+    return utc_now.astimezone(server_tz), server_offset
+
+
+def market_session(symbol, now=None):
+    """Comprueba las sesiones MT5 observadas para los símbolos Vantage del panel."""
+    now = now or datetime.now(timezone.utc)
+    server_now, server_offset = vantage_server_time(now)
+    server_time_label = server_now.isoformat()
+
+    if symbol == "BTC/USD":
+        return {
+            "open": True,
+            "status": "ABIERTO",
+            "reason": (
+                "MT5 muestra sesiones de cotización 00:00-24:00 todos los días; "
+                "la captura no separa una sesión de trading."
+            ),
+            "server_time": server_time_label,
+            "server_utc_offset": f"UTC+{server_offset}",
+        }
+
+    schedules = {
+        # (hora de apertura, cierre lun-jue, cierre viernes), en minutos del servidor.
+        "EUR/USD": (1, 23 * 60 + 58, 23 * 60 + 57),
+        "XAU/USD": (61, 23 * 60 + 58, 23 * 60 + 57),
+    }
+    if symbol not in schedules:
+        return {
+            "open": False,
+            "status": "MERCADO CERRADO",
+            "reason": "Símbolo sin horario Vantage configurado.",
+            "server_time": server_time_label,
+            "server_utc_offset": f"UTC+{server_offset}",
+        }
+
+    weekday = server_now.weekday()  # lunes=0, domingo=6
+    if weekday >= 5:
+        return {
+            "open": False,
+            "status": "MERCADO CERRADO",
+            "reason": "Fin de semana según la sesión MT5 de Vantage.",
+            "server_time": server_time_label,
+            "server_utc_offset": f"UTC+{server_offset}",
+        }
+
+    start_minute, weekday_close, friday_close = schedules[symbol]
+    close_minute = friday_close if weekday == 4 else weekday_close
+    seconds_since_midnight = (
+        server_now.hour * 3600 + server_now.minute * 60 + server_now.second
+    )
+    is_open = (
+        start_minute * 60 <= seconds_since_midnight < close_minute * 60
+    )
+
+    if is_open:
+        reason = "Dentro de la sesión de trading mostrada en MT5 Vantage."
+    elif seconds_since_midnight < start_minute * 60:
+        reason = "Pausa diaria: todavía no ha comenzado la sesión MT5."
+    else:
+        reason = "Pausa diaria o cierre semanal: la sesión MT5 ya terminó."
+
+    return {
+        "open": is_open,
+        "status": "ABIERTO" if is_open else "MERCADO CERRADO",
+        "reason": reason,
+        "server_time": server_time_label,
+        "server_utc_offset": f"UTC+{server_offset}",
+    }
+
+
+@app.route("/api/market-status", methods=["GET"])
+def market_status():
+    now = datetime.now(timezone.utc)
+    return jsonify({
+        "checked_at": now.isoformat(),
+        "markets": {symbol: market_session(symbol, now) for symbol in sorted(ALLOWED_SYMBOLS)}
+    })
+
 
 INTERVAL_MINUTES = {
     "5min": 5,
@@ -209,6 +273,69 @@ def atr(candles, period=14):
     return value
 
 
+def macd(values, fast=12, slow=26, signal_period=9):
+    if len(values) < slow + signal_period:
+        return None, None, None
+    line = [ema(values[:i + 1], fast) - ema(values[:i + 1], slow)
+            for i in range(slow - 1, len(values))]
+    signal_line = ema(line, signal_period)
+    return line[-1], signal_line, line[-1] - signal_line
+
+def bollinger(values, period=20, deviations=2.0):
+    if len(values) < period: return None, None, None
+    window = values[-period:]
+    middle = sum(window) / period
+    variance = sum((v-middle)**2 for v in window) / period
+    width = deviations * variance ** 0.5
+    return middle + width, middle, middle - width
+
+def adx(candles, period=14):
+    """ADX con suavizado de Wilder para TR, +DM, -DM y DX."""
+    if len(candles) < (period * 2 + 1):
+        return None
+
+    trs, plus_dm, minus_dm = [], [], []
+    for i in range(1, len(candles)):
+        cur, prev = candles[i], candles[i - 1]
+        up_move = cur["high"] - prev["high"]
+        down_move = prev["low"] - cur["low"]
+        plus_dm.append(up_move if up_move > down_move and up_move > 0 else 0.0)
+        minus_dm.append(down_move if down_move > up_move and down_move > 0 else 0.0)
+        trs.append(max(
+            cur["high"] - cur["low"],
+            abs(cur["high"] - prev["close"]),
+            abs(cur["low"] - prev["close"]),
+        ))
+
+    smoothed_tr = sum(trs[:period])
+    smoothed_plus = sum(plus_dm[:period])
+    smoothed_minus = sum(minus_dm[:period])
+    dx_values = []
+
+    for i in range(period - 1, len(trs)):
+        if i >= period:
+            smoothed_tr = smoothed_tr - smoothed_tr / period + trs[i]
+            smoothed_plus = smoothed_plus - smoothed_plus / period + plus_dm[i]
+            smoothed_minus = smoothed_minus - smoothed_minus / period + minus_dm[i]
+
+        if smoothed_tr <= 0:
+            continue
+        plus_di = 100.0 * smoothed_plus / smoothed_tr
+        minus_di = 100.0 * smoothed_minus / smoothed_tr
+        denominator = plus_di + minus_di
+        dx_values.append(
+            100.0 * abs(plus_di - minus_di) / denominator
+            if denominator > 0 else 0.0
+        )
+
+    if len(dx_values) < period:
+        return None
+
+    adx_value = sum(dx_values[:period]) / period
+    for dx_value in dx_values[period:]:
+        adx_value = ((adx_value * (period - 1)) + dx_value) / period
+    return adx_value
+
 def parse_candle_time(raw_time):
     """Convierte la fecha de la vela a hora consciente de zona horaria."""
     if not raw_time:
@@ -293,17 +420,28 @@ def fetch_candles(symbol, interval):
         except (KeyError, TypeError, ValueError):
             continue
 
+        candle["time"] = candle_time.astimezone(CANARY_TZ).isoformat()
         candles.append(candle)
         valid_times.append(candle_time)
 
-    if len(candles) < 55:
+    # Excluir siempre la vela que todavía está formándose.
+    # Twelve Data entrega datetime como hora de apertura de cada vela.
+    now = datetime.now(timezone.utc)
+    interval_seconds = INTERVAL_MINUTES[interval] * 60
+    closed = [
+        (candle, candle_time)
+        for candle, candle_time in zip(candles, valid_times)
+        if candle_time.astimezone(timezone.utc).timestamp() + interval_seconds <= now.timestamp()
+    ]
+    if len(closed) < 55:
         raise RuntimeError(
-            "Datos insuficientes para calcular EMA 50 "
-            f"({len(candles)} velas válidas)"
+            "Datos insuficientes después de excluir la vela en curso "
+            f"({len(closed)} velas cerradas)"
         )
+    candles = [item[0] for item in closed]
+    valid_times = [item[1] for item in closed]
 
     latest_time = valid_times[-1]
-    now = datetime.now(timezone.utc)
 
     age_seconds = (
         now - latest_time.astimezone(timezone.utc)
@@ -431,11 +569,14 @@ def analysis():
         ema50 = ema(closes, 50)
         rsi14 = rsi(closes, 14)
         atr14 = atr(candles, 14)
+        adx14 = adx(candles, 14)
+        macd_line, macd_signal, macd_hist = macd(closes)
+        bb_upper, bb_middle, bb_lower = bollinger(closes, 20, 2.0)
 
         entry = closes[-1]
 
         if (
-            None in (ema20, ema50, rsi14, atr14)
+            None in (ema20, ema50, rsi14, atr14, adx14, macd_line, macd_signal, macd_hist, bb_upper, bb_middle, bb_lower)
             or atr14 <= 0
         ):
             raise RuntimeError(
@@ -443,26 +584,19 @@ def analysis():
                 "para calcular los indicadores"
             )
 
-        # Reglas técnicas experimentales.
-        signal = "ESPERAR"
-        reason = (
-            "Los indicadores no muestran una combinación clara."
-        )
-
-        if ema20 > ema50 and 50 <= rsi14 < 70:
-            signal = "COMPRA"
-            reason = (
-                "EMA 20 por encima de EMA 50 y RSI "
-                "en zona de impulso alcista."
-            )
-
-        elif ema20 < ema50 and 30 < rsi14 <= 50:
-            signal = "VENTA"
-            reason = (
-                "EMA 20 por debajo de EMA 50 y RSI "
-                "en zona de impulso bajista."
-            )
-
+        # Motor multicriterio experimental: tendencia, fuerza y momentum.
+        buy_checks = {'EMA20 > EMA50': ema20 > ema50, 'RSI 52-68': 52 <= rsi14 <= 68, 'MACD positivo': macd_hist > 0, 'Precio sobre media Bollinger': entry > bb_middle}
+        sell_checks = {'EMA20 < EMA50': ema20 < ema50, 'RSI 32-48': 32 <= rsi14 <= 48, 'MACD negativo': macd_hist < 0, 'Precio bajo media Bollinger': entry < bb_middle}
+        buy_score = sum(buy_checks.values())
+        sell_score = sum(sell_checks.values())
+        signal = 'ESPERAR'
+        reason = 'Confluencia insuficiente o tendencia débil; se espera.'
+        if adx14 >= 18 and buy_score >= 3 and buy_score > sell_score:
+            signal = 'COMPRA'
+            reason = 'Confluencia alcista: ' + ', '.join(k for k,v in buy_checks.items() if v) + '. ADX ' + str(round(adx14,1))
+        elif adx14 >= 18 and sell_score >= 3 and sell_score > buy_score:
+            signal = 'VENTA'
+            reason = 'Confluencia bajista: ' + ', '.join(k for k,v in sell_checks.items() if v) + '. ADX ' + str(round(adx14,1))
         stop_loss = None
         take_profit = None
 
@@ -487,12 +621,26 @@ def analysis():
             "ema50": ema50,
             "rsi14": rsi14,
             "atr14": atr14,
+            "adx14": adx14,
+            "macd": macd_line,
+            "macd_signal": macd_signal,
+            "macd_histogram": macd_hist,
+            "bollinger_upper": bb_upper,
+            "bollinger_middle": bb_middle,
+            "bollinger_lower": bb_lower,
+            "buy_score": buy_score,
+            "sell_score": sell_score,
+            "score_max": 4,
             "candle_time": candle_time,
             "candle_age_minutes": candle_age_minutes,
             "candles": len(candles),
+            "recent_candles": [
+                {"time": candle["time"], "high": candle["high"], "low": candle["low"], "close": candle["close"]}
+                for candle in candles
+            ],
             "method": (
-                "EMA20/EMA50 + RSI14; "
-                "SL=1.5x ATR; TP=3x ATR"
+                "EMA20/EMA50 + RSI14 + MACD + ADX14 + Bollinger(20,2); "
+                "score mínimo 3/4 y ADX>=18; SL=1.5x ATR; TP=3x ATR"
             ),
             "warning": (
                 "Señal técnica experimental. Verifica datos, "
@@ -518,6 +666,683 @@ def analysis():
         return jsonify({
             "error": "No se pudieron procesar los datos recibidos"
         }), 502
+
+
+
+@app.route("/api/history", methods=["GET"])
+def signal_history():
+    """Devuelve el historial real de señales registradas por el escáner."""
+    try:
+        limit = min(max(int(request.args.get("limit", "50")), 1), 200)
+    except ValueError:
+        return jsonify({"error": "El límite debe ser un número."}), 400
+
+    params = {
+        "select": "id,symbol,timeframe,direction,entry_price,stop_loss,take_profit,signal_at,candle_time,status,exit_price,closed_at,result_r,result_source,indicators",
+        "order": "signal_at.desc",
+        "limit": str(limit),
+    }
+    for query_name, column in (("symbol", "symbol"), ("timeframe", "timeframe"), ("status", "status")):
+        value = (request.args.get(query_name) or "").strip()
+        if value:
+            allowed = {
+                "symbol": ALLOWED_SYMBOLS,
+                "timeframe": ALLOWED_INTERVALS,
+                "status": {"PENDIENTE", "TP", "SL", "CADUCADA", "CANCELADA"},
+            }[query_name]
+            if value not in allowed:
+                return jsonify({"error": "Filtro no permitido: " + query_name}), 400
+            params[column] = "eq." + value
+
+    candle_time = (request.args.get("candle_time") or "").strip()
+    if candle_time:
+        if len(candle_time) > 64:
+            return jsonify({"error": "Fecha de vela no válida."}), 400
+        params["candle_time"] = "eq." + candle_time
+
+    try:
+        response = requests.get(
+            SUPABASE_URL + "/rest/v1/signal_history",
+            params=params,
+            headers=supabase_headers(),
+            timeout=15,
+        )
+        if response.status_code != 200:
+            return jsonify({"error": "No se pudo consultar el historial."}), 502
+        rows = response.json()
+        return jsonify({"count": len(rows), "signals": rows})
+    except (RuntimeError, requests.RequestException):
+        return jsonify({"error": "No se pudo conectar con el historial."}), 502
+
+
+@app.route("/api/performance", methods=["GET"])
+def signal_performance():
+    """Estadísticas de señales simuladas, basadas exclusivamente en resultados guardados."""
+    try:
+        rows = []
+        page_size = 1000
+        offset = 0
+        # Paginar para que el crecimiento del historial no corte silenciosamente
+        # la muestra en el límite por defecto de PostgREST.
+        while offset < 20000:
+            response = requests.get(
+                SUPABASE_URL + "/rest/v1/signal_history",
+                params={
+                    "select": "symbol,timeframe,direction,status,result_r,closed_at",
+                    "order": "signal_at.asc",
+                    "limit": str(page_size),
+                    "offset": str(offset),
+                },
+                headers=supabase_headers(),
+                timeout=20,
+            )
+            if response.status_code != 200:
+                return jsonify({"error": "No se pudo consultar el historial de señales."}), 502
+            batch = response.json()
+            rows.extend(batch)
+            if len(batch) < page_size:
+                break
+            offset += page_size
+
+        wins = sum(1 for row in rows if row.get("status") == "TP")
+        losses = sum(1 for row in rows if row.get("status") == "SL")
+        pending = sum(1 for row in rows if row.get("status") == "PENDIENTE")
+        expired = sum(1 for row in rows if row.get("status") == "CADUCADA")
+        cancelled = sum(1 for row in rows if row.get("status") == "CANCELADA")
+        closed = wins + losses
+        r_values = [
+            float(row["result_r"]) for row in rows
+            if row.get("status") in ("TP", "SL") and row.get("result_r") is not None
+        ]
+        positive_r = sum(value for value in r_values if value > 0)
+        negative_r = abs(sum(value for value in r_values if value < 0))
+        average_r = (sum(r_values) / len(r_values)) if r_values else None
+        breakdown = {}
+        direction_breakdown = {}
+        for row in rows:
+            status = row.get("status")
+            key = row["symbol"] + " · " + row["timeframe"]
+            item = breakdown.setdefault(key, {
+                "total": 0, "pending": 0, "wins": 0, "losses": 0,
+                "expired": 0, "cancelled": 0, "closed": 0
+            })
+            item["total"] += 1
+            if status == "PENDIENTE":
+                item["pending"] += 1
+            elif status == "TP":
+                item["wins"] += 1
+                item["closed"] += 1
+            elif status == "SL":
+                item["losses"] += 1
+                item["closed"] += 1
+            elif status == "CADUCADA":
+                item["expired"] += 1
+            elif status == "CANCELADA":
+                item["cancelled"] += 1
+
+            direction = row.get("direction") or "SIN DIRECCIÓN"
+            side = direction_breakdown.setdefault(direction, {
+                "total": 0, "wins": 0, "losses": 0, "closed": 0
+            })
+            side["total"] += 1
+            if status == "TP":
+                side["wins"] += 1
+                side["closed"] += 1
+            elif status == "SL":
+                side["losses"] += 1
+                side["closed"] += 1
+
+        sample_size = len(r_values)
+        sample_note = (
+            "Muestra inicial: todavía hacen falta más resultados cerrados para valorar la estrategia."
+            if sample_size < 30 else
+            "Muestra en desarrollo: conviene acumular al menos 100 resultados y comprobar estabilidad por mercado."
+            if sample_size < 100 else
+            "Muestra de 100 o más resultados; sigue siendo necesario validar por mercado y en distintos periodos."
+        )
+        return jsonify({
+            "total_signals": len(rows),
+            "closed_trades": closed,
+            "pending": pending,
+            "expired": expired,
+            "cancelled": cancelled,
+            "wins": wins,
+            "losses": losses,
+            "win_rate": round((wins / closed) * 100, 2) if closed else None,
+            "average_r": round(average_r, 4) if average_r is not None else None,
+            "expectancy_r": round(average_r, 4) if average_r is not None else None,
+            "profit_factor": round(positive_r / negative_r, 4) if negative_r > 0 else (None if positive_r == 0 else "inf"),
+            "sample_size": sample_size,
+            "sample_note": sample_note,
+            "breakdown": breakdown,
+            "direction_breakdown": direction_breakdown,
+            "note": "Estadísticas de señales simuladas del scanner. TP/SL se evalúan con velas OHLC cerradas; no son operaciones reales ni garantizan rentabilidad.",
+            "truncated": len(rows) >= 20000,
+        })
+    except (RuntimeError, requests.RequestException, ValueError, TypeError, KeyError):
+        return jsonify({"error": "No se pudieron calcular las estadísticas."}), 502
+
+
+@app.route("/api/lab-status", methods=["GET"])
+def lab_status():
+    """Diagnóstico real del motor y contadores persistidos en Supabase."""
+    try:
+        def exact_count(path, params=None):
+            response = requests.get(
+                SUPABASE_URL + path,
+                params=params or {"select": "id"},
+                headers={**supabase_headers(), "Prefer": "count=exact", "Range": "0-0"},
+                timeout=15,
+            )
+            if response.status_code not in (200, 206):
+                raise RuntimeError("No se pudo consultar el estado del laboratorio.")
+            content_range = response.headers.get("Content-Range", "")
+            total = content_range.rsplit("/", 1)[-1]
+            return int(total) if total.isdigit() else 0
+
+        total_signals = exact_count("/rest/v1/signal_history")
+        pending_signals = exact_count(
+            "/rest/v1/signal_history",
+            {"select": "id", "status": "eq.PENDIENTE"},
+        )
+        closed_signals = exact_count(
+            "/rest/v1/signal_history",
+            {"select": "id", "status": "in.(TP,SL)"},
+        )
+        subscriptions = exact_count("/rest/v1/push_subscriptions")
+        return jsonify({
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "data_provider": "Twelve Data",
+            "provider_configured": bool(API_KEY),
+            "storage_configured": bool(SUPABASE_URL and SUPABASE_SECRET_KEY),
+            "engine": {
+                "trend": "EMA 20 / EMA 50",
+                "momentum": "RSI 14 + MACD 12/26/9",
+                "volatility": "ATR 14 + Bollinger 20,2",
+                "strength": "ADX 14 (Wilder)",
+                "minimum_confluence": "3/4",
+                "minimum_adx": 18,
+                "risk_model": "SL 1.5 × ATR; TP 3 × ATR",
+                "closed_candles_only": True,
+                "automatic_execution": False,
+            },
+            "records": {
+                "total_signals": total_signals,
+                "pending_signals": pending_signals,
+                "closed_signals": closed_signals,
+                "push_devices": subscriptions,
+            },
+            "note": "Contadores exactos del almacenamiento. El laboratorio no inventa resultados ni ejecuta órdenes.",
+        })
+    except (RuntimeError, requests.RequestException, ValueError, TypeError):
+        return jsonify({"error": "No se pudo obtener el diagnóstico real del laboratorio."}), 502
+
+
+@app.route("/api/push/public-key", methods=["GET"])
+def push_public_key():
+    if not VAPID_PUBLIC_KEY:
+        return jsonify({"error": "Las notificaciones aún no están configuradas."}), 503
+    return jsonify({"public_key": VAPID_PUBLIC_KEY})
+
+
+@app.route("/api/push/subscribe", methods=["POST"])
+def push_subscribe():
+    payload = request.get_json(silent=True) or {}
+    subscription = payload.get("subscription")
+    if not isinstance(subscription, dict) or not subscription.get("endpoint"):
+        return jsonify({"error": "Suscripción no válida."}), 400
+    try:
+        response = requests.post(
+            SUPABASE_URL + "/rest/v1/push_subscriptions?on_conflict=endpoint",
+            headers={**supabase_headers(), "Prefer": "resolution=merge-duplicates,return=minimal"},
+            json={"endpoint": subscription["endpoint"], "subscription": subscription},
+            timeout=15,
+        )
+        if response.status_code not in (200, 201, 204):
+            return jsonify({"error": "No se pudo guardar la suscripción."}), 502
+        return jsonify({"ok": True})
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
+    except requests.RequestException:
+        return jsonify({"error": "No se pudo conectar con el almacenamiento."}), 502
+
+
+@app.route("/api/push/unsubscribe", methods=["POST"])
+def push_unsubscribe():
+    payload = request.get_json(silent=True) or {}
+    endpoint = payload.get("endpoint")
+    if not isinstance(endpoint, str) or not endpoint:
+        return jsonify({"error": "Endpoint no válido."}), 400
+    try:
+        response = requests.delete(
+            SUPABASE_URL + "/rest/v1/push_subscriptions?endpoint=eq." + requests.utils.quote(endpoint, safe=""),
+            headers=supabase_headers(),
+            timeout=15,
+        )
+        if response.status_code not in (200, 204):
+            return jsonify({"error": "No se pudo eliminar la suscripción."}), 502
+        return jsonify({"ok": True})
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
+    except requests.RequestException:
+        return jsonify({"error": "No se pudo conectar con el almacenamiento."}), 502
+
+
+@app.route("/api/push/test", methods=["POST"])
+def push_test():
+    try:
+        response = requests.get(
+            SUPABASE_URL + "/rest/v1/push_subscriptions?select=subscription",
+            headers=supabase_headers(),
+            timeout=15,
+        )
+        if response.status_code != 200:
+            return jsonify({"error": "No se pudieron consultar las suscripciones."}), 502
+        subscriptions = response.json()
+        sent = 0
+        expired = []
+        failures = []
+        for row in subscriptions:
+            subscription = row.get("subscription")
+            if not isinstance(subscription, dict):
+                continue
+            try:
+                send_web_push(subscription, {
+                    "title": "GLOBAL SIGNAL SCANNER",
+                    "body": "¡Perfecto! Las notificaciones push están funcionando en este dispositivo.",
+                    "tag": "gss-push-test",
+                    "url": "https://vantage-signal-scanner.onrender.com/panel_escaner_vantage.html",
+                })
+                sent += 1
+            except Exception as exc:
+                response_obj = getattr(exc, "response", None)
+                status = getattr(response_obj, "status_code", None)
+                detail = getattr(response_obj, "text", "") if response_obj is not None else ""
+                failures.append({"status": status, "detail": str(detail)[:300] or str(exc)[:300]})
+                if status in (404, 410):
+                    expired.append(subscription.get("endpoint", ""))
+        for endpoint in expired:
+            if endpoint:
+                requests.delete(
+                    SUPABASE_URL + "/rest/v1/push_subscriptions?endpoint=eq." + requests.utils.quote(endpoint, safe=""),
+                    headers=supabase_headers(),
+                    timeout=10,
+                )
+        if sent == 0:
+            return jsonify({
+                "error": "La suscripción está guardada, pero el proveedor rechazó el envío push.",
+                "subscriptions_found": len(subscriptions),
+                "failures": failures,
+            }), 502
+        return jsonify({"ok": True, "sent": sent, "subscriptions_found": len(subscriptions), "failures": failures})
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
+    except requests.RequestException:
+        return jsonify({"error": "No se pudo conectar con el almacenamiento."}), 502
+
+
+def resolve_pending_signal_outcomes(symbol, interval, recent_candles):
+    """Cierra TP/SL o caduca señales tras 24 velas cerradas posteriores."""
+    if not recent_candles:
+        return {"resolved": 0, "expired": 0, "errors": 0}
+
+    response = requests.get(
+        SUPABASE_URL + "/rest/v1/signal_history",
+        params={
+            "select": "id,direction,candle_time,stop_loss,take_profit,status",
+            "symbol": "eq." + symbol,
+            "timeframe": "eq." + interval,
+            "status": "eq.PENDIENTE",
+            "order": "candle_time.asc",
+            "limit": "200",
+        },
+        headers=supabase_headers(), timeout=15,
+    )
+    if response.status_code != 200:
+        return {"resolved": 0, "expired": 0, "errors": 1}
+
+    pending = response.json()
+    resolved = 0
+    expired = 0
+    errors = 0
+    interval_seconds = INTERVAL_MINUTES[interval] * 60
+    max_lifetime_candles = 24
+
+    for signal in pending:
+        try:
+            signal_time = datetime.fromisoformat(str(signal["candle_time"]).replace("Z", "+00:00"))
+            stop = float(signal["stop_loss"])
+            target = float(signal["take_profit"])
+            direction = signal["direction"]
+            outcome = None
+            closing_candle = None
+            candles_elapsed = 0
+
+            for candle in recent_candles:
+                candle_time = datetime.fromisoformat(str(candle["time"]).replace("Z", "+00:00"))
+                if candle_time <= signal_time:
+                    continue
+
+                candles_elapsed += 1
+                high = float(candle["high"])
+                low = float(candle["low"])
+                if direction == "COMPRA":
+                    hit_sl = low <= stop
+                    hit_tp = high >= target
+                else:
+                    hit_sl = high >= stop
+                    hit_tp = low <= target
+
+                # Si ambos niveles aparecen tocados en la misma vela OHLC,
+                # se aplica el criterio conservador: SL primero.
+                if hit_sl:
+                    outcome, closing_candle = "SL", candle
+                    break
+                if hit_tp:
+                    outcome, closing_candle = "TP", candle
+                    break
+                if candles_elapsed >= max_lifetime_candles:
+                    closing_candle = candle
+                    outcome = "CADUCADA"
+                    break
+
+            if not outcome:
+                continue
+
+            close_time = datetime.fromisoformat(str(closing_candle["time"]).replace("Z", "+00:00"))
+            closed_at = datetime.fromtimestamp(
+                close_time.timestamp() + interval_seconds, timezone.utc
+            ).isoformat()
+            close_high = float(closing_candle["high"])
+            close_low = float(closing_candle["low"])
+            close_price = float(closing_candle["close"])
+            is_expired = outcome == "CADUCADA"
+
+            patch_data = {
+                "status": outcome,
+                "exit_price": None if is_expired else (stop if outcome == "SL" else target),
+                "closed_at": closed_at,
+                "result_r": None if is_expired else (2.0 if outcome == "TP" else -1.0),
+                "result_source": (
+                    "CADUCADA tras 24 velas cerradas posteriores a la señal; "
+                    "sin tocar TP ni SL."
+                    if is_expired else
+                    "Velas OHLC cerradas posteriores a la señal; "
+                    "si TP y SL coinciden en una vela, se cuenta SL primero."
+                ),
+                "closing_candle_time": close_time.astimezone(timezone.utc).isoformat(),
+                "closing_candle_high": close_high,
+                "closing_candle_low": close_low,
+                "closing_candle_close": close_price,
+                "candles_to_resolution": candles_elapsed,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+            patch = requests.patch(
+                SUPABASE_URL + "/rest/v1/signal_history",
+                params={"id": "eq." + str(signal["id"]), "status": "eq.PENDIENTE"},
+                headers={**supabase_headers(), "Prefer": "return=minimal"},
+                json=patch_data,
+                timeout=15,
+            )
+            if patch.status_code in (200, 204):
+                if is_expired:
+                    expired += 1
+                else:
+                    resolved += 1
+            else:
+                errors += 1
+        except (KeyError, TypeError, ValueError, requests.RequestException):
+            errors += 1
+
+    return {"resolved": resolved, "expired": expired, "errors": errors}
+
+SIGNAL_CRON_SECRET = os.environ.get("SIGNAL_CRON_SECRET", "")
+
+@app.route("/api/push/scan", methods=["POST"])
+def push_scan():
+    supplied = request.headers.get("X-Scanner-Cron-Secret", "")
+    if not SIGNAL_CRON_SECRET or not hmac.compare_digest(supplied, SIGNAL_CRON_SECRET):
+        return jsonify({"error": "No autorizado."}), 401
+
+    results = []
+    sent_total = 0
+    token = access_serializer().dumps({"access": True})
+    intervals = ["5min", "15min", "30min"]
+    symbols = ["EUR/USD", "XAU/USD", "BTC/USD"]
+
+    # Reutiliza el mismo endpoint de análisis que consume el panel.
+    # Pausa entre consultas para no superar de golpe el límite del proveedor.
+    import time
+    with app.test_client() as client:
+        for index, (symbol, interval) in enumerate(
+            (pair for interval in intervals for pair in [(s, interval) for s in symbols])
+        ):
+            session = market_session(symbol)
+            if not session["open"]:
+                results.append({
+                    "symbol": symbol, "interval": interval,
+                    "status": "market_closed",
+                    "detail": "Mercado cerrado: no se analiza ni se envían alertas."
+                })
+                if index < 8:
+                    time.sleep(8)
+                continue
+
+            response = client.get(
+                "/api/analysis",
+                query_string={"symbol": symbol, "interval": interval},
+                headers={"Authorization": "Bearer " + token},
+            )
+            if response.status_code != 200:
+                results.append({
+                    "symbol": symbol, "interval": interval,
+                    "status": "analysis_error",
+                    "detail": (response.get_json(silent=True) or {}).get("error", "Error de análisis"),
+                })
+            else:
+                data = response.get_json() or {}
+                outcome_result = resolve_pending_signal_outcomes(
+                    symbol, interval, data.get("recent_candles", [])
+                )
+                direction = data.get("signal") or "ESPERAR"
+
+                # Asegurar el historial en cada ciclo para señales activas.
+                # La clave única hace esta escritura idempotente: si ya existe,
+                # Supabase ignora el duplicado; si faltaba por un fallo previo,
+                # queda recuperada aunque el estado ya estuviera registrado.
+                candle_time = str(data.get("candle_time") or "")
+                if direction in ("COMPRA", "VENTA"):
+                    signal_key = "|".join([symbol, interval, direction, candle_time])
+                    history_payload = {
+                        "signal_key": signal_key,
+                        "symbol": symbol,
+                        "timeframe": interval,
+                        "direction": direction,
+                        "entry_price": data.get("entry"),
+                        "stop_loss": data.get("stop_loss"),
+                        "take_profit": data.get("take_profit"),
+                        "signal_at": datetime.now(timezone.utc).isoformat(),
+                        "candle_time": data.get("candle_time"),
+                        "status": "PENDIENTE",
+                        "indicators": {
+                            "ema20": data.get("ema20"),
+                            "ema50": data.get("ema50"),
+                            "rsi14": data.get("rsi14"),
+                            "adx14": data.get("adx14"),
+                            "atr14": data.get("atr14"),
+                            "macd": data.get("macd"),
+                            "macd_signal": data.get("macd_signal"),
+                            "macd_histogram": data.get("macd_histogram"),
+                            "bollinger_upper": data.get("bollinger_upper"),
+                            "bollinger_middle": data.get("bollinger_middle"),
+                            "bollinger_lower": data.get("bollinger_lower"),
+                            "buy_score": data.get("buy_score"),
+                            "sell_score": data.get("sell_score"),
+                        },
+                    }
+                    history_response = requests.post(
+                        SUPABASE_URL + "/rest/v1/signal_history?on_conflict=signal_key",
+                        headers={
+                            **supabase_headers(),
+                            "Prefer": "resolution=ignore-duplicates,return=minimal",
+                        },
+                        json=history_payload,
+                        timeout=15,
+                    )
+                    if history_response.status_code not in (200, 201, 204):
+                        results.append({
+                            "symbol": symbol, "interval": interval,
+                            "status": "history_save_error",
+                            "http_status": history_response.status_code,
+                        })
+                        continue
+
+                # Consultar el último estado registrado para este mercado y temporalidad.
+                # Así no se repite una alerta mientras COMPRA/VENTA siga vigente.
+                state_response = requests.get(
+                    SUPABASE_URL + "/rest/v1/signal_alerts",
+                    params={
+                        "select": "direction,created_at",
+                        "market": "eq." + symbol,
+                        "timeframe": "eq." + interval,
+                        "order": "created_at.desc",
+                        "limit": "1",
+                    },
+                    headers=supabase_headers(),
+                    timeout=15,
+                )
+                if state_response.status_code != 200:
+                    results.append({
+                        "symbol": symbol, "interval": interval,
+                        "status": "state_read_error"
+                    })
+                else:
+                    previous_rows = state_response.json()
+                    previous_direction = (
+                        previous_rows[0].get("direction") if previous_rows else None
+                    )
+
+                    if previous_direction == direction:
+                        results.append({
+                            "symbol": symbol, "interval": interval,
+                            "status": "same_signal_no_notification",
+                            "direction": direction,
+                            "outcomes_resolved": outcome_result["resolved"],
+                            "outcome_errors": outcome_result["errors"]
+                        })
+                    else:
+                        # El historial ya quedó asegurado arriba antes de leer/guardar el estado.
+                        # El estado se guarda solo después de asegurar el historial.
+                        # Si falla este paso, la inserción idempotente del historial
+                        # permitirá reintentar el siguiente ciclo sin duplicar señales.
+                        event_stamp = datetime.now(timezone.utc).isoformat()
+                        fingerprint = "|".join([
+                            symbol, interval, direction, candle_time, event_stamp
+                        ])
+                        insert_response = requests.post(
+                            SUPABASE_URL + "/rest/v1/signal_alerts?on_conflict=market,timeframe,fingerprint",
+                            headers={
+                                **supabase_headers(),
+                                "Prefer": "resolution=ignore-duplicates,return=representation",
+                            },
+                            json={
+                                "market": symbol,
+                                "timeframe": interval,
+                                "direction": direction,
+                                "fingerprint": fingerprint,
+                            },
+                            timeout=15,
+                        )
+                        if insert_response.status_code not in (200, 201):
+                            results.append({
+                                "symbol": symbol, "interval": interval,
+                                "status": "state_save_error",
+                                "http_status": insert_response.status_code,
+                            })
+                            continue
+                        if not insert_response.json():
+                            results.append({
+                                "symbol": symbol, "interval": interval,
+                                "status": "duplicate_state"
+                            })
+                            continue
+                        if direction == "ESPERAR":
+                            results.append({
+                                "symbol": symbol, "interval": interval,
+                                "status": "state_reset_no_notification"
+                            })
+                            continue
+
+                        # Solo se notifica una transición nueva a COMPRA o VENTA.
+                        price_digits = 5 if symbol == "EUR/USD" else 2
+
+                        def display_price(value):
+                            return f"{float(value):,.{price_digits}f}" if value is not None else "—"
+
+                        short_interval = {
+                            "5min": "M5", "15min": "M15", "30min": "M30"
+                        }.get(interval, interval)
+                        alert_body = (
+                            f"{symbol} · {short_interval} | "
+                            f"Entrada {display_price(data.get('entry'))} · "
+                            f"SL {display_price(data.get('stop_loss'))} · "
+                            f"TP {display_price(data.get('take_profit'))}"
+                        )
+
+                        subs_response = requests.get(
+                            SUPABASE_URL + "/rest/v1/push_subscriptions?select=subscription",
+                            headers=supabase_headers(), timeout=15,
+                        )
+                        if subs_response.status_code != 200:
+                            results.append({
+                                "symbol": symbol, "interval": interval,
+                                "status": "subscription_read_error"
+                            })
+                        else:
+                            subscriptions = subs_response.json()
+                            delivered = 0
+                            expired = []
+                            for row in subscriptions:
+                                subscription = row.get("subscription")
+                                if not isinstance(subscription, dict):
+                                    continue
+                                try:
+                                    send_web_push(subscription, {
+                                        "title": f"GLOBAL SIGNAL · {direction}",
+                                        "body": alert_body,
+                                        "tag": "gss-" + symbol.replace("/", "") + "-" + interval,
+                                        "url": ("https://vantage-signal-scanner.onrender.com/panel_escaner_vantage.html?view=scanner&symbol=" + requests.utils.quote(symbol, safe="") + "&timeframe=" + requests.utils.quote(interval, safe="")),
+                                        "data": {
+                                            "symbol": symbol, "interval": interval,
+                                            "direction": direction,
+                                            "entry": data.get("entry"),
+                                            "stop_loss": data.get("stop_loss"),
+                                            "take_profit": data.get("take_profit"),
+                                        },
+                                    })
+                                    delivered += 1
+                                except Exception as exc:
+                                    response_obj = getattr(exc, "response", None)
+                                    if getattr(response_obj, "status_code", None) in (404, 410):
+                                        expired.append(subscription.get("endpoint", ""))
+
+                            for endpoint in expired:
+                                if endpoint:
+                                    requests.delete(
+                                        SUPABASE_URL + "/rest/v1/push_subscriptions?endpoint=eq." + requests.utils.quote(endpoint, safe=""),
+                                        headers=supabase_headers(), timeout=10,
+                                    )
+
+                            sent_total += delivered
+                            results.append({
+                                "symbol": symbol, "interval": interval,
+                                "status": "new_signal_notified" if delivered else "new_signal_no_delivery",
+                                "devices": delivered
+                            })
+            if index < 8:
+                time.sleep(8)
+
+    return jsonify({"ok": True, "alerts_sent": sent_total, "checks": results})
 
 
 if __name__ == "__main__":

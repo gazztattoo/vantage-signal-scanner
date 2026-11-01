@@ -78,7 +78,7 @@ def create_access_token():
 def protect_signal_endpoints():
     if request.method == "OPTIONS":
         return None
-    if request.path not in ("/api/analysis", "/api/price", "/api/history", "/api/performance", "/api/push/subscribe", "/api/push/test", "/api/push/unsubscribe"):
+    if request.path not in ("/api/analysis", "/api/price", "/api/history", "/api/performance", "/api/lab-status", "/api/push/subscribe", "/api/push/test", "/api/push/unsubscribe"):
         return None
     if not ACCESS_TOKEN_SECRET:
         return jsonify({"error": "El acceso privado no está configurado."}), 503
@@ -691,6 +691,61 @@ def signal_performance():
         })
     except (RuntimeError, requests.RequestException, ValueError, TypeError):
         return jsonify({"error": "No se pudieron calcular las estadísticas."}), 502
+
+
+@app.route("/api/lab-status", methods=["GET"])
+def lab_status():
+    """Diagnóstico real del motor y contadores persistidos en Supabase."""
+    try:
+        def exact_count(path, params=None):
+            response = requests.get(
+                SUPABASE_URL + path,
+                params=params or {"select": "id"},
+                headers={**supabase_headers(), "Prefer": "count=exact", "Range": "0-0"},
+                timeout=15,
+            )
+            if response.status_code != 200:
+                raise RuntimeError("No se pudo consultar el estado del laboratorio.")
+            content_range = response.headers.get("Content-Range", "")
+            total = content_range.rsplit("/", 1)[-1]
+            return int(total) if total.isdigit() else 0
+
+        total_signals = exact_count("/rest/v1/signal_history")
+        pending_signals = exact_count(
+            "/rest/v1/signal_history",
+            {"select": "id", "status": "eq.PENDIENTE"},
+        )
+        closed_signals = exact_count(
+            "/rest/v1/signal_history",
+            {"select": "id", "status": "in.(TP,SL)"},
+        )
+        subscriptions = exact_count("/rest/v1/push_subscriptions")
+        return jsonify({
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "data_provider": "Twelve Data",
+            "provider_configured": bool(API_KEY),
+            "storage_configured": bool(SUPABASE_URL and SUPABASE_SECRET_KEY),
+            "engine": {
+                "trend": "EMA 20 / EMA 50",
+                "momentum": "RSI 14 + MACD 12/26/9",
+                "volatility": "ATR 14 + Bollinger 20,2",
+                "strength": "ADX 14 (Wilder)",
+                "minimum_confluence": "3/4",
+                "minimum_adx": 18,
+                "risk_model": "SL 1.5 × ATR; TP 3 × ATR",
+                "closed_candles_only": True,
+                "automatic_execution": False,
+            },
+            "records": {
+                "total_signals": total_signals,
+                "pending_signals": pending_signals,
+                "closed_signals": closed_signals,
+                "push_devices": subscriptions,
+            },
+            "note": "Contadores exactos del almacenamiento. El laboratorio no inventa resultados ni ejecuta órdenes.",
+        })
+    except (RuntimeError, requests.RequestException, ValueError, TypeError):
+        return jsonify({"error": "No se pudo obtener el diagnóstico real del laboratorio."}), 502
 
 
 @app.route("/api/push/public-key", methods=["GET"])

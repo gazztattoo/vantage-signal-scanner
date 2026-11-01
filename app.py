@@ -1088,6 +1088,57 @@ def push_scan():
                 )
                 direction = data.get("signal") or "ESPERAR"
 
+                # Asegurar el historial en cada ciclo para señales activas.
+                # La clave única hace esta escritura idempotente: si ya existe,
+                # Supabase ignora el duplicado; si faltaba por un fallo previo,
+                # queda recuperada aunque el estado ya estuviera registrado.
+                candle_time = str(data.get("candle_time") or "")
+                if direction in ("COMPRA", "VENTA"):
+                    signal_key = "|".join([symbol, interval, direction, candle_time])
+                    history_payload = {
+                        "signal_key": signal_key,
+                        "symbol": symbol,
+                        "timeframe": interval,
+                        "direction": direction,
+                        "entry_price": data.get("entry"),
+                        "stop_loss": data.get("stop_loss"),
+                        "take_profit": data.get("take_profit"),
+                        "signal_at": datetime.now(timezone.utc).isoformat(),
+                        "candle_time": data.get("candle_time"),
+                        "status": "PENDIENTE",
+                        "indicators": {
+                            "ema20": data.get("ema20"),
+                            "ema50": data.get("ema50"),
+                            "rsi14": data.get("rsi14"),
+                            "adx14": data.get("adx14"),
+                            "atr14": data.get("atr14"),
+                            "macd": data.get("macd"),
+                            "macd_signal": data.get("macd_signal"),
+                            "macd_histogram": data.get("macd_histogram"),
+                            "bollinger_upper": data.get("bollinger_upper"),
+                            "bollinger_middle": data.get("bollinger_middle"),
+                            "bollinger_lower": data.get("bollinger_lower"),
+                            "buy_score": data.get("buy_score"),
+                            "sell_score": data.get("sell_score"),
+                        },
+                    }
+                    history_response = requests.post(
+                        SUPABASE_URL + "/rest/v1/signal_history?on_conflict=signal_key",
+                        headers={
+                            **supabase_headers(),
+                            "Prefer": "resolution=ignore-duplicates,return=minimal",
+                        },
+                        json=history_payload,
+                        timeout=15,
+                    )
+                    if history_response.status_code not in (200, 201, 204):
+                        results.append({
+                            "symbol": symbol, "interval": interval,
+                            "status": "history_save_error",
+                            "http_status": history_response.status_code,
+                        })
+                        continue
+
                 # Consultar el último estado registrado para este mercado y temporalidad.
                 # Así no se repite una alerta mientras COMPRA/VENTA siga vigente.
                 state_response = requests.get(
@@ -1122,56 +1173,7 @@ def push_scan():
                             "outcome_errors": outcome_result["errors"]
                         })
                     else:
-                        # Primero persistir la señal operable en el historial.
-                        # Si falla, NO se registra el cambio de estado: el siguiente
-                        # ciclo podrá reintentar sin perder la señal.
-                        candle_time = str(data.get("candle_time") or "")
-                        if direction in ("COMPRA", "VENTA"):
-                            signal_key = "|".join([symbol, interval, direction, candle_time])
-                            history_payload = {
-                                "signal_key": signal_key,
-                                "symbol": symbol,
-                                "timeframe": interval,
-                                "direction": direction,
-                                "entry_price": data.get("entry"),
-                                "stop_loss": data.get("stop_loss"),
-                                "take_profit": data.get("take_profit"),
-                                "signal_at": datetime.now(timezone.utc).isoformat(),
-                                "candle_time": data.get("candle_time"),
-                                "status": "PENDIENTE",
-                                "indicators": {
-                                    "ema20": data.get("ema20"),
-                                    "ema50": data.get("ema50"),
-                                    "rsi14": data.get("rsi14"),
-                                    "adx14": data.get("adx14"),
-                                    "atr14": data.get("atr14"),
-                                    "macd": data.get("macd"),
-                                    "macd_signal": data.get("macd_signal"),
-                                    "macd_histogram": data.get("macd_histogram"),
-                                    "bollinger_upper": data.get("bollinger_upper"),
-                                    "bollinger_middle": data.get("bollinger_middle"),
-                                    "bollinger_lower": data.get("bollinger_lower"),
-                                    "buy_score": data.get("buy_score"),
-                                    "sell_score": data.get("sell_score"),
-                                },
-                            }
-                            history_response = requests.post(
-                                SUPABASE_URL + "/rest/v1/signal_history?on_conflict=signal_key",
-                                headers={
-                                    **supabase_headers(),
-                                    "Prefer": "resolution=ignore-duplicates,return=minimal",
-                                },
-                                json=history_payload,
-                                timeout=15,
-                            )
-                            if history_response.status_code not in (200, 201, 204):
-                                results.append({
-                                    "symbol": symbol, "interval": interval,
-                                    "status": "history_save_error",
-                                    "http_status": history_response.status_code,
-                                })
-                                continue
-
+                        # El historial ya quedó asegurado arriba antes de leer/guardar el estado.
                         # El estado se guarda solo después de asegurar el historial.
                         # Si falla este paso, la inserción idempotente del historial
                         # permitirá reintentar el siguiente ciclo sin duplicar señales.

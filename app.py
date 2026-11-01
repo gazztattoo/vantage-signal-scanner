@@ -215,6 +215,40 @@ def atr(candles, period=14):
     return value
 
 
+def macd(values, fast=12, slow=26, signal_period=9):
+    if len(values) < slow + signal_period:
+        return None, None, None
+    line = [ema(values[:i + 1], fast) - ema(values[:i + 1], slow)
+            for i in range(slow - 1, len(values))]
+    signal_line = ema(line, signal_period)
+    return line[-1], signal_line, line[-1] - signal_line
+
+def bollinger(values, period=20, deviations=2.0):
+    if len(values) < period: return None, None, None
+    window = values[-period:]
+    middle = sum(window) / period
+    variance = sum((v-middle)**2 for v in window) / period
+    width = deviations * variance ** 0.5
+    return middle + width, middle, middle - width
+
+def adx(candles, period=14):
+    if len(candles) < period * 2 + 1: return None
+    trs, plus_dm, minus_dm = [], [], []
+    for i in range(1, len(candles)):
+        cur, prev = candles[i], candles[i-1]
+        up, down = cur['high']-prev['high'], prev['low']-cur['low']
+        plus_dm.append(up if up > down and up > 0 else 0.0)
+        minus_dm.append(down if down > up and down > 0 else 0.0)
+        trs.append(max(cur['high']-cur['low'], abs(cur['high']-prev['close']), abs(cur['low']-prev['close'])))
+    dx = []
+    for end in range(period, len(trs)+1):
+        total = sum(trs[end-period:end])
+        if total <= 0: continue
+        p = 100*sum(plus_dm[end-period:end])/total
+        m = 100*sum(minus_dm[end-period:end])/total
+        dx.append(100*abs(p-m)/(p+m) if p+m else 0.0)
+    return sum(dx[-period:])/period if len(dx) >= period else None
+
 def parse_candle_time(raw_time):
     """Convierte la fecha de la vela a hora consciente de zona horaria."""
     if not raw_time:
@@ -437,11 +471,14 @@ def analysis():
         ema50 = ema(closes, 50)
         rsi14 = rsi(closes, 14)
         atr14 = atr(candles, 14)
+        adx14 = adx(candles, 14)
+        macd_line, macd_signal, macd_hist = macd(closes)
+        bb_upper, bb_middle, bb_lower = bollinger(closes, 20, 2.0)
 
         entry = closes[-1]
 
         if (
-            None in (ema20, ema50, rsi14, atr14)
+            None in (ema20, ema50, rsi14, atr14, adx14, macd_line, macd_signal, macd_hist, bb_upper, bb_middle, bb_lower)
             or atr14 <= 0
         ):
             raise RuntimeError(
@@ -449,26 +486,19 @@ def analysis():
                 "para calcular los indicadores"
             )
 
-        # Reglas técnicas experimentales.
-        signal = "ESPERAR"
-        reason = (
-            "Los indicadores no muestran una combinación clara."
-        )
-
-        if ema20 > ema50 and 50 <= rsi14 < 70:
-            signal = "COMPRA"
-            reason = (
-                "EMA 20 por encima de EMA 50 y RSI "
-                "en zona de impulso alcista."
-            )
-
-        elif ema20 < ema50 and 30 < rsi14 <= 50:
-            signal = "VENTA"
-            reason = (
-                "EMA 20 por debajo de EMA 50 y RSI "
-                "en zona de impulso bajista."
-            )
-
+        # Motor multicriterio experimental: tendencia, fuerza y momentum.
+        buy_checks = {'EMA20 > EMA50': ema20 > ema50, 'RSI 52-68': 52 <= rsi14 <= 68, 'MACD positivo': macd_hist > 0, 'Precio sobre media Bollinger': entry > bb_middle}
+        sell_checks = {'EMA20 < EMA50': ema20 < ema50, 'RSI 32-48': 32 <= rsi14 <= 48, 'MACD negativo': macd_hist < 0, 'Precio bajo media Bollinger': entry < bb_middle}
+        buy_score = sum(buy_checks.values())
+        sell_score = sum(sell_checks.values())
+        signal = 'ESPERAR'
+        reason = 'Confluencia insuficiente o tendencia débil; se espera.'
+        if adx14 >= 18 and buy_score >= 3 and buy_score > sell_score:
+            signal = 'COMPRA'
+            reason = 'Confluencia alcista: ' + ', '.join(k for k,v in buy_checks.items() if v) + '. ADX ' + str(round(adx14,1))
+        elif adx14 >= 18 and sell_score >= 3 and sell_score > buy_score:
+            signal = 'VENTA'
+            reason = 'Confluencia bajista: ' + ', '.join(k for k,v in sell_checks.items() if v) + '. ADX ' + str(round(adx14,1))
         stop_loss = None
         take_profit = None
 
@@ -493,12 +523,22 @@ def analysis():
             "ema50": ema50,
             "rsi14": rsi14,
             "atr14": atr14,
+            "adx14": adx14,
+            "macd": macd_line,
+            "macd_signal": macd_signal,
+            "macd_histogram": macd_hist,
+            "bollinger_upper": bb_upper,
+            "bollinger_middle": bb_middle,
+            "bollinger_lower": bb_lower,
+            "buy_score": buy_score,
+            "sell_score": sell_score,
+            "score_max": 4,
             "candle_time": candle_time,
             "candle_age_minutes": candle_age_minutes,
             "candles": len(candles),
             "method": (
-                "EMA20/EMA50 + RSI14; "
-                "SL=1.5x ATR; TP=3x ATR"
+                "EMA20/EMA50 + RSI14 + MACD + ADX14 + Bollinger(20,2); "
+                "score mínimo 3/4 y ADX>=18; SL=1.5x ATR; TP=3x ATR"
             ),
             "warning": (
                 "Señal técnica experimental. Verifica datos, "

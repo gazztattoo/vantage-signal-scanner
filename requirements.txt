@@ -4,4 +4,3 @@ requests
 gunicorn
 flask-cors
 itsdangerous
-pywebpush==2.0.3

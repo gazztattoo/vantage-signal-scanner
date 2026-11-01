@@ -599,6 +599,117 @@ def push_test():
         return jsonify({"error": "No se pudo conectar con el almacenamiento."}), 502
 
 
+SIGNAL_CRON_SECRET = os.environ.get("SIGNAL_CRON_SECRET", "")
+
+@app.route("/api/push/scan", methods=["POST"])
+def push_scan():
+    supplied = request.headers.get("X-Scanner-Cron-Secret", "")
+    if not SIGNAL_CRON_SECRET or not hmac.compare_digest(supplied, SIGNAL_CRON_SECRET):
+        return jsonify({"error": "No autorizado."}), 401
+
+    results = []
+    sent_total = 0
+    token = access_serializer().dumps({"access": True})
+    intervals = ["5min", "15min", "30min"]
+    symbols = ["EUR/USD", "XAU/USD", "BTC/USD"]
+
+    # Reutiliza el mismo endpoint de análisis que consume el panel.
+    # Pausa entre consultas para no superar de golpe el límite del proveedor.
+    import time
+    with app.test_client() as client:
+        for index, (symbol, interval) in enumerate(
+            (pair for interval in intervals for pair in [(s, interval) for s in symbols])
+        ):
+            response = client.get(
+                "/api/analysis",
+                query_string={"symbol": symbol, "interval": interval},
+                headers={"Authorization": "Bearer " + token},
+            )
+            if response.status_code != 200:
+                results.append({
+                    "symbol": symbol, "interval": interval,
+                    "status": "analysis_error",
+                    "detail": (response.get_json(silent=True) or {}).get("error", "Error de análisis"),
+                })
+            else:
+                data = response.get_json() or {}
+                direction = data.get("signal")
+                if direction not in ("COMPRA", "VENTA"):
+                    results.append({"symbol": symbol, "interval": interval, "status": "no_signal"})
+                else:
+                    candle_time = str(data.get("candle_time") or "")
+                    fingerprint = "|".join([symbol, interval, direction, candle_time])
+                    alert_body = (
+                        f"{direction} · {symbol} · {interval} | "
+                        f"Entrada: {data.get('entry')} | "
+                        f"SL: {data.get('stop_loss')} | TP: {data.get('take_profit')}"
+                    )
+                    subs_response = requests.get(
+                        SUPABASE_URL + "/rest/v1/push_subscriptions?select=subscription",
+                        headers=supabase_headers(), timeout=15,
+                    )
+                    if subs_response.status_code != 200:
+                        results.append({"symbol": symbol, "interval": interval, "status": "subscription_read_error"})
+                    else:
+                        subscriptions = subs_response.json()
+                        delivered = 0
+                        expired = []
+                        for row in subscriptions:
+                            subscription = row.get("subscription")
+                            if not isinstance(subscription, dict):
+                                continue
+                            try:
+                                send_web_push(subscription, {
+                                    "title": f"GLOBAL SIGNAL · {direction}",
+                                    "body": alert_body,
+                                    "tag": "gss-" + symbol.replace("/", "") + "-" + interval,
+                                    "url": "https://global-signal-push-test-panel.onrender.com/panel_escaner_vantage.html",
+                                    "data": {
+                                        "symbol": symbol, "interval": interval,
+                                        "direction": direction, "entry": data.get("entry"),
+                                        "stop_loss": data.get("stop_loss"),
+                                        "take_profit": data.get("take_profit"),
+                                    },
+                                })
+                                delivered += 1
+                            except Exception as exc:
+                                response_obj = getattr(exc, "response", None)
+                                if getattr(response_obj, "status_code", None) in (404, 410):
+                                    expired.append(subscription.get("endpoint", ""))
+                        for endpoint in expired:
+                            if endpoint:
+                                requests.delete(
+                                    SUPABASE_URL + "/rest/v1/push_subscriptions?endpoint=eq." + requests.utils.quote(endpoint, safe=""),
+                                    headers=supabase_headers(), timeout=10,
+                                )
+                        if delivered:
+                            insert_response = requests.post(
+                                SUPABASE_URL + "/rest/v1/signal_alerts?on_conflict=fingerprint",
+                                headers={
+                                    **supabase_headers(),
+                                    "Prefer": "resolution=ignore-duplicates,return=representation",
+                                },
+                                json={
+                                    "market": symbol, "timeframe": interval,
+                                    "direction": direction, "fingerprint": fingerprint,
+                                },
+                                timeout=15,
+                            )
+                            if insert_response.status_code not in (200, 201):
+                                results.append({"symbol": symbol, "interval": interval, "status": "history_save_error"})
+                            elif insert_response.json():
+                                sent_total += delivered
+                                results.append({"symbol": symbol, "interval": interval, "status": "sent", "devices": delivered})
+                            else:
+                                results.append({"symbol": symbol, "interval": interval, "status": "duplicate"})
+                        else:
+                            results.append({"symbol": symbol, "interval": interval, "status": "no_delivery"})
+            if index < 8:
+                time.sleep(8)
+
+    return jsonify({"ok": True, "alerts_sent": sent_total, "checks": results})
+
+
 if __name__ == "__main__":
     app.run(
         host="0.0.0.0",

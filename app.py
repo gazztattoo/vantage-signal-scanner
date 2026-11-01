@@ -362,6 +362,7 @@ def fetch_candles(symbol, interval):
         except (KeyError, TypeError, ValueError):
             continue
 
+        candle["time"] = candle_time.astimezone(CANARY_TZ).isoformat()
         candles.append(candle)
         valid_times.append(candle_time)
 
@@ -575,6 +576,10 @@ def analysis():
             "candle_time": candle_time,
             "candle_age_minutes": candle_age_minutes,
             "candles": len(candles),
+            "recent_candles": [
+                {"time": candle["time"], "high": candle["high"], "low": candle["low"], "close": candle["close"]}
+                for candle in candles
+            ],
             "method": (
                 "EMA20/EMA50 + RSI14 + MACD + ADX14 + Bollinger(20,2); "
                 "score mínimo 3/4 y ADX>=18; SL=1.5x ATR; TP=3x ATR"
@@ -851,6 +856,93 @@ def push_test():
         return jsonify({"error": "No se pudo conectar con el almacenamiento."}), 502
 
 
+def resolve_pending_signal_outcomes(symbol, interval, recent_candles):
+    """Cierra señales del escáner usando velas cerradas posteriores a la vela de señal."""
+    if not recent_candles:
+        return {"resolved": 0, "errors": 0}
+
+    response = requests.get(
+        SUPABASE_URL + "/rest/v1/signal_history",
+        params={
+            "select": "id,direction,candle_time,stop_loss,take_profit,status",
+            "symbol": "eq." + symbol,
+            "timeframe": "eq." + interval,
+            "status": "eq.PENDIENTE",
+            "order": "candle_time.asc",
+            "limit": "200",
+        },
+        headers=supabase_headers(), timeout=15,
+    )
+    if response.status_code != 200:
+        return {"resolved": 0, "errors": 1}
+
+    pending = response.json()
+    resolved = 0
+    errors = 0
+    interval_seconds = INTERVAL_MINUTES[interval] * 60
+
+    for signal in pending:
+        try:
+            signal_time = datetime.fromisoformat(str(signal["candle_time"]).replace("Z", "+00:00"))
+            stop = float(signal["stop_loss"])
+            target = float(signal["take_profit"])
+            direction = signal["direction"]
+            outcome = None
+            exit_price = None
+            closing_candle = None
+
+            for candle in recent_candles:
+                candle_time = datetime.fromisoformat(str(candle["time"]).replace("Z", "+00:00"))
+                if candle_time <= signal_time:
+                    continue
+                high = float(candle["high"])
+                low = float(candle["low"])
+                if direction == "COMPRA":
+                    hit_sl = low <= stop
+                    hit_tp = high >= target
+                else:
+                    hit_sl = high >= stop
+                    hit_tp = low <= target
+
+                # Si ambos niveles aparecen tocados en la misma vela OHLC,
+                # se aplica el criterio conservador: SL primero.
+                if hit_sl:
+                    outcome, exit_price, closing_candle = "SL", stop, candle
+                    break
+                if hit_tp:
+                    outcome, exit_price, closing_candle = "TP", target, candle
+                    break
+
+            if not outcome:
+                continue
+
+            close_time = datetime.fromisoformat(str(closing_candle["time"]).replace("Z", "+00:00"))
+            closed_at = (close_time.timestamp() + interval_seconds)
+            closed_iso = datetime.fromtimestamp(closed_at, timezone.utc).isoformat()
+            patch = requests.patch(
+                SUPABASE_URL + "/rest/v1/signal_history",
+                params={"id": "eq." + str(signal["id"]), "status": "eq.PENDIENTE"},
+                headers={**supabase_headers(), "Prefer": "return=minimal"},
+                json={
+                    "status": outcome,
+                    "exit_price": exit_price,
+                    "closed_at": closed_iso,
+                    "result_r": 2.0 if outcome == "TP" else -1.0,
+                    "result_source": "Velas OHLC cerradas posteriores a la señal; si TP y SL coinciden en una vela, se cuenta SL primero.",
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                },
+                timeout=15,
+            )
+            if patch.status_code in (200, 204):
+                resolved += 1
+            else:
+                errors += 1
+        except (KeyError, TypeError, ValueError, requests.RequestException):
+            errors += 1
+
+    return {"resolved": resolved, "errors": errors}
+
+
 SIGNAL_CRON_SECRET = os.environ.get("SIGNAL_CRON_SECRET", "")
 
 @app.route("/api/push/scan", methods=["POST"])
@@ -896,6 +988,9 @@ def push_scan():
                 })
             else:
                 data = response.get_json() or {}
+                outcome_result = resolve_pending_signal_outcomes(
+                    symbol, interval, data.get("recent_candles", [])
+                )
                 direction = data.get("signal") or "ESPERAR"
 
                 # Consultar el último estado registrado para este mercado y temporalidad.
@@ -927,7 +1022,9 @@ def push_scan():
                         results.append({
                             "symbol": symbol, "interval": interval,
                             "status": "same_signal_no_notification",
-                            "direction": direction
+                            "direction": direction,
+                            "outcomes_resolved": outcome_result["resolved"],
+                            "outcome_errors": outcome_result["errors"]
                         })
                     else:
                         candle_time = str(data.get("candle_time") or "")

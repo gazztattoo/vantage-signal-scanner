@@ -120,3 +120,63 @@ The Supabase service-role key must never be placed in the MCP service.
 - No MCP implementation should be connected to the protected routes until a
   separate read-only credential/authorization boundary is implemented and tested
   in TEST, with no access to push or mutation routes.
+
+
+## Proposed implementation plan — review checkpoint (no application code changed)
+
+### What was inspected
+- `app.py` defines a Flask `before_request` guard that currently protects
+  analysis, price, history, performance, lab-status and three push POST routes
+  with one itsdangerous panel token.
+- `/api/access` issues that broad panel token after checking the panel access code.
+- History/performance read data through the existing API's Supabase REST helper.
+- `requirements.txt` currently has no JWT/JWKS verification library.
+- This inspection was read-only. No application source, dependencies, tests,
+  environment variables, database policies, or deployments were changed.
+
+### Proposed TEST-only code change (not yet authorized or implemented)
+1. Add a dedicated Auth0 API resource for the TEST API with a unique audience
+   identifier and a single permission `scanner:read`.
+2. Add a separate M2M client for the MCP service. Its client-credentials grant
+   requests a token for that TEST API audience with only `scanner:read`.
+   Store its client secret only in the future MCP service's private environment;
+   it must never be placed in GitHub or this API source.
+3. Add a small JWT verifier to the TEST Flask API, using Auth0's published JWKS
+   and a maintained JWT library (for example PyJWT with cryptographic support).
+   Pin the dependency after compatibility review. Cache JWKS safely; validate
+   RS256, exact issuer, exact TEST API audience, expiry and `scanner:read`.
+   Fail closed on missing configuration, invalid token or JWKS/network failure.
+4. Keep the current panel-token validation intact. On the protected data GET
+   routes only, accept either the existing panel token OR a valid dedicated
+   read-only API token. The read-only token must never satisfy panel access,
+   push routes or any non-GET route. Do not alter `/api/access`.
+5. Keep the allowlist explicit: `GET /api/price`, `GET /api/analysis`,
+   `GET /api/history`, `GET /api/performance`, `GET /api/lab-status`.
+   Health and market-status remain public as they are today. MCP tools should
+   still expose only the six named read tools and validate all arguments.
+6. Preserve the panel's existing behavior and response payloads. Do not change
+   signal calculation, signal history, Supabase policies/data, push code,
+   notification delivery, UI, banner, or spacing.
+
+### Mandatory test matrix before any deployment
+- Existing panel token: current protected panel GETs still work as before.
+- Valid Auth0 read-only token: succeeds on each explicitly approved data GET.
+- Same read-only token: rejected on `POST /api/access`, all `/api/push/*`
+  routes (including public-key if policy keeps it public, no write access either
+  way), and every other non-allowlisted route.
+- Wrong issuer, audience, algorithm, signature, expired token, missing scope,
+  malformed claims and unavailable JWKS: rejected safely.
+- Unknown symbols/intervals/filters, repeated or unknown query keys and
+  out-of-range limits: rejected or constrained according to documented schema.
+- OPTIONS/CORS behavior and existing panel browser flow remain unchanged.
+- Unit tests use mocked JWKS and mocked upstream calls; integration tests point
+  only at TEST. No live notification, scan, database write or trading action.
+- Secret scan confirms no Auth0 credentials or runtime secrets in Git history,
+  source, fixtures, logs or test output.
+
+### Scope and deployment gate
+This change is limited to a proposed diff on `mcp-readonly-test`. Do not push
+`push-test`, because it auto-deploys. Do not create or modify a Render service,
+Auth0 callback, production resource, or deployment until the code diff, test
+results, TEST environment-variable names/values handling, and rollback plan have
+been shown to the user and explicitly approved.

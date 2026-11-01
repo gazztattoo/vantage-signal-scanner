@@ -69,6 +69,9 @@ label,.hint{font-size:12px;color:var(--muted)}
 select,button{font:inherit;border-radius:11px;padding:11px 13px;border:1px solid var(--line);background:#101a14;color:var(--text)}
 button{cursor:pointer;font-weight:800;background:var(--green);color:#06130b;border-color:var(--green)}
 button:disabled{opacity:.45;cursor:not-allowed}
+.notification-toolbar{padding:12px;border:1px solid var(--line);border-radius:13px;background:rgba(16,25,21,.72)}
+.notification-toolbar #togglePush{min-width:210px}
+.notification-toolbar #togglePush.is-active{background:#182b20;color:var(--green);border-color:#28543a}
 .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
 
 
@@ -363,6 +366,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
   </select>
   <button id="refresh">↻ Actualizar análisis</button>
   <span class="hint" id="updated">Sin actualizar</span>
+</section>
+
+<section class="toolbar notification-toolbar" aria-label="Notificaciones">
+  <button id="togglePush" type="button">🔔 Activar notificaciones</button>
+  <span class="hint" id="pushStatus" role="status" aria-live="polite">Notificaciones desactivadas</span>
 </section>
 
 <section class="grid" id="cards" aria-live="polite"></section>
@@ -800,6 +808,70 @@ async function update(){
 button.addEventListener("click",update);
 document.getElementById("interval").addEventListener("change",update);
 if(accessToken){hideAccessGate();update();}else{showAccessGate();statusEl.textContent="Acceso requerido";}
+
+const pushStatus=document.getElementById("pushStatus");
+const togglePushButton=document.getElementById("togglePush");
+const PUSH_API=API_BASE+"/api/push";
+function urlBase64ToUint8Array(value){
+  const padding="=".repeat((4-value.length%4)%4);
+  const base64=(value+padding).replace(/-/g,"+").replace(/_/g,"/");
+  const raw=atob(base64);
+  return Uint8Array.from([...raw].map(char=>char.charCodeAt(0)));
+}
+function setPushUi(active,message){
+  togglePushButton.textContent=active?"🔕 Desactivar notificaciones":"🔔 Activar notificaciones";
+  togglePushButton.classList.toggle("is-active",active);
+  pushStatus.textContent=message;
+}
+async function restorePushState(){
+  try{
+    if(!("serviceWorker" in navigator)||!("PushManager" in window)||!("Notification" in window)){
+      togglePushButton.disabled=true;pushStatus.textContent="Este navegador no admite notificaciones push.";return;
+    }
+    const registration=await navigator.serviceWorker.ready;
+    const subscription=await registration.pushManager.getSubscription();
+    const active=Notification.permission==="granted"&&Boolean(subscription);
+    setPushUi(active,active?"Notificaciones activadas en este dispositivo":
+      Notification.permission==="denied"?"Permiso bloqueado en los ajustes del dispositivo":"Notificaciones desactivadas");
+  }catch(error){pushStatus.textContent="No se pudo comprobar el estado de las notificaciones.";}
+}
+togglePushButton.addEventListener("click",async()=>{
+  togglePushButton.disabled=true;
+  try{
+    if(!accessToken)throw new Error("Primero debes entrar al scanner.");
+    if(!("serviceWorker" in navigator)||!("PushManager" in window)||!("Notification" in window))
+      throw new Error("Este navegador no admite notificaciones push.");
+    const registration=await navigator.serviceWorker.ready;
+    let subscription=await registration.pushManager.getSubscription();
+    if(subscription){
+      const response=await fetch(PUSH_API+"/unsubscribe",{method:"POST",
+        headers:{"Content-Type":"application/json","Authorization":"Bearer "+accessToken},
+        body:JSON.stringify({endpoint:subscription.endpoint})});
+      const result=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(result.error||"No se pudo desactivar la suscripción.");
+      await subscription.unsubscribe();
+      setPushUi(false,"Notificaciones desactivadas en este dispositivo.");return;
+    }
+    const permission=await Notification.requestPermission();
+    if(permission!=="granted")throw new Error("No se concedió permiso para notificaciones.");
+    const keyResponse=await fetch(PUSH_API+"/public-key");
+    const keyData=await keyResponse.json().catch(()=>({}));
+    if(!keyResponse.ok||!keyData.public_key)throw new Error(keyData.error||"No se pudo obtener la clave pública.");
+    subscription=await registration.pushManager.subscribe({userVisibleOnly:true,
+      applicationServerKey:urlBase64ToUint8Array(keyData.public_key)});
+    const response=await fetch(PUSH_API+"/subscribe",{method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+accessToken},
+      body:JSON.stringify({subscription:subscription.toJSON()})});
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok){await subscription.unsubscribe().catch(()=>{});throw new Error(result.error||"No se pudo guardar la suscripción.");}
+    setPushUi(true,"Notificaciones activadas en este dispositivo.");
+  }catch(error){
+    pushStatus.textContent=error.message||"No se pudo cambiar el estado de las notificaciones.";
+    await restorePushState();
+  }finally{togglePushButton.disabled=false;}
+});
+restorePushState();
+
 </script>
 
 <script>

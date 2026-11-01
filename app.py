@@ -1403,6 +1403,7 @@ def push_scan():
                                 f"TP {display_price(data.get('take_profit'))}"
                             )
                             queued = 0
+                            queue_errors = 0
                             for row in subscriptions:
                                 endpoint = row.get("endpoint")
                                 subscription = row.get("subscription")
@@ -1438,10 +1439,22 @@ def push_scan():
                                 )
                                 if queue_response.status_code in (200, 201, 204):
                                     queued += 1
+                                else:
+                                    queue_errors += 1
+                            if queue_errors:
+                                # Permitir que el siguiente ciclo reconstruya las filas que faltaron.
+                                # La unicidad del outbox evita duplicar las que ya quedaron guardadas.
+                                requests.delete(
+                                    SUPABASE_URL + "/rest/v1/signal_alerts",
+                                    params={"market": "eq." + symbol, "timeframe": "eq." + interval,
+                                            "fingerprint": "eq." + fingerprint},
+                                    headers=supabase_headers(), timeout=10,
+                                )
                             results.append({
                                 "symbol": symbol, "interval": interval,
                                 "status": "delivery_queued" if queued else "new_signal_no_subscribers",
-                                "devices_queued": queued
+                                "devices_queued": queued,
+                                "queue_errors": queue_errors
                             })
 
             if index < 8:

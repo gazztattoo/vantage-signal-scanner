@@ -69,9 +69,6 @@ label,.hint{font-size:12px;color:var(--muted)}
 select,button{font:inherit;border-radius:11px;padding:11px 13px;border:1px solid var(--line);background:#101a14;color:var(--text)}
 button{cursor:pointer;font-weight:800;background:var(--green);color:#06130b;border-color:var(--green)}
 button:disabled{opacity:.45;cursor:not-allowed}
-.notification-toolbar{padding:12px;border:1px solid var(--line);border-radius:13px;background:rgba(16,25,21,.72)}
-.notification-toolbar #togglePush{min-width:210px}
-.notification-toolbar #togglePush.is-active{background:#182b20;color:var(--green);border-color:#28543a}
 .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
 
 
@@ -294,7 +291,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .foot{font-size:10px;color:var(--muted);line-height:1.5;margin-top:12px}
 .error{color:var(--red);overflow-wrap:anywhere;word-break:break-word}
 .bottom{
-  margin-top:0;
+  margin-top:14px;
   padding:0;
   border:0;
   background:transparent;
@@ -303,6 +300,33 @@ button:disabled{opacity:.45;cursor:not-allowed}
   overflow:hidden;
 }
 .bottom strong{color:var(--text)}
+
+.app-nav{display:flex;gap:8px;overflow:visible;padding:9px;margin:0;border:1px solid #294536;border-radius:18px;background:rgba(5,14,9,.96);position:fixed;left:50%;bottom:calc(12px + env(safe-area-inset-bottom));transform:translateX(-50%);width:min(680px,calc(100% - 24px));z-index:1000;box-shadow:0 10px 35px rgba(0,0,0,.55),0 0 18px rgba(88,242,154,.08);backdrop-filter:blur(18px)}
+.app-nav button{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:9px 6px;background:transparent;color:var(--muted);border:1px solid transparent;border-radius:12px;font-size:11px}
+.app-nav button.active{background:#123b26;color:var(--green);border-color:#28543a}
+.app-nav .nav-icon{width:23px;height:23px;display:grid;place-items:center;color:currentColor;opacity:.88}.app-nav .nav-icon svg{display:block;width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.app-nav button.active .nav-icon{opacity:1}.app-nav button{transition:background .18s,border-color .18s,color .18s,transform .18s}.app-nav button:active{transform:scale(.96)}
+.app-nav button span:last-child{font-size:10px}
+.app-view[hidden]{display:none!important}
+body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
+.wrap{padding-bottom:calc(112px + env(safe-area-inset-bottom))}
+.data-panel{background:linear-gradient(160deg,#121e17,#0c130f);border:1px solid var(--line);border-radius:16px;padding:15px;margin:0 0 12px;overflow:hidden}
+.data-panel h2{font-size:17px;margin:0 0 5px}
+.data-panel p{font-size:12px;color:var(--muted);line-height:1.5;margin:0 0 12px}
+.data-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.data-toolbar select,.data-toolbar button{flex:1;min-width:110px}
+.data-list{display:grid;gap:9px}
+.data-row{display:grid;grid-template-columns:1.1fr .9fr .9fr;gap:8px;padding:11px;border:1px solid var(--line);border-radius:11px;background:#080f0b}
+.data-row strong{display:block;font-size:12px;overflow-wrap:anywhere}
+.data-row span{display:block;color:var(--muted);font-size:9px;margin-bottom:4px}
+.data-status{font-size:10px;font-weight:900;color:var(--amber)}
+.data-status.tp{color:var(--green)}.data-status.sl{color:var(--red)}
+.stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.stat-box{padding:13px;border:1px solid var(--line);border-radius:12px;background:#080f0b}
+.stat-box span{display:block;color:var(--muted);font-size:10px}
+.stat-box strong{display:block;font-size:22px;margin-top:5px}
+.empty-state{padding:22px 12px;text-align:center;border:1px dashed #31503d;border-radius:12px;color:var(--muted);font-size:12px;line-height:1.6}
+@media(max-width:560px){.app-nav{gap:2px;padding:6px}.app-nav button{min-width:0;padding:8px 2px;font-size:9px}.app-nav .nav-icon{width:21px;height:21px}.app-nav .nav-icon svg{width:20px;height:20px}.app-nav button span:last-child{font-size:9px}.data-row{grid-template-columns:1fr 1fr}.data-row>div:last-child{grid-column:1/-1}.stat-box strong{font-size:19px}}
+
 @media(max-width:760px){
   .grid{grid-template-columns:1fr}
   .wrap{padding:17px 12px}
@@ -330,6 +354,16 @@ button:disabled{opacity:.45;cursor:not-allowed}
     <span id="status">Esperando conexión</span>
   </div>
 </header>
+
+<nav class="app-nav" aria-label="Navegación principal">
+  <button type="button" class="active" data-view="scanner" aria-label="Scanner"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></span><span>Scanner</span></button>
+  <button type="button" data-view="analysis" aria-label="Análisis"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 3v18M20 3v18M4 7h4v6H4zM10 5h4v11h-4zM16 9h4v7h-4z"/></svg></span><span>Análisis</span></button>
+  <button type="button" data-view="performance" aria-label="Rendimiento"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 20h18M5 16l5-5 3 2 6-7"/><path d="M14 6h5v5"/><path d="M5 20V17M10 20v-3M15 20v-5M20 20v-8"/></svg></span><span>Rendimiento</span></button>
+  <button type="button" data-view="history" aria-label="Historial"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"/><path d="M3 3v5h5M12 7v5l3.5 2"/></svg></span><span>Historial</span></button>
+  <button type="button" data-view="lab" aria-label="Lab"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5.5 9.2A2 2 0 0 0 6.2 21h11.6a2 2 0 0 0 1.7-2.8L14 9V3"/><path d="M8 15h8M10 12h4"/></svg></span><span>Lab</span></button>
+</nav>
+
+<div class="app-view" id="viewScanner">
 
 <section class="market-overview" aria-label="Resumen técnico del mercado">
   <section class="overview-panel">
@@ -368,9 +402,12 @@ button:disabled{opacity:.45;cursor:not-allowed}
   <span class="hint" id="updated">Sin actualizar</span>
 </section>
 
-<section class="toolbar notification-toolbar" aria-label="Notificaciones">
-  <button id="togglePush" type="button">🔔 Activar notificaciones</button>
-  <span class="hint" id="pushStatus" role="status" aria-live="polite">Notificaciones desactivadas</span>
+
+<section class="toolbar" aria-label="Notificaciones">
+  <button id="enablePush" type="button">🔔 Activar notificaciones</button>
+  <button id="disablePush" type="button" disabled>🔕 Desactivar notificaciones</button>
+  <button id="testPush" type="button" disabled>Enviar notificación de prueba</button>
+  <span class="hint" id="pushStatus">Notificaciones desactivadas</span>
 </section>
 
 <section class="grid" id="cards" aria-live="polite"></section>
@@ -382,6 +419,63 @@ button:disabled{opacity:.45;cursor:not-allowed}
     style="display:block;width:100%;height:auto;"
   >
 </div>
+</div>
+
+<section class="app-view" id="viewHistory" hidden>
+  <div class="data-panel">
+    <h2>Historial de señales</h2>
+    <p>Operaciones registradas automáticamente por el escáner. Solo se muestran registros reales guardados en el servidor.</p>
+    <div class="data-toolbar">
+      <select id="historySymbol"><option value="">Todos los mercados</option><option>EUR/USD</option><option>XAU/USD</option><option>BTC/USD</option></select>
+      <select id="historyTimeframe"><option value="">Todas las temporalidades</option><option value="5min">M5</option><option value="15min">M15</option><option value="30min">M30</option></select>
+      <select id="historyStatus"><option value="">Todos los estados</option><option>PENDIENTE</option><option>TP</option><option>SL</option><option>CADUCADA</option><option>CANCELADA</option></select>
+      <button id="historyRefresh" type="button">Actualizar</button>
+    </div>
+    <div id="historyMessage" class="hint" style="margin-bottom:10px">Cargando historial…</div>
+    <div id="historyList" class="data-list"></div>
+  </div>
+</section>
+
+<section class="app-view" id="viewPerformance" hidden>
+  <div class="data-panel">
+    <h2>Efectividad del scanner · Simulación</h2>
+    <p>Evaluación automática de señales hipotéticas. No abre operaciones reales. Las pendientes se muestran aparte y solo TP/SL cuentan para el porcentaje de acierto.</p>
+    <div id="performanceMessage" class="hint" style="margin-bottom:12px">Cargando estadísticas…</div>
+    <div id="performanceStats" class="stat-grid"></div>
+    <div id="performanceBreakdown" class="data-list" style="margin-top:12px"></div>
+  </div>
+</section>
+
+<section class="app-view" id="viewAnalysis" hidden>
+  <div class="data-panel">
+    <h2>Análisis técnico</h2>
+    <p>Consulta los indicadores del motor para un mercado y temporalidad. Los datos son análisis técnicos experimentales, no una garantía de resultado.</p>
+    <div class="data-toolbar">
+      <select id="analysisSymbol"><option value="EUR/USD">EUR/USD</option><option value="XAU/USD">XAU/USD</option><option value="BTC/USD">BTC/USD</option></select>
+      <select id="analysisTimeframe"><option value="5min">M5</option><option value="15min">M15</option><option value="30min">M30</option></select>
+      <button id="analysisRefresh" type="button">Analizar</button>
+    </div>
+    <div id="analysisMessage" class="hint" style="margin-bottom:12px">Selecciona un mercado para consultar sus indicadores.</div>
+    <div id="analysisResult" class="stat-grid"></div>
+  </div>
+</section>
+
+<section class="app-view" id="viewLab" hidden>
+  <div class="data-panel">
+    <h2>Signal Lab</h2>
+    <p>Laboratorio experimental del motor de confluencia. Aquí mostramos qué filtros utiliza el análisis; no se ejecutan operaciones ni se presentan resultados hipotéticos como rendimiento real.</p>
+    <div class="stat-grid">
+      <div class="stat-box"><span>Tendencia</span><strong>EMA 20 / 50</strong></div>
+      <div class="stat-box"><span>Momentum</span><strong>RSI 14 + MACD</strong></div>
+      <div class="stat-box"><span>Volatilidad</span><strong>ATR 14 + Bollinger</strong></div>
+      <div class="stat-box"><span>Fuerza</span><strong>ADX 14</strong></div>
+    </div>
+    <div id="labMessage" class="hint" style="margin:12px 0">Consultando diagnóstico real…</div>
+    <div id="labStats" class="stat-grid"></div>
+    <div id="labDetails" class="data-panel" style="margin-top:12px"></div>
+    <button id="labRefresh" type="button" style="margin-top:10px">Actualizar diagnóstico</button>
+  </div>
+</section>
 
 </main>
 
@@ -459,7 +553,25 @@ function instrumentIdentity(m){
   return `<span class="instrument-mark">${esc(m.symbol.slice(0,1))}</span>`;
 }
 
-function render(m,d,err){
+function render(m,d,err,marketClosed=false){
+  if(marketClosed){
+    return `
+      <article class="card">
+        <div class="cardhead">
+          <div class="instrument-id">
+            ${instrumentIdentity(m)}
+            <div class="instrument-copy">
+              <div class="symbol">${m.symbol}</div>
+              <div class="market">${m.category}</div>
+            </div>
+          </div>
+          <span class="pill">MERCADO CERRADO</span>
+        </div>
+        <p class="reason">Este mercado está fuera de su horario habitual. Los análisis y las alertas se reanudarán cuando vuelva a abrir.</p>
+        <div class="foot">No es un error de conexión ni de datos.</div>
+      </article>
+    `;
+  }
   if(err){
     return `
       <article class="card">
@@ -761,7 +873,22 @@ async function update(){
     </article>
   `).join("");
 
+  let marketState={};
+  try{
+    const marketResponse=await fetch(API_BASE+"/api/market-status");
+    if(marketResponse.ok){
+      const marketData=await marketResponse.json();
+      marketState=marketData.markets||{};
+    }
+  }catch(error){
+    console.warn("No se pudo consultar el horario de mercado",error);
+  }
+
   const out=await Promise.all(markets.map(async m=>{
+    const session=marketState[m.symbol];
+    if(session && !session.open){
+      return {m,marketClosed:true,err:"MERCADO CERRADO · No se generan señales ni alertas fuera de la sesión habitual."};
+    }
     try{
       return {m,d:await load(m)};
     }catch(e){
@@ -769,8 +896,22 @@ async function update(){
     }
   }));
 
-  cards.innerHTML=out.map(x=>render(x.m,x.d,x.err)).join("");
+  cards.innerHTML=out.map(x=>render(x.m,x.d,x.err,!!x.marketClosed)).join("");
   updateOverview(out);
+  const notificationParams=new URLSearchParams(window.location.search);
+  const targetSymbol=notificationParams.get("symbol");
+  if(notificationParams.get("view")==="scanner" && targetSymbol){
+    const target=out.find(x=>x.m.symbol===targetSymbol);
+    const targetCard=[...cards.querySelectorAll(".card")].find(card=>card.querySelector(".symbol")?.textContent.trim()===targetSymbol);
+    if(targetCard){
+      targetCard.scrollIntoView({behavior:"smooth",block:"center"});
+      targetCard.style.outline="2px solid var(--green)";
+      targetCard.style.outlineOffset="3px";
+    }
+    if(target){
+      statusEl.textContent=target.err?"Scanner abierto · "+targetSymbol+" · "+target.err:"Señal de notificación · "+targetSymbol+" · "+document.getElementById("interval").value.toUpperCase();
+    }
+  }
 
   const authExpired=out.some(x=>x.err && (
     x.err.includes("Sesión caducada") ||
@@ -805,72 +946,309 @@ async function update(){
   button.disabled=false;
 }
 
+
+const viewButtons=[...document.querySelectorAll("[data-view]")];
+function switchView(name){
+  viewButtons.forEach(button=>button.classList.toggle("active",button.dataset.view===name));
+  ["scanner","analysis","performance","history","lab"].forEach(view=>{
+    document.getElementById("view"+view[0].toUpperCase()+view.slice(1)).hidden=view!==name;
+  });
+  if(name==="history")loadHistory();
+  if(name==="performance")loadPerformance();
+  if(name==="analysis")loadTechnicalAnalysis();
+  if(name==="lab")loadLabStatus();
+}
+viewButtons.forEach(button=>button.addEventListener("click",()=>switchView(button.dataset.view)));
+const notificationParams=new URLSearchParams(window.location.search);
+if(notificationParams.get("view")==="history") switchView("history");
+if(notificationParams.get("view")==="scanner") switchView("scanner");
+const notificationTimeframe=notificationParams.get("timeframe");
+if(["5min","15min","30min"].includes(notificationTimeframe)){
+  document.getElementById("interval").value=notificationTimeframe;
+}
+
+async function loadTechnicalAnalysis(){
+  const message=document.getElementById("analysisMessage");
+  const result=document.getElementById("analysisResult");
+  const symbol=document.getElementById("analysisSymbol").value;
+  const interval=document.getElementById("analysisTimeframe").value;
+  message.textContent="Consultando indicadores…";result.innerHTML="";
+  try{
+    const params=new URLSearchParams({symbol,interval});
+    const response=await fetch(API_BASE+"/api/analysis?"+params,{headers:authHeaders()});
+    const data=await response.json().catch(()=>({}));
+    if(response.status===401){message.textContent="Sesión caducada. Vuelve a entrar al panel.";showAccessGate();return;}
+    if(!response.ok||data.error)throw new Error(data.error||"No se pudo obtener el análisis.");
+    const fields=[
+      ["Señal",first(data,["signal","direction","recommendation"])||"—"],
+      ["Precio",fmt(first(data,["price","entry"]),8)],
+      ["EMA 20",fmt(first(data,["ema20","ema_20"]),6)],
+      ["EMA 50",fmt(first(data,["ema50","ema_50"]),6)],
+      ["RSI 14",fmt(first(data,["rsi14","rsi_14","rsi"]),2)],
+      ["ADX 14",fmt(first(data,["adx14","adx_14"]),2)],
+      ["MACD",fmt(first(data,["macd"]),6)],
+      ["MACD histograma",fmt(first(data,["macd_histogram"]),6)],
+      ["Bollinger superior",fmt(first(data,["bb_upper","bollinger_upper"]),6)],
+      ["Bollinger media",fmt(first(data,["bb_middle","bollinger_middle"]),6)],
+      ["Bollinger inferior",fmt(first(data,["bb_lower","bollinger_lower"]),6)],
+      ["ATR 14",fmt(first(data,["atr14","atr_14","atr"]),6)],
+      ["Stop Loss",fmt(first(data,["stop_loss","sl"]),8)],
+      ["Take Profit",fmt(first(data,["take_profit","tp"]),8)]
+    ];
+    result.innerHTML=fields.map(([label,value])=>'<div class="stat-box"><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong></div>').join("");
+    message.textContent=symbol+" · "+({"5min":"M5","15min":"M15","30min":"M30"})[interval]+" · Datos recibidos del motor.";
+  }catch(error){message.textContent=error.message||"Error al consultar el análisis.";}
+}
+document.getElementById("analysisRefresh").addEventListener("click",loadTechnicalAnalysis);
+document.getElementById("analysisSymbol").addEventListener("change",loadTechnicalAnalysis);
+document.getElementById("analysisTimeframe").addEventListener("change",loadTechnicalAnalysis);
+
+async function loadLabStatus(){
+  const message=document.getElementById("labMessage");
+  const stats=document.getElementById("labStats");
+  const details=document.getElementById("labDetails");
+  message.textContent="Consultando almacenamiento y configuración del motor…";
+  stats.innerHTML="";details.innerHTML="";
+  try{
+    const response=await fetch(API_BASE+"/api/lab-status",{headers:authHeaders()});
+    const data=await response.json().catch(()=>({}));
+    if(response.status===401){message.textContent="Sesión caducada. Vuelve a entrar al panel.";showAccessGate();return;}
+    if(!response.ok)throw new Error(data.error||"No se pudo cargar el diagnóstico.");
+    const records=data.records||{};
+    const values=[
+      ["Señales registradas",records.total_signals??0],
+      ["Pendientes",records.pending_signals??0],
+      ["Cerradas",records.closed_signals??0],
+      ["Dispositivos push",records.push_devices??0],
+      ["Proveedor de datos",data.provider_configured?"Configurado":"No configurado"],
+      ["Almacenamiento",data.storage_configured?"Conectado":"No conectado"]
+    ];
+    stats.innerHTML=values.map(([label,value])=>'<div class="stat-box"><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong></div>').join("");
+    const engine=data.engine||{};
+    details.innerHTML='<strong style="font-size:13px">Configuración activa del motor</strong><div class="data-list" style="margin-top:10px">'+Object.entries(engine).map(([key,value])=>'<div class="data-row"><div style="grid-column:1/-1"><span>'+esc(key.replaceAll("_"," "))+'</span><strong>'+esc(value)+'</strong></div></div>').join("")+'</div>';
+    message.textContent="Diagnóstico actualizado: "+new Date(data.checked_at).toLocaleString("es-ES")+" · "+(data.data_provider||"Proveedor no indicado");
+  }catch(error){message.textContent=error.message||"Error al consultar el laboratorio.";}
+}
+document.getElementById("labRefresh").addEventListener("click",loadLabStatus);
+
+function authHeaders(){return {"Authorization":"Bearer "+accessToken};}
+function statusClass(status){return status==="TP"?"tp":status==="SL"?"sl":"";}
+async function loadHistory(){
+  const message=document.getElementById("historyMessage");
+  const list=document.getElementById("historyList");
+  message.textContent="Consultando historial…";list.innerHTML="";
+  const params=new URLSearchParams({limit:"100"});
+  const deepLink=new URLSearchParams(window.location.search);
+  const symbol=deepLink.get("symbol")||document.getElementById("historySymbol").value;
+  const timeframe=deepLink.get("timeframe")||document.getElementById("historyTimeframe").value;
+  const candleTime=deepLink.get("candle_time")||"";
+  const state=document.getElementById("historyStatus").value;
+  if(symbol){params.set("symbol",symbol);document.getElementById("historySymbol").value=symbol;}
+  if(timeframe){params.set("timeframe",timeframe);document.getElementById("historyTimeframe").value=timeframe;}
+  if(candleTime)params.set("candle_time",candleTime);
+  if(state)params.set("status",state);
+  const controller=new AbortController();
+  const timeoutId=setTimeout(()=>controller.abort(),60000);
+  try{
+    const response=await fetch(API_BASE+"/api/history?"+params,{headers:authHeaders(),signal:controller.signal});
+    const data=await response.json().catch(()=>({}));
+    if(response.status===401){message.textContent="Sesión caducada. Vuelve a entrar al panel.";showAccessGate();return;}
+    if(!response.ok)throw new Error(data.error||"No se pudo cargar el historial.");
+    const rows=data.signals||[];
+    message.textContent=deepLink.has("candle_time")?"Señal de la notificación · "+rows.length+" registro(s) exacto(s).":rows.length+" señal(es) encontrada(s).";
+    if(!rows.length){list.innerHTML='<div class="empty-state">Todavía no hay señales guardadas con estos filtros.<br>Cuando aparezca una nueva señal COMPRA o VENTA, se registrará aquí.</div>';return;}
+    list.innerHTML=rows.map(row=>{
+      const date=row.signal_at?new Date(row.signal_at).toLocaleString("es-ES"):"—";
+      const timeframeLabel=({"5min":"M5","15min":"M15","30min":"M30"})[row.timeframe]||row.timeframe;
+      return '<article class="data-row"><div><span>Mercado · '+esc(timeframeLabel)+'</span><strong>'+esc(row.symbol)+' · '+esc(row.direction)+'</strong><span>'+esc(date)+'</span></div><div><span>Entrada</span><strong>'+fmt(row.entry_price,8)+'</strong><span>SL '+fmt(row.stop_loss,8)+'</span></div><div><span>Take profit</span><strong>'+fmt(row.take_profit,8)+'</strong><span class="data-status '+statusClass(row.status)+'">'+esc(row.status)+'</span></div></article>';
+    }).join("");
+  }catch(error){
+    message.textContent=error.name==="AbortError"
+      ?"El servidor tardó demasiado en responder. Pulsa Actualizar para intentarlo de nuevo."
+      :(error.message||"Error al consultar el historial.");
+    list.innerHTML="";
+  }finally{
+    clearTimeout(timeoutId);
+  }
+}
+async function loadPerformance(){
+  const message=document.getElementById("performanceMessage");
+  const stats=document.getElementById("performanceStats");
+  const breakdown=document.getElementById("performanceBreakdown");
+  message.textContent="Calculando efectividad…";stats.innerHTML="";breakdown.innerHTML="";
+  try{
+    const response=await fetch(API_BASE+"/api/performance",{headers:authHeaders()});
+    const data=await response.json().catch(()=>({}));
+    if(response.status===401){message.textContent="Sesión caducada. Vuelve a entrar al panel.";showAccessGate();return;}
+    if(!response.ok)throw new Error(data.error||"No se pudieron cargar las estadísticas.");
+    const values=[
+      ["Señales registradas",data.total_signals??0],
+      ["Pendientes",data.pending??0],
+      ["Resultados cerrados",data.closed_trades??0],
+      ["Ganadas (TP)",data.wins??0],
+      ["Perdidas (SL)",data.losses??0],
+      ["Porcentaje de acierto",data.win_rate===null?"—":data.win_rate+"%"],
+      ["Expectativa media",data.expectancy_r===null?"—":data.expectancy_r+" R"],
+      ["Factor de beneficio",data.profit_factor==="inf"?"∞":data.profit_factor??"—"]
+    ];
+    stats.innerHTML=values.map(([label,value])=>'<div class="stat-box"><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong></div>').join("");
+    const groups=Object.entries(data.breakdown||{});
+    const groupHtml=groups.length?'<div class="data-panel"><strong style="font-size:12px">Resultados por mercado y temporalidad</strong></div>'+groups.map(([name,item])=>'<article class="data-row"><div><span>Mercado / temporalidad · señales '+item.total+'</span><strong>'+esc(name)+'</strong></div><div><span>Ganadas / perdidas</span><strong>'+item.wins+' / '+item.losses+'</strong></div><div><span>Pendientes</span><strong>'+item.pending+'</strong></div></article>').join(""):'<div class="empty-state">Todavía no hay señales registradas.</div>';
+    const sides=Object.entries(data.direction_breakdown||{});
+    const sideHtml=sides.length?'<div class="data-panel"><strong style="font-size:12px">Efectividad por dirección</strong></div>'+sides.map(([name,item])=>'<article class="data-row"><div><span>Dirección · señales '+item.total+'</span><strong>'+esc(name)+'</strong></div><div><span>Ganadas</span><strong>'+item.wins+'</strong></div><div><span>Perdidas</span><strong>'+item.losses+'</strong></div></article>').join(""):"";
+    breakdown.innerHTML=groupHtml+sideHtml;
+    message.textContent=(data.sample_note?data.sample_note+" ":"")+(data.note||"Resultados simulados del scanner.")+(data.truncated?" Atención: se alcanzó el límite de lectura; la estadística puede estar incompleta.":"");
+  }catch(error){message.textContent=error.message||"Error al calcular rendimiento.";}
+}
+document.getElementById("historyRefresh").addEventListener("click",loadHistory);
+["historySymbol","historyTimeframe","historyStatus"].forEach(id=>document.getElementById(id).addEventListener("change",loadHistory));
+
 button.addEventListener("click",update);
 document.getElementById("interval").addEventListener("change",update);
 if(accessToken){hideAccessGate();update();}else{showAccessGate();statusEl.textContent="Acceso requerido";}
 
 const pushStatus=document.getElementById("pushStatus");
-const togglePushButton=document.getElementById("togglePush");
+const enablePushButton=document.getElementById("enablePush");
+const disablePushButton=document.getElementById("disablePush");
+const testPushButton=document.getElementById("testPush");
 const PUSH_API=API_BASE+"/api/push";
+
+// Restaurar el estado real de Push al abrir o volver a entrar al panel.
+async function restorePushState(){
+  try{
+    if(!("serviceWorker" in navigator)||!("PushManager" in window)||!("Notification" in window)){
+      pushStatus.textContent="Notificaciones no disponibles en este navegador";
+      return;
+    }
+    const registration=await navigator.serviceWorker.ready;
+    const subscription=await registration.pushManager.getSubscription();
+    if(Notification.permission!=="granted"){
+      pushStatus.textContent=Notification.permission==="denied"
+        ?"Notificaciones bloqueadas en los ajustes del dispositivo"
+        :"Notificaciones desactivadas";
+      testPushButton.disabled=true;
+      enablePushButton.disabled=false;
+      disablePushButton.disabled=true;
+      return;
+    }
+    if(subscription){
+      pushStatus.textContent="Notificaciones activadas en este dispositivo";
+      enablePushButton.textContent="🔔 Notificaciones activas";
+      enablePushButton.disabled=true;
+      disablePushButton.disabled=false;
+      testPushButton.disabled=false;
+    }else{
+      pushStatus.textContent="Permiso concedido, pero falta activar la suscripción";
+      enablePushButton.textContent="🔔 Activar notificaciones";
+      enablePushButton.disabled=false;
+      disablePushButton.disabled=true;
+      testPushButton.disabled=true;
+    }
+  }catch(error){
+    pushStatus.textContent="No se pudo comprobar el estado de las notificaciones";
+    enablePushButton.disabled=false;
+    disablePushButton.disabled=true;
+    testPushButton.disabled=true;
+  }
+}
+restorePushState();
+
 function urlBase64ToUint8Array(value){
   const padding="=".repeat((4-value.length%4)%4);
   const base64=(value+padding).replace(/-/g,"+").replace(/_/g,"/");
   const raw=atob(base64);
   return Uint8Array.from([...raw].map(char=>char.charCodeAt(0)));
 }
-function setPushUi(active,message){
-  togglePushButton.textContent=active?"🔕 Desactivar notificaciones":"🔔 Activar notificaciones";
-  togglePushButton.classList.toggle("is-active",active);
-  pushStatus.textContent=message;
-}
-async function restorePushState(){
+
+enablePushButton.addEventListener("click",async()=>{
+  enablePushButton.disabled=true;
+  pushStatus.textContent="Preparando notificaciones…";
   try{
-    if(!("serviceWorker" in navigator)||!("PushManager" in window)||!("Notification" in window)){
-      togglePushButton.disabled=true;pushStatus.textContent="Este navegador no admite notificaciones push.";return;
-    }
-    const registration=await navigator.serviceWorker.ready;
-    const subscription=await registration.pushManager.getSubscription();
-    const active=Notification.permission==="granted"&&Boolean(subscription);
-    setPushUi(active,active?"Notificaciones activadas en este dispositivo":
-      Notification.permission==="denied"?"Permiso bloqueado en los ajustes del dispositivo":"Notificaciones desactivadas");
-  }catch(error){pushStatus.textContent="No se pudo comprobar el estado de las notificaciones.";}
-}
-togglePushButton.addEventListener("click",async()=>{
-  togglePushButton.disabled=true;
-  try{
-    if(!accessToken)throw new Error("Primero debes entrar al scanner.");
-    if(!("serviceWorker" in navigator)||!("PushManager" in window)||!("Notification" in window))
+    if(!("serviceWorker" in navigator)||!("PushManager" in window)){
       throw new Error("Este navegador no admite notificaciones push.");
-    const registration=await navigator.serviceWorker.ready;
-    let subscription=await registration.pushManager.getSubscription();
-    if(subscription){
-      const response=await fetch(PUSH_API+"/unsubscribe",{method:"POST",
-        headers:{"Content-Type":"application/json","Authorization":"Bearer "+accessToken},
-        body:JSON.stringify({endpoint:subscription.endpoint})});
-      const result=await response.json().catch(()=>({}));
-      if(!response.ok)throw new Error(result.error||"No se pudo desactivar la suscripción.");
-      await subscription.unsubscribe();
-      setPushUi(false,"Notificaciones desactivadas en este dispositivo.");return;
     }
+    if(!accessToken)throw new Error("Primero debes entrar al scanner.");
     const permission=await Notification.requestPermission();
     if(permission!=="granted")throw new Error("No se concedió permiso para notificaciones.");
+    const registration=await navigator.serviceWorker.ready;
     const keyResponse=await fetch(PUSH_API+"/public-key");
-    const keyData=await keyResponse.json().catch(()=>({}));
+    const keyData=await keyResponse.json();
     if(!keyResponse.ok||!keyData.public_key)throw new Error(keyData.error||"No se pudo obtener la clave pública.");
-    subscription=await registration.pushManager.subscribe({userVisibleOnly:true,
-      applicationServerKey:urlBase64ToUint8Array(keyData.public_key)});
-    const response=await fetch(PUSH_API+"/subscribe",{method:"POST",
+    let subscription=await registration.pushManager.getSubscription();
+    if(!subscription){
+      subscription=await registration.pushManager.subscribe({
+      userVisibleOnly:true,
+        applicationServerKey:urlBase64ToUint8Array(keyData.public_key)
+      });
+    }
+    const response=await fetch(PUSH_API+"/subscribe",{
+      method:"POST",
       headers:{"Content-Type":"application/json","Authorization":"Bearer "+accessToken},
-      body:JSON.stringify({subscription:subscription.toJSON()})});
+      body:JSON.stringify({subscription:subscription.toJSON()})
+    });
     const result=await response.json().catch(()=>({}));
-    if(!response.ok){await subscription.unsubscribe().catch(()=>{});throw new Error(result.error||"No se pudo guardar la suscripción.");}
-    setPushUi(true,"Notificaciones activadas en este dispositivo.");
+    if(!response.ok)throw new Error(result.error||"No se pudo guardar la suscripción.");
+    pushStatus.textContent="Notificaciones activadas en este dispositivo";
+    enablePushButton.textContent="🔔 Notificaciones activas";
+    enablePushButton.disabled=true;
+    disablePushButton.disabled=false;
+    testPushButton.disabled=false;
   }catch(error){
-    pushStatus.textContent=error.message||"No se pudo cambiar el estado de las notificaciones.";
+    pushStatus.textContent=error.message||"No se pudieron activar las notificaciones.";
     await restorePushState();
-  }finally{togglePushButton.disabled=false;}
+  }finally{
+    await restorePushState();
+  }
 });
-restorePushState();
+
+disablePushButton.addEventListener("click",async()=>{
+  disablePushButton.disabled=true;
+  pushStatus.textContent="Desactivando notificaciones en este dispositivo…";
+  try{
+    if(!accessToken)throw new Error("Primero debes entrar al scanner.");
+    const registration=await navigator.serviceWorker.ready;
+    const subscription=await registration.pushManager.getSubscription();
+    if(!subscription)throw new Error("No hay una suscripción activa en este dispositivo.");
+    const response=await fetch(PUSH_API+"/unsubscribe",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+accessToken},
+      body:JSON.stringify({endpoint:subscription.endpoint})
+    });
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(result.error||"No se pudo eliminar la suscripción del servidor.");
+    await subscription.unsubscribe();
+    pushStatus.textContent="Notificaciones desactivadas en este dispositivo.";
+    enablePushButton.textContent="🔔 Activar notificaciones";
+    testPushButton.disabled=true;
+  }catch(error){
+    pushStatus.textContent=error.message||"No se pudieron desactivar las notificaciones.";
+  }finally{
+    await restorePushState();
+  }
+});
+
+testPushButton.addEventListener("click",async()=>{
+  testPushButton.disabled=true;
+  pushStatus.textContent="Enviando notificación de prueba…";
+  try{
+    const response=await fetch(PUSH_API+"/test",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+accessToken},
+      body:"{}"
+    });
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok){
+      const failures=Array.isArray(result.failures)?result.failures.map(item=>"HTTP "+(item.status||"desconocido")+": "+(item.detail||"sin detalle")).join(" | "):"";
+      pushStatus.textContent="Error HTTP "+response.status+": "+(result.error||"No se pudo enviar la prueba.")+(failures?" — "+failures:"");
+      return;
+    }
+    pushStatus.textContent="Prueba enviada. Revisa las notificaciones del dispositivo.";
+  }catch(error){
+    pushStatus.textContent=error.message||"Falló el envío de prueba.";
+  }finally{
+    testPushButton.disabled=false;
+  }
+});
 
 </script>
 

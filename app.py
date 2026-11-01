@@ -639,10 +639,18 @@ def push_scan():
                 else:
                     candle_time = str(data.get("candle_time") or "")
                     fingerprint = "|".join([symbol, interval, direction, candle_time])
+                    # Formato compacto para que iOS muestre los tres niveles.
+                    # Forex conserva 5 decimales; metales y cripto usan 2.
+                    price_digits = 5 if symbol == "EUR/USD" else 2
+                    def display_price(value):
+                        return f"{float(value):,.{price_digits}f}" if value is not None else "—"
+
+                    short_interval = {"5min": "M5", "15min": "M15", "30min": "M30"}.get(interval, interval)
                     alert_body = (
-                        f"{direction} · {symbol} · {interval} | "
-                        f"Entrada: {data.get('entry')} | "
-                        f"SL: {data.get('stop_loss')} | TP: {data.get('take_profit')}"
+                        f"{symbol} · {short_interval} | "
+                        f"Entrada {display_price(data.get('entry'))} · "
+                        f"SL {display_price(data.get('stop_loss'))} · "
+                        f"TP {display_price(data.get('take_profit'))}"
                     )
                     subs_response = requests.get(
                         SUPABASE_URL + "/rest/v1/push_subscriptions?select=subscription",

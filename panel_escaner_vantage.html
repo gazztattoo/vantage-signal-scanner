@@ -437,8 +437,8 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 
 <section class="app-view" id="viewPerformance" hidden>
   <div class="data-panel">
-    <h2>Rendimiento comprobado</h2>
-    <p>Las estadísticas solo incluyen operaciones cerradas con TP o SL registrado. Las señales pendientes no cuentan como ganadas ni perdidas.</p>
+    <h2>Efectividad del scanner · Simulación</h2>
+    <p>Evaluación automática de señales hipotéticas. No abre operaciones reales. Las pendientes se muestran aparte y solo TP/SL cuentan para el porcentaje de acierto.</p>
     <div id="performanceMessage" class="hint" style="margin-bottom:12px">Cargando estadísticas…</div>
     <div id="performanceStats" class="stat-grid"></div>
     <div id="performanceBreakdown" class="data-list" style="margin-top:12px"></div>
@@ -1074,23 +1074,29 @@ async function loadPerformance(){
   const message=document.getElementById("performanceMessage");
   const stats=document.getElementById("performanceStats");
   const breakdown=document.getElementById("performanceBreakdown");
-  message.textContent="Calculando resultados…";stats.innerHTML="";breakdown.innerHTML="";
+  message.textContent="Calculando efectividad…";stats.innerHTML="";breakdown.innerHTML="";
   try{
     const response=await fetch(API_BASE+"/api/performance",{headers:authHeaders()});
     const data=await response.json().catch(()=>({}));
     if(response.status===401){message.textContent="Sesión caducada. Vuelve a entrar al panel.";showAccessGate();return;}
     if(!response.ok)throw new Error(data.error||"No se pudieron cargar las estadísticas.");
     const values=[
-      ["Operaciones cerradas",data.closed_trades??0],
+      ["Señales registradas",data.total_signals??0],
+      ["Pendientes",data.pending??0],
+      ["Resultados cerrados",data.closed_trades??0],
       ["Ganadas (TP)",data.wins??0],
       ["Perdidas (SL)",data.losses??0],
       ["Porcentaje de acierto",data.win_rate===null?"—":data.win_rate+"%"],
-      ["Promedio R",data.average_r===null?"—":data.average_r+" R"]
+      ["Expectativa media",data.expectancy_r===null?"—":data.expectancy_r+" R"],
+      ["Factor de beneficio",data.profit_factor==="inf"?"∞":data.profit_factor??"—"]
     ];
     stats.innerHTML=values.map(([label,value])=>'<div class="stat-box"><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong></div>').join("");
     const groups=Object.entries(data.breakdown||{});
-    breakdown.innerHTML=groups.length?'<div class="data-panel"><strong style="font-size:12px">Resultados por mercado y temporalidad</strong></div>'+groups.map(([name,item])=>'<article class="data-row"><div><span>Mercado / temporalidad</span><strong>'+esc(name)+'</strong></div><div><span>Ganadas</span><strong>'+item.wins+'</strong></div><div><span>Perdidas</span><strong>'+item.losses+'</strong></div></article>').join(""):'<div class="empty-state">Aún no hay operaciones cerradas con resultado TP o SL.<br>El porcentaje de acierto aparecerá cuando existan resultados comprobados.</div>';
-    message.textContent=data.note||"Estadísticas calculadas con operaciones cerradas.";
+    const groupHtml=groups.length?'<div class="data-panel"><strong style="font-size:12px">Resultados por mercado y temporalidad</strong></div>'+groups.map(([name,item])=>'<article class="data-row"><div><span>Mercado / temporalidad · señales '+item.total+'</span><strong>'+esc(name)+'</strong></div><div><span>Ganadas / perdidas</span><strong>'+item.wins+' / '+item.losses+'</strong></div><div><span>Pendientes</span><strong>'+item.pending+'</strong></div></article>').join(""):'<div class="empty-state">Todavía no hay señales registradas.</div>';
+    const sides=Object.entries(data.direction_breakdown||{});
+    const sideHtml=sides.length?'<div class="data-panel"><strong style="font-size:12px">Efectividad por dirección</strong></div>'+sides.map(([name,item])=>'<article class="data-row"><div><span>Dirección · señales '+item.total+'</span><strong>'+esc(name)+'</strong></div><div><span>Ganadas</span><strong>'+item.wins+'</strong></div><div><span>Perdidas</span><strong>'+item.losses+'</strong></div></article>').join(""):"";
+    breakdown.innerHTML=groupHtml+sideHtml;
+    message.textContent=(data.sample_note?data.sample_note+" ":"")+(data.note||"Resultados simulados del scanner.")+(data.truncated?" Atención: se alcanzó el límite de lectura; la estadística puede estar incompleta.":"");
   }catch(error){message.textContent=error.message||"Error al calcular rendimiento.";}
 }
 document.getElementById("historyRefresh").addEventListener("click",loadHistory);

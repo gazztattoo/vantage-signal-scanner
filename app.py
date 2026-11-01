@@ -663,7 +663,7 @@ def push_scan():
                                     "title": f"GLOBAL SIGNAL · {direction}",
                                     "body": alert_body,
                                     "tag": "gss-" + symbol.replace("/", "") + "-" + interval,
-                                    "url": "https://global-signal-push-test-panel.onrender.com/panel_escaner_vantage.html",
+                                    "url": "https://vantage-signal-scanner.onrender.com/",
                                     "data": {
                                         "symbol": symbol, "interval": interval,
                                         "direction": direction, "entry": data.get("entry"),

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1584 336" role="img" aria-labelledby="title desc">
+<title id="title">GLOBAL SIGNAL SCANNER</title><desc id="desc">Trading Intelligence — Forex, Gold, Crypto</desc>
+<defs>
+ <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#020906"/><stop offset=".52" stop-color="#07170f"/><stop offset="1" stop-color="#010503"/></linearGradient>
+ <linearGradient id="green" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#baffd4"/><stop offset=".28" stop-color="#16f58b"/><stop offset=".62" stop-color="#008d4d"/><stop offset="1" stop-color="#d6ffe5"/></linearGradient>
+ <linearGradient id="beam" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#00e879" stop-opacity="0"/><stop offset=".5" stop-color="#00ff88" stop-opacity=".9"/><stop offset="1" stop-color="#00e879" stop-opacity="0"/></linearGradient>
+ <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+ <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="2" fill="#22ff99" opacity=".24"/></pattern>
+</defs>
+<rect width="1584" height="336" rx="28" fill="url(#bg)"/>
+<rect x="2" y="2" width="1580" height="332" rx="26" fill="none" stroke="#19ef89" stroke-width="4"/>
+<path d="M1000 0H1584V336H850Z" fill="url(#dots)" opacity=".7"/>
+<path d="M1120 -10L970 346h100L1220 -10Z" fill="#00d978" opacity=".12"/>
+<path d="M1190 -10L1040 346" stroke="#00f58a" stroke-width="9" opacity=".75" filter="url(#glow)"/>
+<path d="M1080 300H1540" stroke="url(#beam)" stroke-width="4" filter="url(#glow)"/>
+<!-- monogram -->
+<g transform="translate(55 45)" filter="url(#glow)">
+ <path d="M175 45A111 111 0 1 0 202 211H126A48 48 0 1 1 127 93H176L207 59Z" fill="none" stroke="url(#green)" stroke-width="24" stroke-linecap="round"/>
+ <path d="M128 142H225V221H195V174H128Z" fill="url(#green)"/>
+ <path d="M74 92L118 48" stroke="#e5fff0" stroke-width="7" opacity=".85"/>
+</g>
+<g font-family="Arial, Helvetica, sans-serif" fill="#f2fff7">
+ <text x="300" y="132" font-size="58" font-weight="800" letter-spacing="-1">GLOBAL <tspan fill="#18ed87">SIGNAL SCANNER</tspan></text>
+ <text x="305" y="191" font-size="27" letter-spacing="12" fill="#c8ddd1">T R A D I N G   I N T E L L I G E N C E</text>
+ <text x="305" y="252" font-size="30" letter-spacing="8" font-weight="700">FOREX <tspan fill="#20f58e">•</tspan> GOLD <tspan fill="#20f58e">•</tspan> CRYPTO</text>
+ <text x="1515" y="91" text-anchor="end" font-size="23" font-weight="600">Análisis técnico</text>
+ <text x="1515" y="126" text-anchor="end" font-size="23">Datos en tiempo real</text>
+ <text x="1515" y="161" text-anchor="end" font-size="23">Uso educativo</text>
+</g>
+<g transform="translate(1275 225)">
+ <rect width="250" height="55" rx="27" fill="#06170e" stroke="#1df18c" stroke-width="2"/>
+ <circle cx="27" cy="27" r="11" fill="#25f58d" filter="url(#glow)"/>
+ <text x="51" y="36" fill="#eafff1" font-family="Arial,Helvetica,sans-serif" font-size="22" font-weight="700">Sistema operativo</text>
+</g>
+<circle cx="1080" cy="300" r="8" fill="#baffd4" filter="url(#glow)"/>
+</svg>

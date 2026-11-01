@@ -552,6 +552,7 @@ def push_test():
         subscriptions = response.json()
         sent = 0
         expired = []
+        failures = []
         for row in subscriptions:
             subscription = row.get("subscription")
             if not isinstance(subscription, dict):
@@ -565,7 +566,10 @@ def push_test():
                 })
                 sent += 1
             except Exception as exc:
-                status = getattr(getattr(exc, "response", None), "status_code", None)
+                response_obj = getattr(exc, "response", None)
+                status = getattr(response_obj, "status_code", None)
+                detail = getattr(response_obj, "text", "") if response_obj is not None else ""
+                failures.append({"status": status, "detail": str(detail)[:300] or str(exc)[:300]})
                 if status in (404, 410):
                     expired.append(subscription.get("endpoint", ""))
         for endpoint in expired:
@@ -576,8 +580,12 @@ def push_test():
                     timeout=10,
                 )
         if sent == 0:
-            return jsonify({"error": "No hay suscripciones activas para enviar la prueba."}), 404
-        return jsonify({"ok": True, "sent": sent})
+            return jsonify({
+                "error": "La suscripción está guardada, pero el proveedor rechazó el envío push.",
+                "subscriptions_found": len(subscriptions),
+                "failures": failures,
+            }), 502
+        return jsonify({"ok": True, "sent": sent, "subscriptions_found": len(subscriptions), "failures": failures})
     except RuntimeError as exc:
         return jsonify({"error": str(exc)}), 503
     except requests.RequestException:

@@ -1240,9 +1240,10 @@ def push_scan():
                         # El estado se guarda solo después de asegurar el historial.
                         # Si falla este paso, la inserción idempotente del historial
                         # permitirá reintentar el siguiente ciclo sin duplicar señales.
-                        event_stamp = datetime.now(timezone.utc).isoformat()
+                        # Huella determinista: dos Cron simultáneos no deben
+                        # crear dos eventos para la misma transición/vela.
                         fingerprint = "|".join([
-                            symbol, interval, direction, candle_time, event_stamp
+                            symbol, interval, direction, candle_time
                         ])
                         insert_response = requests.post(
                             SUPABASE_URL + "/rest/v1/signal_alerts?on_conflict=market,timeframe,fingerprint",
@@ -1299,6 +1300,14 @@ def push_scan():
                             headers=supabase_headers(), timeout=15,
                         )
                         if subs_response.status_code != 200:
+                            # Quitar el estado provisional para permitir reintento
+                            # en el siguiente ciclo si falla la lectura de dispositivos.
+                            requests.delete(
+                                SUPABASE_URL + "/rest/v1/signal_alerts",
+                                params={"market": "eq." + symbol, "timeframe": "eq." + interval,
+                                        "fingerprint": "eq." + fingerprint},
+                                headers=supabase_headers(), timeout=10,
+                            )
                             results.append({
                                 "symbol": symbol, "interval": interval,
                                 "status": "subscription_read_error"
@@ -1306,6 +1315,7 @@ def push_scan():
                         else:
                             subscriptions = subs_response.json()
                             delivered = 0
+                            failed = 0
                             expired = []
                             for row in subscriptions:
                                 subscription = row.get("subscription")
@@ -1327,6 +1337,7 @@ def push_scan():
                                     })
                                     delivered += 1
                                 except Exception as exc:
+                                    failed += 1
                                     response_obj = getattr(exc, "response", None)
                                     if getattr(response_obj, "status_code", None) in (404, 410):
                                         expired.append(subscription.get("endpoint", ""))
@@ -1338,11 +1349,27 @@ def push_scan():
                                         headers=supabase_headers(), timeout=10,
                                     )
 
+                            # Si había dispositivos pero todos rechazaron el envío,
+                            # borrar el estado provisional permite reintentar en el próximo ciclo.
+                            # Si al menos un dispositivo recibió el aviso, se conserva para
+                            # evitar duplicarlo en los dispositivos que sí lo recibieron.
+                            if subscriptions and delivered == 0 and failed > 0:
+                                requests.delete(
+                                    SUPABASE_URL + "/rest/v1/signal_alerts",
+                                    params={"market": "eq." + symbol, "timeframe": "eq." + interval,
+                                            "fingerprint": "eq." + fingerprint},
+                                    headers=supabase_headers(), timeout=10,
+                                )
+
                             sent_total += delivered
                             results.append({
                                 "symbol": symbol, "interval": interval,
-                                "status": "new_signal_notified" if delivered else "new_signal_no_delivery",
-                                "devices": delivered
+                                "status": (
+                                    "new_signal_notified" if delivered
+                                    else ("new_signal_retry_scheduled" if failed else "new_signal_no_delivery")
+                                ),
+                                "devices": delivered,
+                                "failed_devices": failed
                             })
             if index < 8:
                 time.sleep(8)

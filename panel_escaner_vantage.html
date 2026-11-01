@@ -867,7 +867,11 @@ testPushButton.addEventListener("click",async()=>{
       body:"{}"
     });
     const result=await response.json().catch(()=>({}));
-    if(!response.ok)throw new Error(result.error||"No se pudo enviar la prueba.");
+    if(!response.ok){
+      const failures=Array.isArray(result.failures)?result.failures.map(item=>"HTTP "+(item.status||"desconocido")+": "+(item.detail||"sin detalle")).join(" | "):"";
+      pushStatus.textContent="Error HTTP "+response.status+": "+(result.error||"No se pudo enviar la prueba.")+(failures?" — "+failures:"");
+      return;
+    }
     pushStatus.textContent="Prueba enviada. Revisa las notificaciones del dispositivo.";
   }catch(error){
     pushStatus.textContent=error.message||"Falló el envío de prueba.";

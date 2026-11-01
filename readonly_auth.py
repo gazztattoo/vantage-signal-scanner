@@ -62,7 +62,7 @@ def verify_access_token(token):
         else:
             return False
         return required_scope in scope_set
-    except (InvalidTokenError, Exception):
+    except Exception:
         # Fail closed for malformed tokens, key lookup/network failures, and
         # unexpected verifier errors. Never fall back to the panel credential.
         return False

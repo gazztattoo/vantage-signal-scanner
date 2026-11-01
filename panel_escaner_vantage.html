@@ -469,10 +469,10 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
       <div class="stat-box"><span>Volatilidad</span><strong>ATR 14 + Bollinger</strong></div>
       <div class="stat-box"><span>Fuerza</span><strong>ADX 14</strong></div>
     </div>
-    <div class="empty-state" style="margin-top:12px">
-      <strong>Motor experimental</strong><br>
-      La señal exige confluencia de indicadores y filtros de fuerza. Las reglas todavía necesitan validación histórica y seguimiento de operaciones cerradas antes de considerar cualquier ventaja estadística demostrada.
-    </div>
+    <div id="labMessage" class="hint" style="margin:12px 0">Consultando diagnóstico real…</div>
+    <div id="labStats" class="stat-grid"></div>
+    <div id="labDetails" class="data-panel" style="margin-top:12px"></div>
+    <button id="labRefresh" type="button" style="margin-top:10px">Actualizar diagnóstico</button>
   </div>
 </section>
 
@@ -941,6 +941,7 @@ function switchView(name){
   if(name==="history")loadHistory();
   if(name==="performance")loadPerformance();
   if(name==="analysis")loadTechnicalAnalysis();
+  if(name==="lab")loadLabStatus();
 }
 viewButtons.forEach(button=>button.addEventListener("click",()=>switchView(button.dataset.view)));
 
@@ -979,6 +980,34 @@ async function loadTechnicalAnalysis(){
 document.getElementById("analysisRefresh").addEventListener("click",loadTechnicalAnalysis);
 document.getElementById("analysisSymbol").addEventListener("change",loadTechnicalAnalysis);
 document.getElementById("analysisTimeframe").addEventListener("change",loadTechnicalAnalysis);
+
+async function loadLabStatus(){
+  const message=document.getElementById("labMessage");
+  const stats=document.getElementById("labStats");
+  const details=document.getElementById("labDetails");
+  message.textContent="Consultando almacenamiento y configuración del motor…";
+  stats.innerHTML="";details.innerHTML="";
+  try{
+    const response=await fetch(API_BASE+"/api/lab-status",{headers:authHeaders()});
+    const data=await response.json().catch(()=>({}));
+    if(response.status===401){message.textContent="Sesión caducada. Vuelve a entrar al panel.";showAccessGate();return;}
+    if(!response.ok)throw new Error(data.error||"No se pudo cargar el diagnóstico.");
+    const records=data.records||{};
+    const values=[
+      ["Señales registradas",records.total_signals??0],
+      ["Pendientes",records.pending_signals??0],
+      ["Cerradas",records.closed_signals??0],
+      ["Dispositivos push",records.push_devices??0],
+      ["Proveedor de datos",data.provider_configured?"Configurado":"No configurado"],
+      ["Almacenamiento",data.storage_configured?"Conectado":"No conectado"]
+    ];
+    stats.innerHTML=values.map(([label,value])=>'<div class="stat-box"><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong></div>').join("");
+    const engine=data.engine||{};
+    details.innerHTML='<strong style="font-size:13px">Configuración activa del motor</strong><div class="data-list" style="margin-top:10px">'+Object.entries(engine).map(([key,value])=>'<div class="data-row"><div style="grid-column:1/-1"><span>'+esc(key.replaceAll("_"," "))+'</span><strong>'+esc(value)+'</strong></div></div>').join("")+'</div>';
+    message.textContent="Diagnóstico actualizado: "+new Date(data.checked_at).toLocaleString("es-ES")+" · "+(data.data_provider||"Proveedor no indicado");
+  }catch(error){message.textContent=error.message||"Error al consultar el laboratorio.";}
+}
+document.getElementById("labRefresh").addEventListener("click",loadLabStatus);
 
 function authHeaders(){return {"Authorization":"Bearer "+accessToken};}
 function statusClass(status){return status==="TP"?"tp":status==="SL"?"sl":"";}

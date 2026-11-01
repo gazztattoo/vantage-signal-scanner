@@ -8,6 +8,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 import hmac
+from readonly_auth import is_configured as readonly_auth_configured, verify_access_token as verify_readonly_access_token
 
 app = Flask(__name__)
 CORS(app, resources={
@@ -74,25 +75,48 @@ def create_access_token():
     return jsonify({"token": token, "expires_in": TOKEN_MAX_AGE_SECONDS})
 
 
+READONLY_GET_PATHS = {
+    "/api/analysis",
+    "/api/price",
+    "/api/history",
+    "/api/performance",
+    "/api/lab-status",
+}
+PANEL_PROTECTED_PATHS = READONLY_GET_PATHS | {
+    "/api/push/subscribe",
+    "/api/push/test",
+    "/api/push/unsubscribe",
+}
+
+
 @app.before_request
 def protect_signal_endpoints():
     if request.method == "OPTIONS":
         return None
-    if request.path not in ("/api/analysis", "/api/price", "/api/history", "/api/performance", "/api/lab-status", "/api/push/subscribe", "/api/push/test", "/api/push/unsubscribe"):
+    if request.path not in PANEL_PROTECTED_PATHS:
         return None
-    if not ACCESS_TOKEN_SECRET:
-        return jsonify({"error": "El acceso privado no está configurado."}), 503
+
     authorization = request.headers.get("Authorization", "")
-    if not authorization.startswith("Bearer "):
-        return jsonify({"error": "Acceso requerido. Introduce el código del panel."}), 401
-    token = authorization[7:].strip()
-    try:
-        data = access_serializer().loads(token, max_age=TOKEN_MAX_AGE_SECONDS)
-        if data.get("access") is not True:
-            raise BadSignature("Token no válido")
-    except (BadSignature, SignatureExpired, RuntimeError):
-        return jsonify({"error": "Sesión caducada o no válida. Vuelve a introducir el código."}), 401
-    return None
+    token = authorization[7:].strip() if authorization.startswith("Bearer ") else ""
+
+    # Preserve the panel's existing signed-token authorization unchanged.
+    if token and ACCESS_TOKEN_SECRET:
+        try:
+            data = access_serializer().loads(token, max_age=TOKEN_MAX_AGE_SECONDS)
+            if data.get("access") is True:
+                return None
+        except (BadSignature, SignatureExpired, RuntimeError):
+            pass
+
+    # The Auth0 read-only credential is accepted only on the exact data GET
+    # allowlist. It can never authorize push routes or any non-GET request.
+    if request.method == "GET" and request.path in READONLY_GET_PATHS:
+        if token and verify_readonly_access_token(token):
+            return None
+
+    if not ACCESS_TOKEN_SECRET and not readonly_auth_configured():
+        return jsonify({"error": "El acceso privado no está configurado."}), 503
+    return jsonify({"error": "Acceso requerido o token no válido."}), 401
 TWELVE_DATA_URL = "https://api.twelvedata.com"
 
 ALLOWED_SYMBOLS = {"EUR/USD", "XAU/USD", "BTC/USD"}

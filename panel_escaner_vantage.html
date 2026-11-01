@@ -897,6 +897,20 @@ async function update(){
 
   cards.innerHTML=out.map(x=>render(x.m,x.d,x.err,!!x.marketClosed)).join("");
   updateOverview(out);
+  const notificationParams=new URLSearchParams(window.location.search);
+  const targetSymbol=notificationParams.get("symbol");
+  if(notificationParams.get("view")==="scanner" && targetSymbol){
+    const target=out.find(x=>x.m.symbol===targetSymbol);
+    const targetCard=[...cards.querySelectorAll(".card")].find(card=>card.querySelector(".symbol")?.textContent.trim()===targetSymbol);
+    if(targetCard){
+      targetCard.scrollIntoView({behavior:"smooth",block:"center"});
+      targetCard.style.outline="2px solid var(--green)";
+      targetCard.style.outlineOffset="3px";
+    }
+    if(target){
+      statusEl.textContent=target.err?"Scanner abierto · "+targetSymbol+" · "+target.err:"Señal de notificación · "+targetSymbol+" · "+document.getElementById("interval").value.toUpperCase();
+    }
+  }
 
   const authExpired=out.some(x=>x.err && (
     x.err.includes("Sesión caducada") ||
@@ -944,7 +958,13 @@ function switchView(name){
   if(name==="lab")loadLabStatus();
 }
 viewButtons.forEach(button=>button.addEventListener("click",()=>switchView(button.dataset.view)));
-if(new URLSearchParams(window.location.search).get("view")==="history") switchView("history");
+const notificationParams=new URLSearchParams(window.location.search);
+if(notificationParams.get("view")==="history") switchView("history");
+if(notificationParams.get("view")==="scanner") switchView("scanner");
+const notificationTimeframe=notificationParams.get("timeframe");
+if(["5min","15min","30min"].includes(notificationTimeframe)){
+  document.getElementById("interval").value=notificationTimeframe;
+}
 
 async function loadTechnicalAnalysis(){
   const message=document.getElementById("analysisMessage");

@@ -1122,46 +1122,12 @@ def push_scan():
                             "outcome_errors": outcome_result["errors"]
                         })
                     else:
+                        # Primero persistir la señal operable en el historial.
+                        # Si falla, NO se registra el cambio de estado: el siguiente
+                        # ciclo podrá reintentar sin perder la señal.
                         candle_time = str(data.get("candle_time") or "")
-                        event_stamp = datetime.now(timezone.utc).isoformat()
-                        fingerprint = "|".join([
-                            symbol, interval, direction, candle_time, event_stamp
-                        ])
-
-                        # Registrar el cambio de estado ANTES del push para impedir
-                        # que el siguiente ciclo vuelva a enviar la misma alerta.
-                        insert_response = requests.post(
-                            SUPABASE_URL + "/rest/v1/signal_alerts?on_conflict=market,timeframe,fingerprint",
-                            headers={
-                                **supabase_headers(),
-                                "Prefer": "resolution=ignore-duplicates,return=representation",
-                            },
-                            json={
-                                "market": symbol,
-                                "timeframe": interval,
-                                "direction": direction,
-                                "fingerprint": fingerprint,
-                            },
-                            timeout=15,
-                        )
-                        if insert_response.status_code not in (200, 201):
-                            results.append({
-                                "symbol": symbol, "interval": interval,
-                                "status": "state_save_error"
-                            })
-                        elif not insert_response.json():
-                            results.append({
-                                "symbol": symbol, "interval": interval,
-                                "status": "duplicate_state"
-                            })
-                        elif direction == "ESPERAR":
-                            results.append({
-                                "symbol": symbol, "interval": interval,
-                                "status": "state_reset_no_notification"
-                            })
-                        else:
-                            # Registrar la señal operable para historial y estadísticas.
-                            signal_key = "|".join([symbol, interval, direction, str(data.get("candle_time") or "")])
+                        if direction in ("COMPRA", "VENTA"):
+                            signal_key = "|".join([symbol, interval, direction, candle_time])
                             history_payload = {
                                 "signal_key": signal_key,
                                 "symbol": symbol,
@@ -1201,9 +1167,51 @@ def push_scan():
                             if history_response.status_code not in (200, 201, 204):
                                 results.append({
                                     "symbol": symbol, "interval": interval,
-                                    "status": "history_save_error"
+                                    "status": "history_save_error",
+                                    "http_status": history_response.status_code,
                                 })
                                 continue
+
+                        # El estado se guarda solo después de asegurar el historial.
+                        # Si falla este paso, la inserción idempotente del historial
+                        # permitirá reintentar el siguiente ciclo sin duplicar señales.
+                        event_stamp = datetime.now(timezone.utc).isoformat()
+                        fingerprint = "|".join([
+                            symbol, interval, direction, candle_time, event_stamp
+                        ])
+                        insert_response = requests.post(
+                            SUPABASE_URL + "/rest/v1/signal_alerts?on_conflict=market,timeframe,fingerprint",
+                            headers={
+                                **supabase_headers(),
+                                "Prefer": "resolution=ignore-duplicates,return=representation",
+                            },
+                            json={
+                                "market": symbol,
+                                "timeframe": interval,
+                                "direction": direction,
+                                "fingerprint": fingerprint,
+                            },
+                            timeout=15,
+                        )
+                        if insert_response.status_code not in (200, 201):
+                            results.append({
+                                "symbol": symbol, "interval": interval,
+                                "status": "state_save_error",
+                                "http_status": insert_response.status_code,
+                            })
+                            continue
+                        if not insert_response.json():
+                            results.append({
+                                "symbol": symbol, "interval": interval,
+                                "status": "duplicate_state"
+                            })
+                            continue
+                        if direction == "ESPERAR":
+                            results.append({
+                                "symbol": symbol, "interval": interval,
+                                "status": "state_reset_no_notification"
+                            })
+                            continue
 
                             # Solo se notifica una transición nueva a COMPRA o VENTA.
                             price_digits = 5 if symbol == "EUR/USD" else 2

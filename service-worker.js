@@ -1,4 +1,4 @@
-const CACHE_NAME = "global-signal-scanner-shell-v4";
+const CACHE_NAME = "global-signal-scanner-shell-v5";
 const SHELL = [
   "./",
   "./panel_escaner_vantage.html",
@@ -55,23 +55,18 @@ self.addEventListener("notificationclick", event => {
     self.location.origin
   ).href;
 
-  event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(clients => {
-      const targetOrigin = new URL(targetUrl).origin;
-
-      // WindowClient.navigate solo debe usarse para destinos del mismo origen.
-      // Para el panel original (otro dominio), abrir una ventana nueva.
-      if (targetOrigin === self.location.origin) {
-        for (const client of clients) {
-          if (client.url.startsWith(self.location.origin) && "focus" in client) {
-            return client.navigate(targetUrl).then(() => client.focus());
-          }
-        }
+  event.waitUntil((async () => {
+    const targetOrigin = new URL(targetUrl).origin;
+    if (targetOrigin !== self.location.origin) return;
+    const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const client of clients) {
+      if (new URL(client.url).origin === self.location.origin && "focus" in client) {
+        if (client.url !== targetUrl && "navigate" in client) await client.navigate(targetUrl);
+        return client.focus();
       }
-
-      return self.clients.openWindow(targetUrl);
-    })
-  );
+    }
+    return self.clients.openWindow(targetUrl);
+  })());
 });
 
 self.addEventListener("fetch", event => {

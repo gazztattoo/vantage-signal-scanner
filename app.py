@@ -930,9 +930,14 @@ def push_unsubscribe():
 
 @app.route("/api/push/test", methods=["POST"])
 def push_test():
+    payload = request.get_json(silent=True) or {}
+    endpoint = payload.get("endpoint")
+    if not isinstance(endpoint, str) or not endpoint.strip():
+        return jsonify({"error": "No se indicó el dispositivo que solicita la prueba."}), 400
     try:
         response = requests.get(
-            SUPABASE_URL + "/rest/v1/push_subscriptions?select=subscription",
+            SUPABASE_URL + "/rest/v1/push_subscriptions",
+            params={"select": "subscription", "endpoint": "eq." + endpoint},
             headers=supabase_headers(),
             timeout=15,
         )

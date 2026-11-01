@@ -51,7 +51,7 @@ body{
   border-radius:0;
   background:#080d0b
 }
-.status{
+.status.ok{border-color:#28543a}.status.partial{border-color:#80602b}.status.error{border-color:#71323b}\n.status{
   position:absolute;
   top:12px;
   right:12px;
@@ -915,24 +915,24 @@ async function update(){
     return;
   }
 
-  const closed=out.filter(x=>x.marketClosed).map(x=>x.m.symbol);
-  const failures=out.filter(x=>!x.marketClosed && x.err);
-  const active=out.filter(x=>!x.marketClosed && !x.err).map(x=>x.m.symbol);
+  const connected=out.filter(x=>!x.marketClosed && !x.err);
+  const totalMarkets=out.length;
+  const connectedCount=connected.length;
   const statusBox=document.getElementById("connectionStatus");
 
   statusBox.classList.remove("ok","partial","error");
-  if(failures.length===0){
-    statusEl.textContent="Motor conectado";
+  if(connectedCount===totalMarkets && totalMarkets>0){
+    statusEl.textContent="Todos conectados";
     statusBox.classList.add("ok");
     dot.style.background="var(--green)";
-    const parts=[];
-    if(active.length)parts.push("Datos activos: "+active.join(", "));
-    if(closed.length)parts.push("Mercados cerrados: "+closed.join(", "));
+  }else if(connectedCount>0){
+    statusEl.textContent="Conexión parcial";
+    statusBox.classList.add("partial");
+    dot.style.background="var(--amber)";
   }else{
-    statusEl.textContent=active.length?"Conexión parcial":"Error de conexión";
-    statusBox.classList.add(active.length?"partial":"error");
-    dot.style.background=active.length?"var(--amber)":"var(--red)";
-    const failedNames=failures.map(x=>x.m.symbol);
+    statusEl.textContent="Sin conexión";
+    statusBox.classList.add("error");
+    dot.style.background="var(--red)";
   }
   updated.textContent="Actualizado: "+
     new Date().toLocaleTimeString("es-ES");

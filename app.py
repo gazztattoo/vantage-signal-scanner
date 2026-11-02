@@ -633,14 +633,25 @@ def analysis():
         sell_checks = {'EMA20 < EMA50': ema20 < ema50, 'RSI 32-48': 32 <= rsi14 <= 48, 'MACD negativo': macd_hist < 0, 'Precio bajo media Bollinger': entry < bb_middle}
         buy_score = sum(buy_checks.values())
         sell_score = sum(sell_checks.values())
+        # Filtro de calidad: solo A/A+ pueden convertirse en señales operables.
+        # La puntuación mide confluencia técnica, no probabilidad de acierto.
+        buy_adx_ok = adx14 >= 20
+        sell_adx_ok = adx14 >= 20
+        buy_quality = buy_score * 20 + (20 if adx14 >= 25 else 10 if adx14 >= 20 else 0)
+        sell_quality = sell_score * 20 + (20 if adx14 >= 25 else 10 if adx14 >= 20 else 0)
         signal = 'ESPERAR'
-        reason = 'Confluencia insuficiente o tendencia débil; se espera.'
-        if adx14 >= 18 and buy_score >= 3 and buy_score > sell_score:
+        reason = 'Filtro A/A+: falta confluencia o fuerza suficiente; se espera.'
+        if buy_adx_ok and buy_score >= 3 and buy_score > sell_score:
             signal = 'COMPRA'
-            reason = 'Confluencia alcista: ' + ', '.join(k for k,v in buy_checks.items() if v) + '. ADX ' + str(round(adx14,1))
-        elif adx14 >= 18 and sell_score >= 3 and sell_score > buy_score:
+            reason = 'Confluencia alcista A/A+: ' + ', '.join(k for k,v in buy_checks.items() if v) + '. ADX ' + str(round(adx14,1))
+        elif sell_adx_ok and sell_score >= 3 and sell_score > buy_score:
             signal = 'VENTA'
-            reason = 'Confluencia bajista: ' + ', '.join(k for k,v in sell_checks.items() if v) + '. ADX ' + str(round(adx14,1))
+            reason = 'Confluencia bajista A/A+: ' + ', '.join(k for k,v in sell_checks.items() if v) + '. ADX ' + str(round(adx14,1))
+        selected_score = buy_score if signal == 'COMPRA' else sell_score if signal == 'VENTA' else max(buy_score, sell_score)
+        selected_quality = buy_quality if signal == 'COMPRA' else sell_quality if signal == 'VENTA' else max(buy_quality, sell_quality)
+        quality_grade = 'A+' if selected_score == 4 and adx14 >= 25 else 'A' if selected_score >= 3 and adx14 >= 20 else 'B' if selected_score >= 2 else 'C'
+        if signal == 'ESPERAR':
+            reason += ' Calidad actual: ' + quality_grade + ' (' + str(selected_quality) + '/100).'
         stop_loss = None
         take_profit = None
 
@@ -675,6 +686,11 @@ def analysis():
             "buy_score": buy_score,
             "sell_score": sell_score,
             "score_max": 4,
+            "quality_grade": quality_grade,
+            "quality_score": selected_quality,
+            "quality_max": 100,
+            "quality_label": {"A+": "Excelente", "A": "Buena", "B": "Débil", "C": "Insuficiente"}[quality_grade],
+            "quality_rule": "Solo COMPRA/VENTA con al menos 3/4 criterios y ADX>=20; A+ exige 4/4 y ADX>=25.",
             "candle_time": candle_time,
             "candle_age_minutes": candle_age_minutes,
             "candles": len(candles),

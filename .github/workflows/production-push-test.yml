@@ -1,0 +1,27 @@
+name: Vantage - Prueba de notificaciones de producción
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  push-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Enviar notificación de prueba al dispositivo suscrito
+        env:
+          SIGNAL_CRON_SECRET: ${{ secrets.SIGNAL_CRON_SECRET }}
+          API_URL: https://vantage-signal-api-carlos.onrender.com
+        run: |
+          if [ -z "$SIGNAL_CRON_SECRET" ]; then
+            echo "::error::Falta configurar SIGNAL_CRON_SECRET en GitHub."
+            exit 1
+          fi
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "X-Scanner-Cron-Secret: $SIGNAL_CRON_SECRET" \
+            --header "Content-Type: application/json" \
+            "$API_URL/api/push/admin-test"

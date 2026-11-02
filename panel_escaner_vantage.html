@@ -483,8 +483,40 @@ const API_BASE="https://vantage-signal-api-carlos.onrender.com";
 let accessToken=sessionStorage.getItem("gss_access_token")||"";
 const accessGate=document.getElementById("accessGate"), accessForm=document.getElementById("accessForm"), accessCodeInput=document.getElementById("accessCode"), accessError=document.getElementById("accessError"), accessSubmit=document.getElementById("accessSubmit");
 function showAccessGate(){accessGate.hidden=false;} function hideAccessGate(){accessGate.hidden=true;}
-async function requestAccess(code){const response=await fetch(API_BASE+"/api/access",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code})});const data=await response.json().catch(()=>({}));if(!response.ok||!data.token)throw new Error(data.error||"No se pudo validar el código.");accessToken=data.token;sessionStorage.setItem("gss_access_token",accessToken);}
-accessForm.addEventListener("submit",async event=>{event.preventDefault();accessSubmit.disabled=true;accessError.textContent="Verificando acceso…";try{await requestAccess(accessCodeInput.value);accessCodeInput.value="";if(accessToken){if(accessToken){hideAccessGate();update();}else{showAccessGate();statusEl.textContent="Acceso requerido";}}else{showAccessGate();statusEl.textContent="Acceso requerido";}}catch(error){accessError.textContent=error.message||"Código incorrecto.";}finally{accessSubmit.disabled=false;}});
+async function requestAccess(code){
+  const response=await fetch(API_BASE+"/api/access",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||!data.token)throw new Error(data.error||`No se pudo validar el código (HTTP ${response.status}).`);
+  accessToken=data.token;
+  sessionStorage.setItem("gss_access_token",accessToken);
+
+  // Confirmar con la misma API que acaba de emitir el token antes de cerrar la pantalla.
+  const check=await fetch(API_BASE+"/api/access/check",{method:"GET",headers:authHeaders(),cache:"no-store"});
+  const checkData=await check.json().catch(()=>({}));
+  if(!check.ok||checkData.valid!==true){
+    accessToken="";
+    sessionStorage.removeItem("gss_access_token");
+    throw new Error(checkData.error||`El servidor emitió el acceso, pero no validó la sesión (HTTP ${check.status}).`);
+  }
+}
+accessForm.addEventListener("submit",async event=>{
+  event.preventDefault();
+  accessSubmit.disabled=true;
+  accessError.textContent="Verificando código y sesión…";
+  try{
+    await requestAccess(accessCodeInput.value);
+    accessCodeInput.value="";
+    accessError.textContent="";
+    hideAccessGate();
+    statusEl.textContent="Sesión verificada · Cargando scanner…";
+    await update();
+  }catch(error){
+    showAccessGate();
+    accessError.textContent=error.message||"No se pudo completar el acceso.";
+  }finally{
+    accessSubmit.disabled=false;
+  }
+});
 
 const markets=[
   {symbol:"EUR/USD",category:"FOREX"},
@@ -935,10 +967,11 @@ async function update(){
   ));
 
   if(authExpired){
+    const authFailure=out.find(x=>x.status===401);
     accessToken="";
     sessionStorage.removeItem("gss_access_token");
     showAccessGate();
-    accessError.textContent="Tu sesión ha caducado. Introduce de nuevo el código de acceso.";
+    accessError.textContent=authFailure?.err||"La API rechazó la sesión. Vuelve a introducir el código.";
     statusEl.textContent="Acceso requerido";
     dot.style.background="var(--amber)";
     button.disabled=false;
@@ -1194,9 +1227,11 @@ pushToggleButton.addEventListener("click",async()=>{
 <script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js").catch(err =>
-      console.warn("No se pudo registrar el modo app:", err)
-    );
+    navigator.serviceWorker.register("./service-worker.js", { updateViaCache: "none" })
+      .then(registration => registration.update().catch(err =>
+        console.warn("No se pudo comprobar una actualización del modo app:", err)
+      ))
+      .catch(err => console.warn("No se pudo registrar el modo app:", err));
   });
 }
 </script>

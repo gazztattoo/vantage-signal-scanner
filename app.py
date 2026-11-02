@@ -9,9 +9,11 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 import hmac
+import logging
 import threading
 
 app = Flask(__name__)
+app.logger.setLevel(logging.INFO)
 CORS(app, resources={
     r"/api/*": {
         "origins": ["https://gazztattoo.github.io", "https://vantage-signal-scanner.onrender.com"],
@@ -67,21 +69,30 @@ def access_serializer():
 @app.route("/api/access", methods=["POST"])
 def create_access_token():
     if not PANEL_ACCESS_CODE or not ACCESS_TOKEN_SECRET:
+        app.logger.error("panel_access unavailable reason=missing_server_configuration")
         return jsonify({"error": "El acceso privado aún no está configurado en el servidor."}), 503
     payload = request.get_json(silent=True) or {}
     supplied_code = str(payload.get("code", ""))
     if not hmac.compare_digest(supplied_code, PANEL_ACCESS_CODE):
+        app.logger.warning("panel_access rejected reason=incorrect_code")
         return jsonify({"error": "Código de acceso incorrecto."}), 401
     token = access_serializer().dumps({"access": True})
     app.logger.info("panel_access token_issued")
     return jsonify({"token": token, "expires_in": TOKEN_MAX_AGE_SECONDS})
 
 
+@app.route("/api/access/check", methods=["GET"])
+def check_access_token():
+    # La validación real del token se realiza en protect_signal_endpoints.
+    app.logger.info("panel_access token_verified")
+    return jsonify({"valid": True})
+
+
 @app.before_request
 def protect_signal_endpoints():
     if request.method == "OPTIONS":
         return None
-    if request.path not in ("/api/analysis", "/api/price", "/api/history", "/api/performance", "/api/lab-status", "/api/push/subscribe", "/api/push/test", "/api/push/unsubscribe"):
+    if request.path not in ("/api/access/check", "/api/analysis", "/api/price", "/api/history", "/api/performance", "/api/lab-status", "/api/push/subscribe", "/api/push/test", "/api/push/unsubscribe"):
         return None
     if not ACCESS_TOKEN_SECRET:
         return jsonify({"error": "El acceso privado no está configurado."}), 503

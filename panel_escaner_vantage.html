@@ -480,10 +480,10 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 
 <script>
 const API_BASE="https://vantage-signal-api-carlos.onrender.com";
-let accessToken=sessionStorage.getItem("gss_access_token")||"";
+let accessToken=sessionStorage.getItem("gss_access_token_prod")||"";
 const accessGate=document.getElementById("accessGate"), accessForm=document.getElementById("accessForm"), accessCodeInput=document.getElementById("accessCode"), accessError=document.getElementById("accessError"), accessSubmit=document.getElementById("accessSubmit");
 function showAccessGate(){accessGate.hidden=false;} function hideAccessGate(){accessGate.hidden=true;}
-async function requestAccess(code){const response=await fetch(API_BASE+"/api/access",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code})});const data=await response.json().catch(()=>({}));if(!response.ok||!data.token)throw new Error(data.error||"No se pudo validar el código.");accessToken=data.token;sessionStorage.setItem("gss_access_token",accessToken);}
+async function requestAccess(code){const response=await fetch(API_BASE+"/api/access",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code})});const data=await response.json().catch(()=>({}));if(!response.ok||!data.token)throw new Error(data.error||"No se pudo validar el código.");accessToken=data.token;sessionStorage.setItem("gss_access_token_prod",accessToken);}
 accessForm.addEventListener("submit",async event=>{event.preventDefault();accessSubmit.disabled=true;accessError.textContent="Verificando acceso…";try{await requestAccess(accessCodeInput.value);accessCodeInput.value="";hideAccessGate();update();}catch(error){accessError.textContent=error.message||"Código incorrecto.";}finally{accessSubmit.disabled=false;}});
 
 const markets=[
@@ -936,7 +936,7 @@ async function update(){
 
   if(authExpired){
     accessToken="";
-    sessionStorage.removeItem("gss_access_token");
+    sessionStorage.removeItem("gss_access_token_prod");
     showAccessGate();
     accessError.textContent="Tu sesión ha caducado. Introduce de nuevo el código de acceso.";
     statusEl.textContent="Acceso requerido";

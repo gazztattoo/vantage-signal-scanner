@@ -18,16 +18,25 @@ def main():
         return 2
 
     symbols = ["EUR/USD", "XAU/USD", "BTC/USD"]
-    intervals = ["5min", "15min", "30min"]
+    # Cadencia escalonada: M5 cada 20 min, M15 cada 30 min y M30 cada 60 min.
+    # El workflow se ejecuta cada 10 min; los ciclos se alinean al reloj UTC.
+    minute = time.gmtime().tm_min
+    due_intervals = []
+    if minute % 20 == 0:
+        due_intervals.append("5min")
+    if minute % 30 == 0:
+        due_intervals.append("15min")
+    if minute == 0:
+        due_intervals.append("30min")
+
     failures = 0
     session = requests.Session()
     headers = {"X-Scanner-Cron-Secret": secret}
     request_count = 0
 
-    for interval in intervals:
+    for interval in due_intervals:
         for symbol in symbols:
-            # Keep each Twelve Data request at least 9 seconds apart so a
-            # free-tier 8-credits/minute quota is not exceeded by this scan.
+            # Mantener al menos 9 segundos entre llamadas externas.
             if request_count:
                 time.sleep(9)
             request_count += 1
@@ -51,7 +60,7 @@ def main():
                 print(f"{symbol} {interval} | ERROR | {exc}", file=sys.stderr, flush=True)
                 failures += 1
 
-    print(f"Scanner finished: 9 combinations, {failures} failures.", flush=True)
+    print(f"Scanner finished: {request_count} scheduled combinations, {failures} failures.", flush=True)
     return 1 if failures else 0
 
 

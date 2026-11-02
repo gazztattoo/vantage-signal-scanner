@@ -783,7 +783,9 @@ async function load(m){
   }
 
   if(!r.ok||d.error){
-    throw Error(d.error||`Error HTTP ${r.status}`);
+    const error=new Error(d.error||`Error HTTP ${r.status}`);
+    error.status=r.status;
+    throw error;
   }
 
   return d;
@@ -904,7 +906,7 @@ async function update(){
     try{
       return {m,d:await load(m)};
     }catch(e){
-      return {m,err:e.message||"No se pudo conectar"};
+      return {m,err:e.message||"No se pudo conectar",status:e.status||0};
     }
   }));
 
@@ -925,10 +927,13 @@ async function update(){
     }
   }
 
-  const authExpired=out.some(x=>x.err && (
-    x.err.includes("Sesión caducada") ||
-    x.err.includes("Acceso requerido") ||
-    x.err.includes("Introduce el código")
+  // HTTP status is more reliable than matching localized error text.
+  const authExpired=out.some(x=>x.status===401||x.status===403||(
+    x.err && (
+      x.err.includes("Sesión caducada") ||
+      x.err.includes("Acceso requerido") ||
+      x.err.includes("Introduce el código")
+    )
   ));
 
   if(authExpired){

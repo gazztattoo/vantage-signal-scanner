@@ -18,16 +18,21 @@ def main():
         return 2
 
     symbols = ["EUR/USD", "XAU/USD", "BTC/USD"]
-    # Cadencia escalonada: M5 cada 20 min, M15 cada 30 min y M30 cada 60 min.
-    # El workflow se ejecuta cada 10 min; los ciclos se alinean al reloj UTC.
+    # GitHub Actions puede iniciar unos minutos después del minuto programado.
+    # Se acepta la primera ventana de 10 min de cada ciclo, sin añadir rondas:
+    # M5 cada 20 min, M15 cada 30 min y M30 una vez por hora.
     minute = time.gmtime().tm_min
     due_intervals = []
-    if minute % 20 == 0:
+    if minute % 20 < 10:
         due_intervals.append("5min")
-    if minute % 30 == 0:
+    if minute % 30 < 10:
         due_intervals.append("15min")
-    if minute == 0:
+    if minute < 10:
         due_intervals.append("30min")
+
+    if not due_intervals:
+        print(f"No hay intervalos programados para el minuto UTC {minute:02d}; no se consulta el API.")
+        return 0
 
     failures = 0
     session = requests.Session()

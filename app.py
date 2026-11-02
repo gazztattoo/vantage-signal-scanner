@@ -407,7 +407,19 @@ def twelve_data_get(endpoint, params=None, timeout=20):
             except ValueError as exc:
                 raise RuntimeError("No se pudo verificar el consumo diario de Twelve Data; consulta bloqueada por seguridad.") from exc
             if usage_response.status_code != 200 or "daily_usage" not in usage_data:
-                raise RuntimeError("No se pudo verificar el cupo diario de Twelve Data; consulta bloqueada por seguridad.")
+                # Reportar solo el diagnóstico público del proveedor (nunca la API key)
+                # para distinguir credenciales, límites, formato y errores HTTP.
+                provider_detail = str(
+                    usage_data.get("message")
+                    or usage_data.get("code")
+                    or usage_data.get("status")
+                    or "respuesta sin daily_usage"
+                )[:240]
+                raise RuntimeError(
+                    "No se pudo verificar el cupo diario de Twelve Data "
+                    f"(HTTP {usage_response.status_code}: {provider_detail}); "
+                    "consulta bloqueada por seguridad."
+                )
             try:
                 used = int(usage_data["daily_usage"])
                 daily_limit = int(usage_data.get("plan_daily_limit") or TWELVE_DATA_DAILY_LIMIT)

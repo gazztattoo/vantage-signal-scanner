@@ -1,10 +1,11 @@
 """Safe entry point for the scheduled production scanner.
 
-Runs one market/timeframe per HTTP request to stay below the platform's
-request-duration limit. It never places broker orders.
+Runs one market/timeframe per HTTP request and spaces requests to respect
+the free Twelve Data limit of 8 credits per minute. It never places broker orders.
 """
 import os
 import sys
+import time
 
 import requests
 
@@ -21,9 +22,15 @@ def main():
     failures = 0
     session = requests.Session()
     headers = {"X-Scanner-Cron-Secret": secret}
+    request_count = 0
 
     for interval in intervals:
         for symbol in symbols:
+            # Keep each Twelve Data request at least 9 seconds apart so a
+            # free-tier 8-credits/minute quota is not exceeded by this scan.
+            if request_count:
+                time.sleep(9)
+            request_count += 1
             try:
                 response = session.post(
                     base_url + "/api/push/scan",
@@ -37,6 +44,8 @@ def main():
                     payload = {"response": response.text[:500]}
                 print(f"{symbol} {interval} | HTTP {response.status_code} | {payload}", flush=True)
                 if response.status_code != 200 or not isinstance(payload, dict) or payload.get("error"):
+                    failures += 1
+                elif any(check.get("status") == "analysis_error" for check in payload.get("checks", [])):
                     failures += 1
             except requests.RequestException as exc:
                 print(f"{symbol} {interval} | ERROR | {exc}", file=sys.stderr, flush=True)

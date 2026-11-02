@@ -639,6 +639,8 @@ def price():
             "price": float(data["price"]),
         })
 
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
     except (requests.RequestException, ValueError):
         return jsonify({
             "error": "No se pudo consultar el proveedor de precios"

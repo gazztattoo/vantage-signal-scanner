@@ -130,10 +130,14 @@ def main():
                 if not isinstance(queue, dict) or int(queue.get("errors") or 0) > 0:
                     failures.append(f"{symbol} {interval}: push delivery queue errors")
 
+                check_detail = ""
+                if isinstance(checks, list) and checks:
+                    check_detail = str(checks[0].get("detail") or checks[0].get("http_status") or "")
                 print(
                     f"{symbol} {interval} | HTTP {response.status_code} | "
-                    f"status={checks[0].get('status') if isinstance(checks, list) and checks else 'MISSING'} | "
-                    f"queue={queue}",
+                    f"status={checks[0].get('status') if isinstance(checks, list) and checks else 'MISSING'}"
+                    + (f" | detail={check_detail[:300]}" if check_detail else "")
+                    + f" | queue={queue}",
                     flush=True,
                 )
             except requests.RequestException as exc:

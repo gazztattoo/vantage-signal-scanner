@@ -19,8 +19,10 @@ FAILURE_STATUSES = {
     "subscription_read_error",
     "delivery_queue_error",
     "outbox_error",
+    "confluence_read_error",
 }
 SUCCESS_STATUSES = {
+    "confluence_wait",
     "market_closed",
     "same_signal_no_notification",
     "state_reset_no_notification",

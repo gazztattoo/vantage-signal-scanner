@@ -9,6 +9,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 import hmac
+import threading
 
 app = Flask(__name__)
 CORS(app, resources={
@@ -204,7 +205,18 @@ ANALYSIS_CACHE_TTL_SECONDS = {
     "30min": 55 * 60,
 }
 ANALYSIS_CACHE = {}
-TWELVE_DATA_CREDITS = {"used": None, "left": None, "checked_at": None, "warning": None}
+# Límite diario conservador para el plan Basic (800 créditos/día).
+# Se detienen las consultas de mercado al alcanzar 680 créditos diarios.
+TWELVE_DATA_DAILY_LIMIT = int(os.environ.get("TWELVE_DATA_DAILY_LIMIT", "800"))
+TWELVE_DATA_HARD_STOP = int(os.environ.get("TWELVE_DATA_HARD_STOP", "680"))
+TWELVE_DATA_USAGE_CHECK_SECONDS = 15 * 60
+TWELVE_DATA_LOCK = threading.Lock()
+TWELVE_DATA_CREDITS = {
+    "used": None, "left": None, "checked_at": None, "warning": None,
+    "daily_limit": TWELVE_DATA_DAILY_LIMIT,
+    "hard_stop": TWELVE_DATA_HARD_STOP,
+    "blocked": False,
+}
 
 
 def get_symbol(raw):
@@ -371,49 +383,100 @@ def parse_candle_time(raw_time):
     return parsed
 
 
+def twelve_data_get(endpoint, params=None, timeout=20):
+    """Consulta Twelve Data con control diario y bloqueo preventivo."""
+    with TWELVE_DATA_LOCK:
+        now = datetime.now(timezone.utc)
+        checked_at = TWELVE_DATA_CREDITS.get("checked_at")
+        needs_check = True
+        if checked_at:
+            try:
+                last_check = datetime.fromisoformat(checked_at)
+                needs_check = (now - last_check).total_seconds() >= TWELVE_DATA_USAGE_CHECK_SECONDS
+            except ValueError:
+                needs_check = True
+
+        if needs_check:
+            usage_response = requests.get(
+                f"{TWELVE_DATA_URL}/api_usage",
+                params={"apikey": API_KEY, "timezone": "UTC"},
+                timeout=timeout,
+            )
+            try:
+                usage_data = usage_response.json()
+            except ValueError as exc:
+                raise RuntimeError("No se pudo verificar el consumo diario de Twelve Data; consulta bloqueada por seguridad.") from exc
+            if usage_response.status_code != 200 or "daily_usage" not in usage_data:
+                raise RuntimeError("No se pudo verificar el cupo diario de Twelve Data; consulta bloqueada por seguridad.")
+            try:
+                used = int(usage_data["daily_usage"])
+                daily_limit = int(usage_data.get("plan_daily_limit") or TWELVE_DATA_DAILY_LIMIT)
+            except (TypeError, ValueError):
+                raise RuntimeError("Twelve Data devolvió un consumo diario no válido; consulta bloqueada por seguridad.")
+            TWELVE_DATA_CREDITS.update({
+                "used": used,
+                "left": max(daily_limit - used, 0),
+                "checked_at": now.isoformat(),
+                "daily_limit": daily_limit,
+                "hard_stop": min(TWELVE_DATA_HARD_STOP, daily_limit),
+                "blocked": used >= min(TWELVE_DATA_HARD_STOP, daily_limit),
+                "warning": (
+                    "BLOQUEADO: límite preventivo diario alcanzado"
+                    if used >= min(TWELVE_DATA_HARD_STOP, daily_limit)
+                    else "Aviso: se ha utilizado el 70% o más del cupo diario"
+                    if used >= daily_limit * 0.70 else None
+                ),
+            })
+
+        if TWELVE_DATA_CREDITS.get("used") is not None and (
+            TWELVE_DATA_CREDITS["used"] >= min(
+                TWELVE_DATA_HARD_STOP,
+                TWELVE_DATA_CREDITS.get("daily_limit") or TWELVE_DATA_DAILY_LIMIT,
+            )
+        ):
+            TWELVE_DATA_CREDITS["blocked"] = True
+            raise RuntimeError(
+                "Consultas pausadas para proteger el cupo diario de Twelve Data "
+                f"({TWELVE_DATA_CREDITS['used']}/"
+                f"{TWELVE_DATA_CREDITS.get('daily_limit', TWELVE_DATA_DAILY_LIMIT)} créditos)."
+            )
+
+        response = requests.get(
+            f"{TWELVE_DATA_URL}/{endpoint}",
+            params={**(params or {}), "apikey": API_KEY},
+            timeout=timeout,
+        )
+        # Los headers son créditos de esta petición/minuto, no el acumulado diario.
+        credit_used = response.headers.get("api-credits-used")
+        credit_left = response.headers.get("api-credits-left")
+        try:
+            request_used = int(credit_used) if credit_used is not None else None
+            request_left = int(credit_left) if credit_left is not None else None
+        except (TypeError, ValueError):
+            request_used, request_left = None, None
+        if request_used is not None or request_left is not None:
+            TWELVE_DATA_CREDITS["request_credits_used"] = request_used
+            TWELVE_DATA_CREDITS["request_credits_left"] = request_left
+        return response
+
+
 def fetch_candles(symbol, interval):
     if not API_KEY:
         raise RuntimeError(
             "Falta configurar TWELVE_DATA_API_KEY en Render"
         )
 
-    response = requests.get(
-        f"{TWELVE_DATA_URL}/time_series",
+    response = twelve_data_get(
+        "time_series",
         params={
             "symbol": symbol,
             "interval": interval,
             "outputsize": 100,
-            "apikey": API_KEY,
             "order": "ASC",
             "timezone": "Atlantic/Canary",
         },
         timeout=20,
     )
-
-    credit_used = response.headers.get("api-credits-used")
-    credit_left = response.headers.get("api-credits-left")
-    if credit_used is not None or credit_left is not None:
-        try:
-            used_value = int(credit_used) if credit_used is not None else None
-            left_value = int(credit_left) if credit_left is not None else None
-        except (TypeError, ValueError):
-            used_value, left_value = None, None
-        TWELVE_DATA_CREDITS.update({
-            "used": used_value,
-            "left": left_value,
-            "checked_at": datetime.now(timezone.utc).isoformat(),
-            "warning": (
-                "CRÍTICO: 85% o más del cupo diario utilizado"
-                if used_value is not None and used_value >= 680
-                else "Aviso: 70% o más del cupo diario utilizado"
-                if used_value is not None and used_value >= 560
-                else None
-            ),
-        })
-        if used_value is not None and used_value >= 680:
-            app.logger.warning("Twelve Data: consumo diario >= 85%% (%s créditos).", used_value)
-        elif used_value is not None and used_value >= 560:
-            app.logger.warning("Twelve Data: consumo diario >= 70%% (%s créditos).", used_value)
 
     try:
         data = response.json()
@@ -532,9 +595,9 @@ def health():
 def credits_status():
     return jsonify({
         "provider": "Twelve Data",
-        "daily_limit": 800,
-        "warning_threshold": 560,
-        "critical_threshold": 680,
+        "daily_limit": TWELVE_DATA_DAILY_LIMIT,
+        "warning_threshold": int(TWELVE_DATA_DAILY_LIMIT * 0.70),
+        "critical_threshold": TWELVE_DATA_HARD_STOP,
         **TWELVE_DATA_CREDITS,
     })
 
@@ -555,12 +618,9 @@ def price():
         }), 503
 
     try:
-        response = requests.get(
-            f"{TWELVE_DATA_URL}/price",
-            params={
-                "symbol": symbol,
-                "apikey": API_KEY,
-            },
+        response = twelve_data_get(
+            "price",
+            params={"symbol": symbol},
             timeout=15,
         )
 

@@ -1,4 +1,4 @@
-"""Safe entry point for a Render Cron job.
+"""Safe entry point for the scheduled production scanner.
 
 This script only calls the scanner API. It does not place broker orders.
 Configure SCANNER_API_URL and SIGNAL_CRON_SECRET in the Cron service environment.
@@ -20,7 +20,7 @@ def main():
         response = requests.post(
             base_url + "/api/push/scan",
             headers={"X-Scanner-Cron-Secret": secret},
-            timeout=(10, 180),
+            timeout=(10, 210),
         )
     except requests.RequestException as exc:
         print("Scanner request failed: " + str(exc), file=sys.stderr)

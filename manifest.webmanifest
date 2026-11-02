@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "GLOBAL SIGNAL SCANNER",
-  "short_name": "GLOBAL SCANNER",
-  "description": "Panel de análisis técnico Forex, oro y criptomonedas.",
+  "name": "VANTAGE TEST",
+  "short_name": "VANTAGE TEST",
+  "description": "Panel de pruebas Vantage Signal Scanner. Entorno TEST, separado de producción.",
   "lang": "es",
   "start_url": "./panel_escaner_vantage.html",
   "scope": "./",

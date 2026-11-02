@@ -1120,7 +1120,7 @@ document.getElementById("historyRefresh").addEventListener("click",loadHistory);
 
 button.addEventListener("click",update);
 document.getElementById("interval").addEventListener("change",update);
-hideAccessGate();update();
+if(accessToken){hideAccessGate();update();}else{showAccessGate();statusEl.textContent="Acceso requerido";}
 
 const pushStatus=document.getElementById("pushStatus");
 const pushToggleButton=document.getElementById("pushToggle");

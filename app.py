@@ -1412,6 +1412,8 @@ def push_scan():
         return jsonify({"error": "Símbolo no permitido."}), 400
     if requested_interval and requested_interval not in intervals:
         return jsonify({"error": "Temporalidad no permitida."}), 400
+    if requested_interval == "30min":
+        return jsonify({"error": "M30 es de análisis manual; no admite escaneo automático ni alertas."}), 403
     selected_symbols = [requested_symbol] if requested_symbol else symbols
     selected_intervals = [requested_interval] if requested_interval else intervals
 

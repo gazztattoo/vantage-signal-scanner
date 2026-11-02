@@ -988,6 +988,64 @@ def push_test():
         return jsonify({"error": "No se pudo conectar con el almacenamiento."}), 502
 
 
+
+@app.route("/api/push/admin-test", methods=["POST"])
+def push_admin_test():
+    """Prueba push administrativa, protegida por el secreto del escáner."""
+    supplied = request.headers.get("X-Scanner-Cron-Secret", "")
+    if not SIGNAL_CRON_SECRET or not hmac.compare_digest(supplied, SIGNAL_CRON_SECRET):
+        return jsonify({"error": "No autorizado."}), 401
+
+    try:
+        response = requests.get(
+            SUPABASE_URL + "/rest/v1/push_subscriptions",
+            params={"select": "subscription", "limit": "100"},
+            headers=supabase_headers(),
+            timeout=15,
+        )
+        if response.status_code != 200:
+            return jsonify({"error": "No se pudieron consultar las suscripciones."}), 502
+
+        subscriptions = response.json()
+        if not subscriptions:
+            return jsonify({"ok": False, "subscriptions_found": 0, "sent": 0,
+                            "failed": 0, "message": "No hay dispositivos suscritos."}), 404
+
+        sent = 0
+        failures = []
+        for row in subscriptions:
+            subscription = row.get("subscription")
+            if not isinstance(subscription, dict) or not subscription.get("endpoint"):
+                failures.append({"reason": "Suscripción no válida."})
+                continue
+            try:
+                send_web_push(subscription, {
+                    "title": "VANTAGE SIGNAL SCANNER",
+                    "body": "Prueba de producción: las notificaciones de Vantage están llegando a este dispositivo.",
+                    "tag": "vantage-production-push-test",
+                    "url": "https://vantage-signal-scanner.onrender.com/panel_escaner_vantage.html",
+                })
+                sent += 1
+            except Exception as exc:
+                response_obj = getattr(exc, "response", None)
+                failures.append({
+                    "status": getattr(response_obj, "status_code", None),
+                    "reason": str(exc)[:300],
+                })
+
+        return jsonify({
+            "ok": sent > 0,
+            "subscriptions_found": len(subscriptions),
+            "sent": sent,
+            "failed": len(failures),
+            "failures": failures,
+        }), (200 if sent > 0 else 502)
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
+    except requests.RequestException:
+        return jsonify({"error": "No se pudo conectar con el almacenamiento."}), 502
+
+
 def resolve_pending_signal_outcomes(symbol, interval, recent_candles):
     """Cierra TP/SL o caduca señales tras 24 velas cerradas posteriores."""
     if not recent_candles:

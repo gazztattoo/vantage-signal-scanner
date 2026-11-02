@@ -1,0 +1,40 @@
+name: Vantage Signal Scanner (cada 20 minutos)
+
+on:
+  schedule:
+    - cron: "*/20 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vantage-signal-scanner-cron
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Ejecutar escáner
+        env:
+          SCANNER_API_URL: https://vantage-signal-api-carlos.onrender.com
+          SIGNAL_CRON_SECRET: ${{ secrets.SIGNAL_CRON_SECRET }}
+        run: |
+          if [ -z "$SIGNAL_CRON_SECRET" ]; then
+            echo "::error::Falta configurar el secreto SIGNAL_CRON_SECRET en GitHub."
+            exit 1
+          fi
+          python scripts/run_signal_scan.py

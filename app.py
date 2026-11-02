@@ -1448,6 +1448,54 @@ def push_scan():
                 )
                 direction = data.get("signal") or "ESPERAR"
 
+                # M5 alerts require a fresh, pending M15 signal in the same direction.
+                # Reuse signal_history; do not request additional Twelve Data candles.
+                if interval == "5min" and direction in ("COMPRA", "VENTA"):
+                    confirmation_response = requests.get(
+                        SUPABASE_URL + "/rest/v1/signal_history",
+                        params={
+                            "select": "direction,signal_at,candle_time,status",
+                            "symbol": "eq." + symbol,
+                            "timeframe": "eq.15min",
+                            "status": "eq.PENDIENTE",
+                            "order": "signal_at.desc",
+                            "limit": "1",
+                        },
+                        headers=supabase_headers(),
+                        timeout=15,
+                    )
+                    if confirmation_response.status_code != 200:
+                        results.append({
+                            "symbol": symbol, "interval": interval,
+                            "status": "confluence_read_error",
+                            "http_status": confirmation_response.status_code,
+                        })
+                        continue
+                    confirmation_rows = confirmation_response.json()
+                    confirmation = confirmation_rows[0] if confirmation_rows else None
+                    confirmation_age = None
+                    if confirmation:
+                        try:
+                            confirmation_time = datetime.fromisoformat(
+                                str(confirmation.get("signal_at")).replace("Z", "+00:00")
+                            )
+                            confirmation_age = (datetime.now(timezone.utc) - confirmation_time).total_seconds() / 60
+                        except (TypeError, ValueError):
+                            confirmation_age = None
+                    if (
+                        not confirmation
+                        or confirmation.get("direction") != direction
+                        or confirmation_age is None
+                        or confirmation_age > 40
+                    ):
+                        results.append({
+                            "symbol": symbol, "interval": interval,
+                            "status": "confluence_wait",
+                            "direction": direction,
+                            "detail": "M15 no confirma una señal M5 reciente en la misma dirección.",
+                        })
+                        continue
+
                 # Asegurar el historial en cada ciclo para señales activas.
                 # La clave única hace esta escritura idempotente: si ya existe,
                 # Supabase ignora el duplicado; si faltaba por un fallo previo,

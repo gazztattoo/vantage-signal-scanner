@@ -63,10 +63,8 @@ def main():
     if minute < 10:
         due_intervals.append("30min")
 
-    report = []
     failures = []
     request_count = 0
-    results = []
 
     if not due_intervals:
         message = f"No scheduled intervals at UTC minute {minute:02d}; API was not called."
@@ -74,8 +72,8 @@ def main():
         write_step_summary([
             "## Vantage Signal Scanner",
             f"- Started: {started_at.isoformat()}",
-            f"- Result: no interval due",
-            f"- API requests: 0",
+            "- Result: no interval due",
+            "- API requests: 0",
             f"- Detail: {message}",
         ])
         return 0
@@ -89,7 +87,6 @@ def main():
             if request_count:
                 time.sleep(9)
             request_count += 1
-            item = {"symbol": symbol, "interval": interval}
             try:
                 response = session.post(
                     base_url + "/api/push/scan",
@@ -97,47 +94,43 @@ def main():
                     headers=headers,
                     timeout=(10, 45),
                 )
-                item["http_status"] = response.status_code
                 try:
                     payload = response.json()
                 except ValueError:
                     payload = {"error": response.text[:300]}
-                item["payload"] = payload
 
                 if response.status_code != 200 or not isinstance(payload, dict) or payload.get("error"):
                     failures.append(f"{symbol} {interval}: HTTP {response.status_code}")
-                else:
-                    checks = payload.get("checks", [])
-                    if not isinstance(checks, list):
-                        failures.append(f"{symbol} {interval}: invalid checks payload")
-                    else:
-                        for check in checks:
-                            status = check.get("status")
-                            if status in FAILURE_STATUSES:
-                                failures.append(
-                                    f"{symbol} {interval} / {check.get('symbol')} "
-                                    f"{check.get('interval')}: {status}"
-                                )
-                            elif status not in SUCCESS_STATUSES:
-                                failures.append(
-                                    f"{symbol} {interval}: unrecognized check status {status!r}"
-                                )
-                    queue = payload.get("delivery_queue") or {}
-                    if int(queue.get("errors") or 0) > 0:
-                        failures.append(f"{symbol} {interval}: push delivery queue errors")
+                    print(f"{symbol} {interval} | HTTP {response.status_code} | API error", flush=True)
+                    continue
 
-                results.append(item)
+                checks = payload.get("checks")
+                if not isinstance(checks, list) or len(checks) != 1:
+                    failures.append(f"{symbol} {interval}: expected exactly one check, got invalid/empty response")
+                else:
+                    check = checks[0]
+                    status = check.get("status")
+                    if status in FAILURE_STATUSES:
+                        failures.append(
+                            f"{symbol} {interval}: {status} "
+                            f"({check.get('detail') or check.get('http_status') or 'sin detalle'})"
+                        )
+                    elif status not in SUCCESS_STATUSES:
+                        failures.append(f"{symbol} {interval}: unrecognized check status {status!r}")
+
+                queue = payload.get("delivery_queue") or {}
+                if not isinstance(queue, dict) or int(queue.get("errors") or 0) > 0:
+                    failures.append(f"{symbol} {interval}: push delivery queue errors")
+
                 print(
                     f"{symbol} {interval} | HTTP {response.status_code} | "
-                    f"checks={len(payload.get('checks', [])) if isinstance(payload, dict) else 0} | "
-                    f"queue={payload.get('delivery_queue', {}) if isinstance(payload, dict) else {}}",
+                    f"status={checks[0].get('status') if isinstance(checks, list) and checks else 'MISSING'} | "
+                    f"queue={queue}",
                     flush=True,
                 )
             except requests.RequestException as exc:
                 message = f"{symbol} {interval}: request failed ({type(exc).__name__})"
                 failures.append(message)
-                item["error"] = message
-                results.append(item)
                 print(message, file=sys.stderr, flush=True)
 
     finished_at = datetime.now(timezone.utc)

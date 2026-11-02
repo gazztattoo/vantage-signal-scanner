@@ -53,30 +53,15 @@ def main():
 
     symbols = ["EUR/USD", "XAU/USD", "BTC/USD"]
     started_at = datetime.now(timezone.utc)
-    # GitHub Actions may start a few minutes after the scheduled minute.
-    # M5 y M15 son automáticos. M30 queda reservado para análisis manual
-    # desde el panel y nunca se incluye en el escáner programado.
-    minute = started_at.minute
-    due_intervals = []
-    if minute % 20 < 10:
-        due_intervals.append("5min")
-    if minute % 30 < 10:
-        due_intervals.append("15min")
+    # Ejecutar M5 y M15 en cada ciclo de GitHub Actions.
+    # No dependemos del minuto exacto de inicio (GitHub puede retrasar
+    # los cron): la caché del API limita las consultas reales a Twelve Data
+    # con TTL de 18 min para M5 y 28 min para M15.
+    # M30 queda reservado exclusivamente al análisis manual del panel.
+    due_intervals = ["5min", "15min"]
 
     failures = []
     request_count = 0
-
-    if not due_intervals:
-        message = f"No scheduled intervals at UTC minute {minute:02d}; API was not called."
-        print(message, flush=True)
-        write_step_summary([
-            "## Vantage Signal Scanner",
-            f"- Started: {started_at.isoformat()}",
-            "- Result: no interval due",
-            "- API requests: 0",
-            f"- Detail: {message}",
-        ])
-        return 0
 
     session = requests.Session()
     headers = {"X-Scanner-Cron-Secret": secret}

@@ -79,22 +79,8 @@ def create_access_token():
 
 @app.before_request
 def protect_signal_endpoints():
-    if request.method == "OPTIONS":
-        return None
-    if request.path not in ("/api/analysis", "/api/price", "/api/history", "/api/performance", "/api/lab-status", "/api/push/subscribe", "/api/push/test", "/api/push/unsubscribe"):
-        return None
-    if not ACCESS_TOKEN_SECRET:
-        return jsonify({"error": "El acceso privado no está configurado."}), 503
-    authorization = request.headers.get("Authorization", "")
-    if not authorization.startswith("Bearer "):
-        return jsonify({"error": "Acceso requerido. Introduce el código del panel."}), 401
-    token = authorization[7:].strip()
-    try:
-        data = access_serializer().loads(token, max_age=TOKEN_MAX_AGE_SECONDS)
-        if data.get("access") is not True:
-            raise BadSignature("Token no válido")
-    except (BadSignature, SignatureExpired, RuntimeError):
-        return jsonify({"error": "Sesión caducada o no válida. Vuelve a introducir el código."}), 401
+    # Acceso directo temporal solicitado: las rutas del panel quedan públicas.
+    # Para restaurar el acceso privado, reponer aquí la validación Bearer.
     return None
 TWELVE_DATA_URL = "https://api.twelvedata.com"
 

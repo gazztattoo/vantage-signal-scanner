@@ -1195,12 +1195,21 @@ def push_scan():
     intervals = ["5min", "15min", "30min"]
     symbols = ["EUR/USD", "XAU/USD", "BTC/USD"]
 
-    # Reutiliza el mismo endpoint de análisis que consume el panel.
-    # Pausa entre consultas para no superar de golpe el límite del proveedor.
-    import time
+    # El escáner programado procesa una combinación por petición para respetar
+    # el límite HTTP de la plataforma. El runner invoca las 9 combinaciones
+    # secuencialmente; cada petición queda aislada y puede reintentarse.
+    requested_symbol = request.args.get("symbol")
+    requested_interval = request.args.get("interval")
+    if requested_symbol and requested_symbol not in symbols:
+        return jsonify({"error": "Símbolo no permitido."}), 400
+    if requested_interval and requested_interval not in intervals:
+        return jsonify({"error": "Temporalidad no permitida."}), 400
+    selected_symbols = [requested_symbol] if requested_symbol else symbols
+    selected_intervals = [requested_interval] if requested_interval else intervals
+
     with app.test_client() as client:
-        for index, (symbol, interval) in enumerate(
-            (pair for interval in intervals for pair in [(s, interval) for s in symbols])
+        for symbol, interval in (
+            (s, tf) for tf in selected_intervals for s in selected_symbols
         ):
             session = market_session(symbol)
             if not session["open"]:
@@ -1209,8 +1218,6 @@ def push_scan():
                     "status": "market_closed",
                     "detail": "Mercado cerrado: no se analiza ni se envían alertas."
                 })
-                if index < 8:
-                    time.sleep(8)
                 continue
 
             response = client.get(
@@ -1456,9 +1463,6 @@ def push_scan():
                                 "devices_queued": queued,
                                 "queue_errors": queue_errors
                             })
-
-            if index < 8:
-                time.sleep(8)
 
     delivery_summary = process_pending_push_deliveries()
     sent_total += delivery_summary["sent"]

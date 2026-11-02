@@ -99,7 +99,17 @@ def main():
 
                 if response.status_code != 200 or not isinstance(payload, dict) or payload.get("error"):
                     failures.append(f"{symbol} {interval}: HTTP {response.status_code}")
-                    print(f"{symbol} {interval} | HTTP {response.status_code} | API error", flush=True)
+                    detail = ""
+                    if isinstance(payload, dict):
+                        checks_detail = payload.get("checks")
+                        if isinstance(checks_detail, list) and checks_detail:
+                            detail = str(checks_detail[0].get("detail") or checks_detail[0].get("status") or "")
+                        detail = detail or str(payload.get("error") or "")
+                    print(
+                        f"{symbol} {interval} | HTTP {response.status_code} | API error"
+                        + (f" | detail={detail[:300]}" if detail else ""),
+                        flush=True,
+                    )
                     continue
 
                 checks = payload.get("checks")

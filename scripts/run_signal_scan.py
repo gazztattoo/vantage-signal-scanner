@@ -52,16 +52,14 @@ def main():
     symbols = ["EUR/USD", "XAU/USD", "BTC/USD"]
     started_at = datetime.now(timezone.utc)
     # GitHub Actions may start a few minutes after the scheduled minute.
-    # Accept the first 10-minute window of each cycle without adding scan rounds:
-    # M5 every 20 min, M15 every 30 min, M30 once per hour.
+    # M5 y M15 son automáticos. M30 queda reservado para análisis manual
+    # desde el panel y nunca se incluye en el escáner programado.
     minute = started_at.minute
     due_intervals = []
     if minute % 20 < 10:
         due_intervals.append("5min")
     if minute % 30 < 10:
         due_intervals.append("15min")
-    if minute < 10:
-        due_intervals.append("30min")
 
     failures = []
     request_count = 0

@@ -394,12 +394,12 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 <section class="toolbar">
   <label for="interval">Temporalidad</label>
   <select id="interval">
-    <option value="5min">M5 · 5 minutos</option>
-    <option value="15min">M15 · 15 minutos</option>
-    <option value="30min">M30 · 30 minutos</option>
+    <option value="5min">M5 · automático</option>
+    <option value="15min">M15 · automático</option>
+    <option value="30min">M30 · manual</option>
   </select>
   <button id="refresh">↻ Actualizar análisis</button>
-  <span class="hint" id="updated">Sin actualizar</span>
+  <span class="hint" id="updated">M5 y M15 se escanean automáticamente. M30 solo al solicitarlo.</span>
 </section>
 
 
@@ -448,12 +448,13 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
   <div class="data-panel">
     <h2>Análisis técnico</h2>
     <p>M5 y M15 se analizan automáticamente. M30 queda reservado para consulta manual con el botón Analizar. Los datos son análisis técnicos experimentales, no una garantía de resultado.</p>
+    <p class="hint">M5 y M15 se actualizan mediante el escáner automático. M30 no se ejecuta en segundo plano: cada consulta manual consume datos solo cuando pulsas Analizar.</p>
     <div class="data-toolbar">
       <select id="analysisSymbol"><option value="EUR/USD">EUR/USD</option><option value="XAU/USD">XAU/USD</option><option value="BTC/USD">BTC/USD</option></select>
-      <select id="analysisTimeframe"><option value="5min">M5</option><option value="15min">M15</option><option value="30min">M30</option></select>
-      <button id="analysisRefresh" type="button">Analizar</button>
+      <select id="analysisTimeframe"><option value="5min">M5 · automático</option><option value="15min">M15 · automático</option><option value="30min">M30 · manual</option></select>
+      <button id="analysisRefresh" type="button">Analizar temporalidad seleccionada</button>
     </div>
-    <div id="analysisMessage" class="hint" style="margin-bottom:12px">Selecciona un mercado para consultar sus indicadores.</div>
+    <div id="analysisMessage" class="hint" style="margin-bottom:12px">Selecciona mercado y temporalidad. M30 se consulta únicamente al pulsar el botón.</div>
     <div id="analysisResult" class="stat-grid"></div>
   </div>
 </section>

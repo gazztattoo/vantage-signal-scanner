@@ -926,7 +926,7 @@ async function update(){
   }
 
   // HTTP status is more reliable than matching localized error text.
-  const authExpired=out.some(x=>x.status===401||x.status===403||(
+  const authExpired=out.some(x=>x.status===401||(
     x.err && (
       x.err.includes("Sesión caducada") ||
       x.err.includes("Acceso requerido") ||

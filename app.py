@@ -73,6 +73,7 @@ def create_access_token():
     if not hmac.compare_digest(supplied_code, PANEL_ACCESS_CODE):
         return jsonify({"error": "Código de acceso incorrecto."}), 401
     token = access_serializer().dumps({"access": True})
+    app.logger.info("panel_access token_issued")
     return jsonify({"token": token, "expires_in": TOKEN_MAX_AGE_SECONDS})
 
 
@@ -86,14 +87,20 @@ def protect_signal_endpoints():
         return jsonify({"error": "El acceso privado no está configurado."}), 503
     authorization = request.headers.get("Authorization", "")
     if not authorization.startswith("Bearer "):
+        app.logger.warning("panel_auth rejected path=%s reason=missing_bearer", request.path)
         return jsonify({"error": "Acceso requerido. Introduce el código del panel."}), 401
     token = authorization[7:].strip()
     try:
         data = access_serializer().loads(token, max_age=TOKEN_MAX_AGE_SECONDS)
         if data.get("access") is not True:
             raise BadSignature("Token no válido")
-    except (BadSignature, SignatureExpired, RuntimeError):
+    except SignatureExpired:
+        app.logger.warning("panel_auth rejected path=%s reason=expired", request.path)
         return jsonify({"error": "Sesión caducada o no válida. Vuelve a introducir el código."}), 401
+    except (BadSignature, RuntimeError) as exc:
+        app.logger.error("panel_auth rejected path=%s reason=%s", request.path, type(exc).__name__)
+        return jsonify({"error": "Sesión caducada o no válida. Vuelve a introducir el código."}), 401
+    app.logger.info("panel_auth accepted path=%s", request.path)
     return None
 TWELVE_DATA_URL = "https://api.twelvedata.com"
 

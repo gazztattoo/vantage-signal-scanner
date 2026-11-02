@@ -340,7 +340,7 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 
 <body>
 
-<section class="access-gate" id="accessGate" aria-label="Acceso privado"><form class="access-box" id="accessForm"><h1>GLOBAL SIGNAL SCANNER</h1><p>Plataforma de acceso privado. Introduce el código que te compartió el administrador.</p><input id="accessCode" type="password" autocomplete="current-password" placeholder="Código de acceso" required><button id="accessSubmit" type="submit">ENTRAR AL SCANNER</button><p class="access-error" id="accessError" role="alert"></p></form></section>
+<section class="access-gate" id="accessGate" hidden aria-label="Acceso privado"><form class="access-box" id="accessForm"><h1>GLOBAL SIGNAL SCANNER</h1><p>Plataforma de acceso privado. Introduce el código que te compartió el administrador.</p><input id="accessCode" type="password" autocomplete="current-password" placeholder="Código de acceso" required><button id="accessSubmit" type="submit">ENTRAR AL SCANNER</button><p class="access-error" id="accessError" role="alert"></p></form></section>
 <main class="wrap">
 
 <header class="top">
@@ -1120,7 +1120,7 @@ document.getElementById("historyRefresh").addEventListener("click",loadHistory);
 
 button.addEventListener("click",update);
 document.getElementById("interval").addEventListener("change",update);
-if(accessToken){hideAccessGate();update();}else{showAccessGate();statusEl.textContent="Acceso requerido";}
+hideAccessGate();update();
 
 const pushStatus=document.getElementById("pushStatus");
 const pushToggleButton=document.getElementById("pushToggle");

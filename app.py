@@ -8,6 +8,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 import hmac
+import math
 
 app = Flask(__name__)
 CORS(app, resources={
@@ -18,7 +19,9 @@ CORS(app, resources={
     }
 })
 
-API_KEY = os.environ.get("TWELVE_DATA_API_KEY")
+# Esta rama es exclusivamente de pruebas: no consulta proveedores de mercado.
+DATA_MODE = "mock"
+API_KEY = None
 PANEL_ACCESS_CODE = os.environ.get("PANEL_ACCESS_CODE", "")
 ACCESS_TOKEN_SECRET = os.environ.get("ACCESS_TOKEN_SECRET", "")
 TOKEN_MAX_AGE_SECONDS = 12 * 60 * 60
@@ -360,7 +363,39 @@ def parse_candle_time(raw_time):
     return parsed
 
 
+def generate_mock_candles(symbol, interval, count=100):
+    """Velas sintéticas deterministas para probar la interfaz sin datos de mercado."""
+    now = datetime.now(timezone.utc)
+    step = INTERVAL_MINUTES[interval] * 60
+    latest_open = int(now.timestamp() // step) * step - step
+    bases = {"EUR/USD": 1.0850, "XAU/USD": 2350.0, "BTC/USD": 68000.0}
+    amplitudes = {"EUR/USD": 0.00045, "XAU/USD": 1.8, "BTC/USD": 42.0}
+    trends = {"EUR/USD": 0.000002, "XAU/USD": 0.012, "BTC/USD": 0.28}
+    base, amplitude, trend = bases[symbol], amplitudes[symbol], trends[symbol]
+    candles = []
+    previous = base
+    for i in range(count):
+        close = base + trend * i + amplitude * math.sin(i / 4.7) + amplitude * 0.35 * math.sin(i / 1.9)
+        open_price = previous
+        spread = amplitude * (0.35 + abs(math.sin(i * 1.31)) * 0.35)
+        candle_time = datetime.fromtimestamp(latest_open - (count - 1 - i) * step, timezone.utc).astimezone(CANARY_TZ)
+        candles.append({
+            "time": candle_time.isoformat(),
+            "open": open_price,
+            "high": max(open_price, close) + spread,
+            "low": min(open_price, close) - spread,
+            "close": close,
+        })
+        previous = close
+    latest_time = datetime.fromtimestamp(latest_open, timezone.utc).astimezone(CANARY_TZ)
+    age_seconds = max((now - latest_time.astimezone(timezone.utc)).total_seconds(), 0)
+    return candles, latest_time.isoformat(), round(age_seconds / 60, 2)
+
+
 def fetch_candles(symbol, interval):
+    if DATA_MODE == "mock":
+        return generate_mock_candles(symbol, interval)
+
     if not API_KEY:
         raise RuntimeError(
             "Falta configurar TWELVE_DATA_API_KEY en Render"
@@ -502,6 +537,15 @@ def price():
             "allowed_symbols": sorted(ALLOWED_SYMBOLS),
         }), 400
 
+    if DATA_MODE == "mock":
+        candles, _, _ = generate_mock_candles(symbol, "5min")
+        return jsonify({
+            "symbol": symbol,
+            "price": candles[-1]["close"],
+            "data_mode": "mock",
+            "warning": "PRECIO SIMULADO: solo para pruebas, no operar.",
+        })
+
     if not API_KEY:
         return jsonify({
             "error": "Falta configurar la clave de Twelve Data"
@@ -642,10 +686,11 @@ def analysis():
                 "EMA20/EMA50 + RSI14 + MACD + ADX14 + Bollinger(20,2); "
                 "score mínimo 3/4 y ADX>=18; SL=1.5x ATR; TP=3x ATR"
             ),
+            "data_mode": DATA_MODE,
             "warning": (
-                "Señal técnica experimental. Verifica datos, "
-                "spread y riesgo antes de operar. "
-                "No ejecuta órdenes."
+                "DATOS SIMULADOS: panel de pruebas. No usar estas señales para operar."
+                if DATA_MODE == "mock" else
+                "Señal técnica experimental. Verifica datos, spread y riesgo antes de operar. No ejecuta órdenes."
             ),
         })
 
@@ -1100,6 +1145,11 @@ SIGNAL_CRON_SECRET = os.environ.get("SIGNAL_CRON_SECRET", "")
 
 @app.route("/api/push/scan", methods=["POST"])
 def push_scan():
+    if DATA_MODE == "mock":
+        return jsonify({
+            "error": "El escáner automático está desactivado en el panel de pruebas.",
+            "data_mode": "mock",
+        }), 403
     supplied = request.headers.get("X-Scanner-Cron-Secret", "")
     if not SIGNAL_CRON_SECRET or not hmac.compare_digest(supplied, SIGNAL_CRON_SECRET):
         return jsonify({"error": "No autorizado."}), 401

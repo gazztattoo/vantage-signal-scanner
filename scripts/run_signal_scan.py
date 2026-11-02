@@ -1,7 +1,7 @@
 """Safe entry point for the scheduled production scanner.
 
-This script only calls the scanner API. It does not place broker orders.
-Configure SCANNER_API_URL and SIGNAL_CRON_SECRET in the Cron service environment.
+Runs one market/timeframe per HTTP request to stay below the platform's
+request-duration limit. It never places broker orders.
 """
 import os
 import sys
@@ -16,28 +16,34 @@ def main():
         print("Missing SCANNER_API_URL or SIGNAL_CRON_SECRET.", file=sys.stderr)
         return 2
 
-    try:
-        response = requests.post(
-            base_url + "/api/push/scan",
-            headers={"X-Scanner-Cron-Secret": secret},
-            timeout=(10, 210),
-        )
-    except requests.RequestException as exc:
-        print("Scanner request failed: " + str(exc), file=sys.stderr)
-        return 1
+    symbols = ["EUR/USD", "XAU/USD", "BTC/USD"]
+    intervals = ["5min", "15min", "30min"]
+    failures = 0
+    session = requests.Session()
+    headers = {"X-Scanner-Cron-Secret": secret}
 
-    print("Scanner HTTP status:", response.status_code)
-    try:
-        payload = response.json()
-    except ValueError:
-        payload = {"response": response.text[:1000]}
-    print(payload)
+    for interval in intervals:
+        for symbol in symbols:
+            try:
+                response = session.post(
+                    base_url + "/api/push/scan",
+                    params={"symbol": symbol, "interval": interval},
+                    headers=headers,
+                    timeout=(10, 30),
+                )
+                try:
+                    payload = response.json()
+                except ValueError:
+                    payload = {"response": response.text[:500]}
+                print(f"{symbol} {interval} | HTTP {response.status_code} | {payload}", flush=True)
+                if response.status_code != 200 or not isinstance(payload, dict) or payload.get("error"):
+                    failures += 1
+            except requests.RequestException as exc:
+                print(f"{symbol} {interval} | ERROR | {exc}", file=sys.stderr, flush=True)
+                failures += 1
 
-    if response.status_code != 200:
-        return 1
-    if not isinstance(payload, dict) or payload.get("error"):
-        return 1
-    return 0
+    print(f"Scanner finished: 9 combinations, {failures} failures.", flush=True)
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":

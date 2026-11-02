@@ -204,6 +204,7 @@ ANALYSIS_CACHE_TTL_SECONDS = {
     "30min": 55 * 60,
 }
 ANALYSIS_CACHE = {}
+TWELVE_DATA_CREDITS = {"used": None, "left": None, "checked_at": None, "warning": None}
 
 
 def get_symbol(raw):
@@ -389,6 +390,31 @@ def fetch_candles(symbol, interval):
         timeout=20,
     )
 
+    credit_used = response.headers.get("api-credits-used")
+    credit_left = response.headers.get("api-credits-left")
+    if credit_used is not None or credit_left is not None:
+        try:
+            used_value = int(credit_used) if credit_used is not None else None
+            left_value = int(credit_left) if credit_left is not None else None
+        except (TypeError, ValueError):
+            used_value, left_value = None, None
+        TWELVE_DATA_CREDITS.update({
+            "used": used_value,
+            "left": left_value,
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "warning": (
+                "CRÍTICO: 85% o más del cupo diario utilizado"
+                if used_value is not None and used_value >= 680
+                else "Aviso: 70% o más del cupo diario utilizado"
+                if used_value is not None and used_value >= 560
+                else None
+            ),
+        })
+        if used_value is not None and used_value >= 680:
+            app.logger.warning("Twelve Data: consumo diario >= 85%% (%s créditos).", used_value)
+        elif used_value is not None and used_value >= 560:
+            app.logger.warning("Twelve Data: consumo diario >= 70%% (%s créditos).", used_value)
+
     try:
         data = response.json()
     except ValueError as exc:
@@ -502,6 +528,17 @@ def health():
     })
 
 
+@app.route("/api/credits/status")
+def credits_status():
+    return jsonify({
+        "provider": "Twelve Data",
+        "daily_limit": 800,
+        "warning_threshold": 560,
+        "critical_threshold": 680,
+        **TWELVE_DATA_CREDITS,
+    })
+
+
 @app.route("/api/price")
 def price():
     symbol = get_symbol(request.args.get("symbol"))
@@ -570,8 +607,19 @@ def analysis():
     cache_key = (symbol, interval)
     cached = ANALYSIS_CACHE.get(cache_key)
     cache_age = time.monotonic() - cached["stored_at"] if cached else None
-    if cached and cache_age < ANALYSIS_CACHE_TTL_SECONDS[interval]:
+    max_data_age_minutes = INTERVAL_MINUTES[interval] * 2 + 1.5
+    cached_candle_age = (
+        float(cached["payload"].get("candle_age_minutes", max_data_age_minutes))
+        if cached else max_data_age_minutes
+    )
+    cache_is_fresh = (
+        cached
+        and cache_age < ANALYSIS_CACHE_TTL_SECONDS[interval]
+        and cached_candle_age + (cache_age / 60) <= max_data_age_minutes
+    )
+    if cache_is_fresh:
         payload = dict(cached["payload"])
+        payload["candle_age_minutes"] = round(cached_candle_age + cache_age / 60, 2)
         payload["cache"] = {"hit": True, "age_seconds": int(cache_age)}
         return jsonify(payload)
 

@@ -1,6 +1,7 @@
 
 import os
 import json
+import time
 import requests
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -194,6 +195,15 @@ INTERVAL_MINUTES = {
     "15min": 15,
     "30min": 30,
 }
+
+# Caché en memoria compartida por las peticiones del proceso API.
+# Los TTL dejan margen antes del siguiente ciclo programado.
+ANALYSIS_CACHE_TTL_SECONDS = {
+    "5min": 18 * 60,
+    "15min": 28 * 60,
+    "30min": 55 * 60,
+}
+ANALYSIS_CACHE = {}
 
 
 def get_symbol(raw):
@@ -557,6 +567,14 @@ def analysis():
             "allowed_intervals": sorted(ALLOWED_INTERVALS),
         }), 400
 
+    cache_key = (symbol, interval)
+    cached = ANALYSIS_CACHE.get(cache_key)
+    cache_age = time.monotonic() - cached["stored_at"] if cached else None
+    if cached and cache_age < ANALYSIS_CACHE_TTL_SECONDS[interval]:
+        payload = dict(cached["payload"])
+        payload["cache"] = {"hit": True, "age_seconds": int(cache_age)}
+        return jsonify(payload)
+
     try:
         candles, candle_time, candle_age_minutes = fetch_candles(
             symbol,
@@ -608,7 +626,7 @@ def analysis():
             stop_loss = entry + 1.5 * atr14
             take_profit = entry - 3.0 * atr14
 
-        return jsonify({
+        payload = {
             "symbol": symbol,
             "interval": interval,
             "signal": signal,
@@ -647,7 +665,13 @@ def analysis():
                 "spread y riesgo antes de operar. "
                 "No ejecuta órdenes."
             ),
-        })
+            "cache": {"hit": False, "age_seconds": 0},
+        }
+        ANALYSIS_CACHE[cache_key] = {
+            "stored_at": time.monotonic(),
+            "payload": payload,
+        }
+        return jsonify(payload)
 
     except requests.RequestException:
         return jsonify({

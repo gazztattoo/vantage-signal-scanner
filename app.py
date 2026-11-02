@@ -205,10 +205,10 @@ ANALYSIS_CACHE_TTL_SECONDS = {
     "30min": 55 * 60,
 }
 ANALYSIS_CACHE = {}
-# Límite diario conservador para el plan Basic (800 créditos/día).
-# Se detienen las consultas de mercado al alcanzar 680 créditos diarios.
+# Producción puede consumir hasta 780 de 800 créditos diarios; 20 quedan como reserva.
+# TEST usa datos simulados y no realiza consultas a Twelve Data.
 TWELVE_DATA_DAILY_LIMIT = int(os.environ.get("TWELVE_DATA_DAILY_LIMIT", "800"))
-TWELVE_DATA_HARD_STOP = int(os.environ.get("TWELVE_DATA_HARD_STOP", "680"))
+TWELVE_DATA_HARD_STOP = int(os.environ.get("TWELVE_DATA_HARD_STOP", "780"))
 TWELVE_DATA_USAGE_CHECK_SECONDS = 15 * 60
 TWELVE_DATA_LOCK = threading.Lock()
 TWELVE_DATA_CREDITS = {

@@ -209,7 +209,7 @@ ANALYSIS_CACHE = {}
 # TEST usa datos simulados y no realiza consultas a Twelve Data.
 TWELVE_DATA_DAILY_LIMIT = int(os.environ.get("TWELVE_DATA_DAILY_LIMIT", "800"))
 TWELVE_DATA_HARD_STOP = int(os.environ.get("TWELVE_DATA_HARD_STOP", "780"))
-TWELVE_DATA_USAGE_CHECK_SECONDS = 15 * 60
+TWELVE_DATA_USAGE_CHECK_SECONDS = 60 * 60  # Una verificación por hora para ahorrar créditos.
 TWELVE_DATA_LOCK = threading.Lock()
 TWELVE_DATA_CREDITS = {
     "used": None, "left": None, "checked_at": None, "warning": None,
@@ -440,6 +440,12 @@ def twelve_data_get(endpoint, params=None, timeout=20):
                 ),
             })
 
+            # Contabilizar también la consulta /api_usage de forma conservadora.
+            # Así el estimado local no depende de que el proveedor la incluya
+            # inmediatamente en daily_usage.
+            TWELVE_DATA_CREDITS["used"] = used + 1
+            TWELVE_DATA_CREDITS["left"] = max(daily_limit - (used + 1), 0)
+
         if TWELVE_DATA_CREDITS.get("used") is not None and (
             TWELVE_DATA_CREDITS["used"] >= min(
                 TWELVE_DATA_HARD_STOP,
@@ -458,6 +464,20 @@ def twelve_data_get(endpoint, params=None, timeout=20):
             params={**(params or {}), "apikey": API_KEY},
             timeout=timeout,
         )
+        # Estimar cada petición facturable entre verificaciones horarias.
+        # Se cuenta incluso si el proveedor devuelve un error HTTP.
+        if TWELVE_DATA_CREDITS.get("used") is not None:
+            TWELVE_DATA_CREDITS["used"] += 1
+            TWELVE_DATA_CREDITS["left"] = max(
+                TWELVE_DATA_CREDITS.get("daily_limit", TWELVE_DATA_DAILY_LIMIT)
+                - TWELVE_DATA_CREDITS["used"], 0
+            )
+            TWELVE_DATA_CREDITS["blocked"] = (
+                TWELVE_DATA_CREDITS["used"] >= min(
+                    TWELVE_DATA_HARD_STOP,
+                    TWELVE_DATA_CREDITS.get("daily_limit") or TWELVE_DATA_DAILY_LIMIT,
+                )
+            )
         # Los headers son créditos de esta petición/minuto, no el acumulado diario.
         credit_used = response.headers.get("api-credits-used")
         credit_left = response.headers.get("api-credits-left")

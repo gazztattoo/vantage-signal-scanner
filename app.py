@@ -701,6 +701,7 @@ def price():
 @app.route("/api/precision-candidate", methods=["GET"])
 def precision_candidate():
     """Read-only M15/M5 quality gate. Never fetches provider data."""
+    from precision_engine_v2 import evaluate_m15_m5_setup, precision_frame_from_payload
     symbol = get_symbol(request.args.get("symbol"))
     if not symbol:
         return jsonify({"error": "Símbolo no permitido."}), 400
@@ -737,7 +738,6 @@ def precision_candidate():
                 "cache_only": True,
             })
 
-    from precision_engine_v2 import evaluate_m15_m5_setup, precision_frame_from_payload
     result = evaluate_m15_m5_setup(
         symbol=symbol, m15=frames["15min"], m5=frames["5min"]
     )

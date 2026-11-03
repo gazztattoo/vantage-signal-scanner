@@ -655,8 +655,10 @@ function render(m,d,err,marketClosed=false){
     `;
   }
 
+  const precision=d.precision||null;
   const raw=String(
-    first(d,["signal","action","recommendation","side"])||"ESPERAR"
+    precision ? (precision.signal||"ESPERAR") :
+    (first(d,["signal","action","recommendation","side"])||"ESPERAR")
   ).toUpperCase();
 
   const s=
@@ -666,9 +668,9 @@ function render(m,d,err,marketClosed=false){
         ?{t:"VENTA",c:"sell"}
         :{t:raw.includes("WAIT")?"ESPERAR":raw,c:""};
 
-  let entry=first(d,["entry","price"]);
-  let sl=first(d,["stop_loss","stopLoss","sl"]);
-  let tp=first(d,["take_profit","takeProfit","tp"]);
+  let entry=precision ? precision.entry_reference : first(d,["entry","price"]);
+  let sl=precision ? precision.stop_loss_reference : first(d,["stop_loss","stopLoss","sl"]);
+  let tp=precision ? precision.take_profit_reference : first(d,["take_profit","takeProfit","tp"]);
   const interval=first(d,["interval"])||document.getElementById("interval").value;
   const candleAge=Number(first(d,["candle_age_minutes"]));
   const maxCandleAge=({ "5min":11.5, "15min":31.5, "30min":61.5 })[interval]||0;
@@ -679,7 +681,7 @@ function render(m,d,err,marketClosed=false){
     entry=null; sl=null; tp=null;
   }
   const hasCandidate=s.t==="COMPRA"||s.t==="VENTA";
-  const reason=first(
+  const reason=(precision&&precision.reason)||first(
     d,["reason","explanation","message","warning","method"]
   )||"Análisis recibido desde la API.";
 
@@ -981,7 +983,17 @@ async function update(){
       return {m,marketClosed:true,err:"MERCADO CERRADO · No se generan señales ni alertas fuera de la sesión habitual."};
     }
     try{
-      return {m,d:await load(m)};
+      const data=await load(m);
+      if(document.getElementById("interval").value!=="30min"){
+        const candidateResponse=await fetch(
+          `${API_BASE}/api/precision-candidate?symbol=${encodeURIComponent(m.symbol)}`,
+          {headers:{"Authorization":"Bearer "+accessToken},cache:"no-store"}
+        );
+        const candidateData=await candidateResponse.json().catch(()=>({}));
+        if(candidateResponse.ok&&!candidateData.error)data.precision=candidateData;
+        else data.precision={signal:"ESPERAR",quality:"INSUFICIENTE",reason:"No se pudo validar la confluencia M15 + M5."};
+      }
+      return {m,d:data};
     }catch(e){
       return {m,err:e.message||"No se pudo conectar",status:e.status||0};
     }

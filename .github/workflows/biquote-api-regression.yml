@@ -9,6 +9,14 @@ on:
       - "tests/test_market_session.py"
       - "tests/test_api_safety.py"
       - ".github/workflows/biquote-api-regression.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "app.py"
+      - "tests/test_biquote_provider.py"
+      - "tests/test_market_session.py"
+      - "tests/test_api_safety.py"
+      - ".github/workflows/biquote-api-regression.yml"
   workflow_dispatch:
 
 permissions:

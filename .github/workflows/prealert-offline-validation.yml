@@ -20,3 +20,5 @@ jobs:
         run: python -m py_compile app.py prealert_engine.py scripts/replay_prealerts.py
       - name: Run provider-free prealert tests
         run: python -m unittest discover -s tests -p "test_prealert*.py" -v
+
+# Trigger validation on this isolated candidate branch.

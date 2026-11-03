@@ -702,7 +702,7 @@ function render(m,d,err,marketClosed=false){
         <span class="pill ${s.c}">${esc(s.t)}</span>
       </div>
 
-      <div class="price">${fmt(first(d,["price","entry"]),8)}</div>
+      <div class="price">${fmt(precision ? precision.entry_reference : first(d,["price","entry"]),8)}</div>
       <div class="priceLabel">PRECIO / ENTRADA DE REFERENCIA</div>
       <p class="reason">${esc(reason)}</p>
 

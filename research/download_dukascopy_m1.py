@@ -174,6 +174,7 @@ def main():
             "symbol": display_symbol, "instrument": instrument, "scale": scale,
             "days_requested": args.days, "days_with_missing_side": missing,
             "failed_downloads": sum(1 for x in failures if x["symbol"] == display_symbol),
+            "days_with_both_sides_pct": round(100.0 * (args.days - missing) / args.days, 1),
             "matched_bid_ask_bars": len(rows), "file": str(target) if rows else None,
         })
         print(summary[-1], flush=True)

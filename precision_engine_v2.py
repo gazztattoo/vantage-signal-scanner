@@ -248,7 +248,7 @@ def precision_frame_from_payload(payload, interval):
             "close": float(latest["close"]),
             "atr": float(payload["atr14"]),
             "candle_age_seconds": age_minutes * 60,
-            "timeframe_seconds": INTERVAL_MINUTES[interval] * 60,
+            "timeframe_seconds": {"5min": 300, "15min": 900}[interval],
             "previous_high": previous_high,
             "previous_low": previous_low,
         }

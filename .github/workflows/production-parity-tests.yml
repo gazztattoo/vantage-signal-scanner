@@ -9,6 +9,9 @@ on:
 jobs:
   python-tests:
     runs-on: ubuntu-latest
+    env:
+      ACCESS_TOKEN_SECRET: precision-ci-only-secret
+      PANEL_ACCESS_CODE: precision-ci-only-code
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

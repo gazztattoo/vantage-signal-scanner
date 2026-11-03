@@ -127,7 +127,7 @@ class CachedPrecisionFrameTests(unittest.TestCase):
         self.assertEqual(frame["timeframe_seconds"], 300)
 
     def test_frame_builder_fails_closed_when_data_missing(self):
-        from app import _precision_frame_from_payload
+        from precision_engine_v2 import precision_frame_from_payload
         self.assertIsNone(precision_frame_from_payload({}, "5min"))
 
 

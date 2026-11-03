@@ -774,7 +774,7 @@ def analysis():
             ],
             "method": (
                 "EMA20/EMA50 + RSI14 + MACD + ADX14 + Bollinger(20,2); "
-                "score mínimo 3/4 y ADX>=18; SL=1.5x ATR; TP=3x ATR"
+                "score mínimo 3/4 y ADX>=20; SL=1.5x ATR; TP=3x ATR"
             ),
             "warning": (
                 "Feed MT5 externo a Vantage. Verifica precio, spread y riesgo antes de operar. "

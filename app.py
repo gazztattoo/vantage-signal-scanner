@@ -92,7 +92,7 @@ def check_access_token():
 def protect_signal_endpoints():
     if request.method == "OPTIONS":
         return None
-    if request.path not in ("/api/access/check", "/api/analysis", "/api/price", "/api/history", "/api/performance", "/api/lab-status", "/api/push/subscribe", "/api/push/test", "/api/push/unsubscribe"):
+    if request.path not in ("/api/access/check", "/api/analysis", "/api/price", "/api/history", "/api/performance", "/api/lab-status", "/api/prealerts/status", "/api/push/subscribe", "/api/push/test", "/api/push/unsubscribe"):
         return None
     if not ACCESS_TOKEN_SECRET:
         return jsonify({"error": "El acceso privado no está configurado."}), 503
@@ -1021,6 +1021,25 @@ def signal_performance():
         })
     except (RuntimeError, requests.RequestException, ValueError, TypeError, KeyError):
         return jsonify({"error": "No se pudieron calcular las estadísticas."}), 502
+
+
+@app.route("/api/prealerts/status", methods=["GET"])
+def prealerts_status():
+    """Estado informativo de prealertas; permanece desactivado hasta completar validación."""
+    return jsonify({
+        "enabled": False,
+        "ready": False,
+        "mode": "PREPARACIÓN",
+        "engine_integrated": False,
+        "live_quotes_available": False,
+        "provider_polling": False,
+        "notifications_enabled": False,
+        "reason": (
+            "Prealertas desactivadas. Falta validar zonas de entrada, "
+            "cotizaciones frescas y replay histórico antes de habilitar cualquier envío."
+        ),
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+    })
 
 
 @app.route("/api/lab-status", methods=["GET"])

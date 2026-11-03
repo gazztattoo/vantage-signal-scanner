@@ -579,7 +579,9 @@ def health():
 @app.route("/api/credits/status")
 def credits_status():
     return jsonify({
-        "provider": "Twelve Data",
+        "provider": "biquote",
+        "twelve_data_consumed": False,
+        "note": "El proveedor activo de mercado es externo; no es una cotización Vantage.",
         "daily_limit": TWELVE_DATA_DAILY_LIMIT,
         "warning_threshold": int(TWELVE_DATA_DAILY_LIMIT * 0.70),
         "critical_threshold": TWELVE_DATA_HARD_STOP,
@@ -723,6 +725,8 @@ def analysis():
         payload = {
             "symbol": symbol,
             "interval": interval,
+            "data_provider": "biquote",
+            "is_vantage_quote": False,
             "signal": signal,
             "reason": reason,
             "price": entry,
@@ -760,8 +764,7 @@ def analysis():
                 "score mínimo 3/4 y ADX>=18; SL=1.5x ATR; TP=3x ATR"
             ),
             "warning": (
-                "Señal técnica experimental. Verifica datos, "
-                "spread y riesgo antes de operar. "
+                "Feed MT5 externo a Vantage. Verifica precio, spread y riesgo antes de operar. "
                 "No ejecuta órdenes."
             ),
             "cache": {"hit": False, "age_seconds": 0},
@@ -775,7 +778,7 @@ def analysis():
     except requests.RequestException:
         return jsonify({
             "error": (
-                "No se pudo conectar con Twelve Data. "
+                "No se pudo conectar con biquote. "
                 "Inténtalo más tarde."
             )
         }), 502

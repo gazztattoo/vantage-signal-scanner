@@ -5,6 +5,8 @@ on:
     branches: [precision-engine-v2]
     paths:
       - "precision_engine_v2.py"
+      - "panel_escaner_vantage.html"
+      - "tests/test_panel_script.py"
       - "external_signal_intelligence.py"
       - "external_technical_signal_adapters.py"
       - "external_biquote_adapter.py"
@@ -26,8 +28,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Run isolated unit tests (no market data or secrets)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check panel JavaScript syntax and isolated unit tests (no market data or secrets)
         run: |
+          python -m unittest discover -s tests -p "test_panel_script.py" -v
           python -m unittest discover -s tests -p "test_precision_engine_v2.py" -v
           python -m unittest discover -s tests -p "test_external_signal_intelligence.py" -v
           python -m unittest discover -s tests -p "test_external_technical_signal_adapters.py" -v

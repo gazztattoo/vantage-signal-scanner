@@ -17,6 +17,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: vantage-precision-historical-research
+  cancel-in-progress: false
+
 jobs:
   download-and-validate:
     runs-on: ubuntu-latest

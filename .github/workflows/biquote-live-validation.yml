@@ -46,29 +46,24 @@ jobs:
                       raise RuntimeError(f"HTTP {response.status}")
                   return json.loads(response.read().decode("utf-8"))
 
-          # One read-only batch quote request for all instruments.
+          # One read-only XAU quote request, using the exact endpoint and schema
+          # consumed by app.py. Together with nine OHLC requests this is 10 max.
           try:
-              quotes = get_json("/api/latest", [("symbols", s) for s in SYMBOLS])
-              if not isinstance(quotes, dict):
-                  raise RuntimeError("Respuesta de cotizaciones no es un objeto JSON")
-              for symbol in SYMBOLS:
-                  q = quotes.get(symbol)
-                  if not isinstance(q, dict):
-                      failures.append(f"{symbol}: falta cotización")
-                      continue
-                  bid, ask = q.get("bid"), q.get("ask")
-                  age = q.get("quoteAgeSeconds")
-                  state = q.get("marketState")
-                  if not isinstance(bid, (int, float)) or not isinstance(ask, (int, float)) or bid <= 0 or ask < bid:
-                      failures.append(f"{symbol}: Bid/Ask inválidos")
-                  elif state != "open" or q.get("stale") is True:
-                      failures.append(f"{symbol}: mercado cerrado o cotización stale (state={state})")
-                  elif not isinstance(age, (int, float)) or age > 90:
-                      failures.append(f"{symbol}: cotización antigua (age={age})")
-                  else:
-                      print(f"QUOTE {symbol}: bid={bid} ask={ask} state={state} age_s={age}")
+              quote = get_json("/api/XAUUSD", {"allowStale": "false"})
+              bid, ask = float(quote["bid"]), float(quote["ask"])
+              stamp = datetime.fromisoformat(str(quote["timestamp"]).replace("Z", "+00:00"))
+              if stamp.tzinfo is None:
+                  raise RuntimeError("timestamp de cotización sin zona horaria")
+              quote_age = (datetime.now(timezone.utc) - stamp.astimezone(timezone.utc)).total_seconds()
+              if bid <= 0 or ask < bid:
+                  raise RuntimeError("Bid/Ask inválidos")
+              if quote.get("stale") or quote.get("marketState") != "open":
+                  raise RuntimeError(f"mercado cerrado o cotización stale (state={quote.get('marketState')})")
+              if quote_age < -5 or quote_age > 90:
+                  raise RuntimeError(f"cotización antigua/futura (age={quote_age:.1f}s)")
+              print(f"QUOTE XAUUSD: bid={bid} ask={ask} state={quote.get('marketState')} age_s={quote_age:.1f}")
           except Exception as exc:
-              failures.append(f"quotes batch: {type(exc).__name__}: {exc}")
+              failures.append(f"XAUUSD quote: {type(exc).__name__}: {exc}")
 
           # Nine read-only OHLC requests: 3 instruments x 3 timeframes.
           for symbol in SYMBOLS:
@@ -104,5 +99,5 @@ jobs:
               for failure in failures:
                   print(" - " + failure)
               sys.exit(1)
-          print("PASS: all live quotes and nine OHLC combinations are fresh and valid.")
+          print("PASS: XAUUSD live quote and all nine OHLC combinations are fresh and valid (10 read-only requests max).")
           PY

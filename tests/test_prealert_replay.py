@@ -1,14 +1,23 @@
+import sys
 import unittest
 from datetime import datetime, timedelta, timezone
-from prealert_replay import replay_rows
+from pathlib import Path
+
+# Import the offline replay module from the repository's scripts directory.
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+from replay_prealerts import replay_rows
 
 T0 = datetime(2026, 11, 3, 12, 0, tzinfo=timezone.utc)
+
+
 def row(seconds, price, confirm=False, invalid=False):
     stamp = (T0 + timedelta(seconds=seconds)).isoformat()
     return {"timestamp": stamp, "symbol": "EUR/USD", "direction": "BUY",
             "price": str(price), "zone_low": "1.1000", "zone_high": "1.1005",
             "setup_valid": "true", "confirmation_valid": str(confirm).lower(),
             "invalidated": str(invalid).lower(), "approach_distance": "0.0005"}
+
 
 class ReplayTests(unittest.TestCase):
     def test_replay_counts_confirmation_and_lead_time(self):
@@ -40,6 +49,7 @@ class ReplayTests(unittest.TestCase):
         stale["data_timestamp"] = (T0 - timedelta(seconds=120)).isoformat()
         report = replay_rows([stale])
         self.assertEqual(report["alert_lifecycles"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

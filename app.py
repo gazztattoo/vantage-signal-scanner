@@ -717,10 +717,18 @@ def precision_candidate():
 
     now_mono = time.monotonic()
     frames = {}
+    source_ages = {}
     for interval, cached in (("5min", m5_cached), ("15min", m15_cached)):
-        age = now_mono - cached["stored_at"]
-        payload = cached["payload"]
-        candle_age = float(payload.get("candle_age_minutes", 9999)) + age / 60
+        try:
+            age = max(0.0, now_mono - float(cached["stored_at"]))
+            payload = cached["payload"]
+            candle_age = float(payload.get("candle_age_minutes", 9999)) + age / 60
+        except (KeyError, TypeError, ValueError, OverflowError):
+            return jsonify({
+                "symbol": symbol, "signal": "ESPERAR", "quality": "INSUFICIENTE",
+                "reason": f"La caché {interval} no tiene metadatos válidos.",
+                "cache_only": True, "execution_ready": False,
+            })
         maximum = INTERVAL_MINUTES[interval] * 2 + 1.5
         if age > ANALYSIS_CACHE_TTL_SECONDS[interval] or candle_age > maximum:
             return jsonify({
@@ -731,6 +739,7 @@ def precision_candidate():
         updated_payload = dict(payload)
         updated_payload["candle_age_minutes"] = candle_age
         frames[interval] = precision_frame_from_payload(updated_payload, interval)
+        source_ages[interval] = round(candle_age, 2)
         if frames[interval] is None:
             return jsonify({
                 "symbol": symbol, "signal": "ESPERAR", "quality": "INSUFICIENTE",
@@ -742,6 +751,7 @@ def precision_candidate():
         symbol=symbol, m15=frames["15min"], m5=frames["5min"]
     )
     result["cache_only"] = True
+    result["source_candle_age_minutes"] = source_ages
     result["timeframes"] = ["15min", "5min"]
     result["execution_ready"] = False
     result["warning"] = (

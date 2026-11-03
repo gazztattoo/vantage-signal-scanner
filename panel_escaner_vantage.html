@@ -680,7 +680,7 @@ function render(m,d,err,marketClosed=false){
     s.c="";
     entry=null; sl=null; tp=null;
   }
-  const hasCandidate=s.t==="COMPRA"||s.t==="VENTA";
+  const hasCandidate=Boolean(precision)&&(s.t==="COMPRA"||s.t==="VENTA");
   const reason=(precision&&precision.reason)||first(
     d,["reason","explanation","message","warning","method"]
   )||"Análisis recibido desde la API.";
@@ -708,8 +708,8 @@ function render(m,d,err,marketClosed=false){
 
       <div class="quality-panel" style="margin:10px 0;padding:11px 12px;border:1px solid ${hasCandidate?"#765d2b":"#34404b"};border-radius:11px;background:#0b1118">
         <div style="font-size:10px;letter-spacing:.65px;color:var(--muted)">TIPO DE ORDEN PREFERIDO</div>
-        <strong style="display:block;margin-top:4px;font-size:13px;color:${hasCandidate?"var(--amber)":"var(--muted)"}">${hasCandidate?"MERCADO · CANDIDATA TÉCNICA":"ESPERAR · SIN ENTRADA VÁLIDA"}</strong>
-        <div style="font-size:11px;line-height:1.45;color:var(--muted);margin-top:5px">${hasCandidate?"La entrada mostrada es el cierre de la vela analizada, no una cotización Bid/Ask en vivo. No ejecutar como orden instantánea hasta confirmar el precio y el spread en Vantage/MT5.":"El motor no confirma una entrada ahora. No se recomienda forzar una operación."}</div>
+        <strong style="display:block;margin-top:4px;font-size:13px;color:${hasCandidate?"var(--amber)":"var(--muted)"}">${hasCandidate?"MERCADO · CANDIDATA TÉCNICA":precision?"ESPERAR · SIN ENTRADA VÁLIDA":"M30 · ANÁLISIS MANUAL"}</strong>
+        <div style="font-size:11px;line-height:1.45;color:var(--muted);margin-top:5px">${hasCandidate?"La entrada mostrada es el cierre de la vela analizada, no una cotización Bid/Ask en vivo. No ejecutar como orden instantánea hasta confirmar el precio y el spread en Vantage/MT5.":precision?"El motor no confirma una entrada ahora. No se recomienda forzar una operación.":"M30 se muestra como contexto manual; no genera una orden automática."}</div>
       </div>
 
       <div class="quality-panel" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0 12px;padding:10px 12px;border:1px solid #28543a;border-radius:11px;background:#09140d">

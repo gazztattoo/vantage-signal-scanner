@@ -22,3 +22,5 @@ jobs:
         run: python -m unittest discover -s tests -p "test_prealert*.py" -v
 
 # Trigger validation on this isolated candidate branch.
+
+# Re-run offline validation after terminal-state regression fix.

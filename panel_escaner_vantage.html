@@ -463,6 +463,11 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
   <div class="data-panel">
     <h2>Signal Lab</h2>
     <p>Laboratorio experimental del motor de confluencia. Aquí mostramos qué filtros utiliza el análisis; no se ejecutan operaciones ni se presentan resultados hipotéticos como rendimiento real.</p>
+    <div class="stat-box" id="prealertStatusCard" style="margin:12px 0;border-color:#8a682d">
+      <span>PREALERTAS · ESTADO DE PRODUCCIÓN</span>
+      <strong id="prealertState" style="font-size:16px;color:var(--amber)">DESACTIVADAS</strong>
+      <p id="prealertReason" style="margin:8px 0 0">Preparación pendiente de validación. No se envían alertas anticipadas.</p>
+    </div>
     <div class="stat-grid">
       <div class="stat-box"><span>Tendencia</span><strong>EMA 20 / 50</strong></div>
       <div class="stat-box"><span>Momentum</span><strong>RSI 14 + MACD</strong></div>
@@ -1004,7 +1009,7 @@ function switchView(name){
   if(name==="history")loadHistory();
   if(name==="performance")loadPerformance();
   if(name==="analysis")loadTechnicalAnalysis();
-  if(name==="lab")loadLabStatus();
+  if(name==="lab"){loadLabStatus();loadPrealertStatus();}
 }
 viewButtons.forEach(button=>button.addEventListener("click",()=>switchView(button.dataset.view)));
 const notificationParams=new URLSearchParams(window.location.search);
@@ -1050,6 +1055,24 @@ async function loadTechnicalAnalysis(){
 document.getElementById("analysisRefresh").addEventListener("click",loadTechnicalAnalysis);
 document.getElementById("analysisSymbol").addEventListener("change",loadTechnicalAnalysis);
 document.getElementById("analysisTimeframe").addEventListener("change",loadTechnicalAnalysis);
+
+async function loadPrealertStatus(){
+  const state=document.getElementById("prealertState");
+  const reason=document.getElementById("prealertReason");
+  try{
+    if(!accessToken)throw new Error("Acceso requerido.");
+    const response=await fetch(API_BASE+"/api/prealerts/status",{headers:authHeaders(),cache:"no-store"});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(data.error||"No se pudo consultar el estado de prealertas.");
+    state.textContent=data.enabled?"ACTIVAS":"DESACTIVADAS";
+    state.style.color=data.enabled?"var(--green)":"var(--amber)";
+    reason.textContent=data.reason||"Sin información adicional.";
+  }catch(error){
+    state.textContent="ESTADO NO DISPONIBLE";
+    state.style.color="var(--red)";
+    reason.textContent=error.message||"No se pudo consultar el estado.";
+  }
+}
 
 async function loadLabStatus(){
   const message=document.getElementById("labMessage");

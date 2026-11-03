@@ -9,6 +9,7 @@ is assumed first (conservative). This is research, not broker execution.
 from __future__ import annotations
 import argparse, csv, json, math
 from collections import defaultdict
+from bisect import bisect_left
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -71,17 +72,32 @@ def signal(c, adx_floor=20, score_floor=3):
     return None
 
 def load_m1(path):
+    """Load validated, strictly chronological BID/ASK M1 bars."""
     out=[]
     with open(path,newline="",encoding="utf-8-sig") as f:
-        for r in csv.DictReader(f):
+        reader=csv.DictReader(f)
+        required={"timestamp"} | {f"{side}_{k}" for side in ("bid","ask") for k in ("open","high","low","close")}
+        missing=required-set(reader.fieldnames or [])
+        if missing:raise ValueError(f"Missing required CSV columns: {sorted(missing)}")
+        previous=None
+        for line,r in enumerate(reader,start=2):
             t=datetime.fromisoformat(r["timestamp"].replace("Z","+00:00"))
             if t.tzinfo is None:t=t.replace(tzinfo=timezone.utc)
-            x={"time":t.astimezone(timezone.utc)}
+            t=t.astimezone(timezone.utc)
+            if previous is not None and t<=previous:
+                raise ValueError(f"Timestamps must be strictly increasing; duplicate/out-of-order row {line}")
+            previous=t
+            x={"time":t}
             for side in ("bid","ask"):
                 for k in ("open","high","low","close"):
-                    x[f"{side}_{k}"]=float(r[f"{side}_{k}"])
+                    value=float(r[f"{side}_{k}"])
+                    if not math.isfinite(value) or value<=0:raise ValueError(f"Invalid {side.upper()} {k} at row {line}")
+                    x[f"{side}_{k}"]=value
+                o,h,l,cl=(x[f"{side}_{k}"] for k in ("open","high","low","close"))
+                if h<max(o,cl,l) or l>min(o,cl,h):raise ValueError(f"Invalid {side.upper()} OHLC at row {line}")
+            for k in ("open","high","low","close"):
+                if x[f"ask_{k}"]<x[f"bid_{k}"]:raise ValueError(f"ASK below BID ({k}) at row {line}")
             out.append(x)
-    out.sort(key=lambda z:z["time"])
     return out
 
 def aggregate(m1, minutes):
@@ -108,6 +124,7 @@ def aggregate(m1, minutes):
 
 def run(m1, minutes, adx_floor=20, score_floor=3):
     bars=aggregate(m1,minutes); trades=[]; i=0; warmup=100
+    m1_times=[z["time"] for z in m1]
     while i < len(bars)-1:
         s=signal(bars[:i+1],adx_floor,score_floor) if i>=warmup else None
         if not s:i+=1;continue
@@ -117,8 +134,8 @@ def run(m1, minutes, adx_floor=20, score_floor=3):
         tp=entry+(3*vol) if side=="BUY" else entry-(3*vol)
         exit_price=None; outcome=None; exit_i=None
         entry_time=entrybar["time"]
-        entry_m1_index=next((k for k,z in enumerate(m1) if z["time"]>=entry_time),None)
-        if entry_m1_index is None:
+        entry_m1_index=bisect_left(m1_times,entry_time)
+        if entry_m1_index>=len(m1):
             break
         for j in range(entry_m1_index,len(m1)):
             z=m1[j]

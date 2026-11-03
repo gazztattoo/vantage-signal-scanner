@@ -31,6 +31,7 @@ def replay_rows(rows, *, approach_distances=None, max_data_age_seconds=90, ttl_s
     previous_by_key = {}
     previous_price_by_key = {}
     events = []
+    terminal_keys = set()
     for row in rows:
         symbol = row["symbol"].strip()
         direction = row["direction"].strip().upper()
@@ -57,6 +58,11 @@ def replay_rows(rows, *, approach_distances=None, max_data_age_seconds=90, ttl_s
             previous_price=previous_price_by_key.get(key),
             previous=previous_by_key.get(key),
         )
+        if not _parse_bool(row["setup_valid"]) or _parse_bool(row["invalidated"]):
+            terminal_keys.discard(key)
+        if key in terminal_keys:
+            previous_price_by_key[key] = price
+            continue
         prior = previous_by_key.get(key)
         if result and (not prior or result.get("alert_id") != prior.get("alert_id") or result.get("state") != prior.get("state")):
             events.append({
@@ -73,6 +79,8 @@ def replay_rows(rows, *, approach_distances=None, max_data_age_seconds=90, ttl_s
             previous_by_key[key] = result
         else:
             previous_by_key.pop(key, None)
+            if result and result["state"] in {"CONFIRMADA", "CANCELADA", "EXPIRADA"}:
+                terminal_keys.add(key)
         previous_price_by_key[key] = price
 
     by_id = {}
@@ -99,6 +107,7 @@ def replay_rows(rows, *, approach_distances=None, max_data_age_seconds=90, ttl_s
     return {
         "input_rows": len(rows),
         "alert_lifecycles": total_lifecycles,
+        "active_at_end": sum(1 for item in previous_by_key.values() if item.get("state") == "PREALERTA"),
         "confirmed": totals["confirmed"],
         "cancelled_without_confirmation": totals["cancelled_without_confirmation"],
         "expired_without_confirmation": totals["expired_without_confirmation"],

@@ -7,14 +7,6 @@ on:
         description: "Historical calendar days to download (14-56)"
         required: true
         default: "28"
-  push:
-    branches: [vantage-precision-research]
-    paths:
-      - "research/download_dukascopy_m1.py"
-      - "tests/test_dukascopy_downloader.py"
-      - "research/backtest_precision.py"
-      - "tests/test_precision_backtest.py"
-      - ".github/workflows/precision-historical-research.yml"
 
 permissions:
   contents: read

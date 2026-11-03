@@ -1,0 +1,28 @@
+name: Precision Engine V2 isolated tests
+
+on:
+  push:
+    branches: [precision-engine-v2]
+    paths:
+      - "precision_engine_v2.py"
+      - "external_signal_intelligence.py"
+      - "tests/test_precision_engine_v2.py"
+      - "tests/test_external_signal_intelligence.py"
+      - ".github/workflows/precision-engine-v2-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run isolated unit tests (no market data or secrets)
+        run: |
+          python -m unittest discover -s tests -p "test_precision_engine_v2.py" -v
+          python -m unittest discover -s tests -p "test_external_signal_intelligence.py" -v

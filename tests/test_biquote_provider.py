@@ -18,7 +18,7 @@ class BiQuoteProviderTests(unittest.TestCase):
     def _bars(self, interval_minutes=5, count=60):
         now = datetime.now(timezone.utc)
         start = now.replace(second=0, microsecond=0)
-        start = start - timedelta(minutes=(count + 2) * interval_minutes)
+        start = start - timedelta(minutes=(count + 1) * interval_minutes)
         bars = []
         for i in range(count):
             price = 1.08 + i * 0.0001

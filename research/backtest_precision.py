@@ -116,7 +116,11 @@ def run(m1, minutes, adx_floor=20, score_floor=3):
         sl=entry-(1.5*vol) if side=="BUY" else entry+(1.5*vol)
         tp=entry+(3*vol) if side=="BUY" else entry-(3*vol)
         exit_price=None; outcome=None; exit_i=None
-        for j in range(i+1,len(m1)):
+        entry_time=entrybar["time"]
+        entry_m1_index=next((k for k,z in enumerate(m1) if z["time"]>=entry_time),None)
+        if entry_m1_index is None:
+            break
+        for j in range(entry_m1_index,len(m1)):
             z=m1[j]
             # Use exit-side quotes: long closes at BID, short closes at ASK.
             hi=z["bid_high"] if side=="BUY" else z["ask_high"]

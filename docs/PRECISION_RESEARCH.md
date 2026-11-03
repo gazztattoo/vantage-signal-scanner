@@ -23,6 +23,8 @@ The current replay is a **single-timeframe core-strategy baseline**, not yet an 
 ## Metrics
 Each parameter combination reports train and chronological holdout (70/30 by trade sequence): closed trade count, win rate, expectancy in R, profit factor, max drawdown in R, and open-at-end count. The grid varies ADX floor (18/20/25/30) and minimum score (3/4); it does not change RSI bands or the ATR exits.
 
+The downloader retries transient HTTP/network failures up to five times. If a particular daily BID/ASK request still fails, it records that request in `download_failures.csv`, skips only that side/day, and continues collecting the remaining history. `download_summary.txt` reports per-instrument missing-side days, failed requests, and the percentage of requested days with both sides. Any report built from partial history must be labeled partial; compare coverage across symbols and periods before interpreting results. The workflow still fails if no instrument yields any matched BID/ASK data.
+
 ## Acceptance limits
 A tiny sample is descriptive only. Do not select parameters from the holdout set and then report that same holdout as unbiased validation. For a real conclusion, require several hundred closed trades per asset/timeframe or clearly state that evidence is insufficient, inspect stability across separate periods, and use a final untouched test period after parameter selection. These results are not a win-rate promise and do not establish broker-specific execution quality.
 

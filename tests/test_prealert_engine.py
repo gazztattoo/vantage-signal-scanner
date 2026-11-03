@@ -54,4 +54,12 @@ class PrealertTests(unittest.TestCase):
     def test_invalid_setup_does_not_create_alert(self): self.assertIsNone(evaluate_prealert(**{**BASE,"setup_valid":False}))
     def test_invalid_direction_rejected(self):
         with self.assertRaises(ValueError): evaluate_prealert(**{**BASE,"direction":"HOLD"})
+    def test_terminal_states_remain_immutable_with_stale_data(self):
+        confirmed = evaluate_prealert(**{**BASE, "current_price": 1.1003, "confirmation_valid": True})
+        later = evaluate_prealert(**{**BASE, "data_timestamp": NOW-timedelta(seconds=91), "previous": confirmed})
+        self.assertEqual(later, confirmed)
+
+        cancelled = {**evaluate_prealert(**BASE), "state": "CANCELADA", "reason": "test"}
+        later_cancelled = evaluate_prealert(**{**BASE, "data_timestamp": NOW-timedelta(seconds=91), "previous": cancelled})
+        self.assertEqual(later_cancelled, cancelled)
 if __name__=="__main__": unittest.main()

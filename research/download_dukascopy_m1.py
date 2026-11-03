@@ -20,6 +20,8 @@ import requests
 BASE_URL = "https://datafeed.dukascopy.com/datafeed"
 INSTRUMENTS = {"EUR/USD": "EURUSD", "XAU/USD": "XAUUSD", "BTC/USD": "BTCUSD"}
 RECORD = struct.Struct(">IIIIIf")  # seconds, open, close, low, high, volume
+MAX_HTTP_ATTEMPTS = 5
+RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 EXPECTED = {
     "EUR/USD": (0.5, 2.0, 1.1),
     "XAU/USD": (200.0, 20000.0, 4000.0),
@@ -82,15 +84,31 @@ def detect_scale(raw_payload: bytes, symbol: str) -> int:
 
 
 def fetch_day(session: requests.Session, instrument: str, day: dt.date, side: str):
+    """Fetch one daily file, retrying transient Dukascopy/network failures."""
     url = (f"{BASE_URL}/{instrument}/{day.year}/{day.month - 1:02d}/"
            f"{day.day:02d}/{side}_candles_min_1.bi5")
-    response = session.get(url, timeout=30)
-    if response.status_code == 404:
-        return None
-    response.raise_for_status()
-    if not response.content:
-        return None
-    return response.content
+    for attempt in range(MAX_HTTP_ATTEMPTS):
+        try:
+            response = session.get(url, timeout=30)
+            if response.status_code == 404:
+                return None  # No file for this date/side is a valid absence.
+            if response.status_code in RETRYABLE_STATUS:
+                if attempt == MAX_HTTP_ATTEMPTS - 1:
+                    response.raise_for_status()
+                retry_after = response.headers.get("Retry-After")
+                try:
+                    delay = min(15.0, max(0.0, float(retry_after))) if retry_after else min(15.0, 2.0 ** attempt)
+                except ValueError:
+                    delay = min(15.0, 2.0 ** attempt)
+                time.sleep(delay)
+                continue
+            response.raise_for_status()
+            return response.content or None
+        except requests.exceptions.RequestException:
+            if attempt == MAX_HTTP_ATTEMPTS - 1:
+                raise
+            time.sleep(min(15.0, 2.0 ** attempt))
+    raise RuntimeError(f"Download failed after {MAX_HTTP_ATTEMPTS} attempts: {url}")
 
 
 def main():

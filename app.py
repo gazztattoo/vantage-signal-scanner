@@ -698,43 +698,6 @@ def price():
 
 
 
-def _precision_frame_from_payload(payload, interval):
-    """Build a closed-candle engine frame from an already cached analysis."""
-    candles = payload.get("recent_candles") or []
-    if len(candles) < 3:
-        return None
-    previous = candles[-4:-1]
-    latest = candles[-1]
-    if len(previous) < 2:
-        return None
-    try:
-        if interval == "5min":
-            previous_high = max(float(item["high"]) for item in previous)
-            previous_low = min(float(item["low"]) for item in previous)
-        else:
-            previous_high = max(float(item["high"]) for item in previous)
-            previous_low = min(float(item["low"]) for item in previous)
-        age_minutes = float(payload.get("candle_age_minutes"))
-        frame = {
-            "ema20": float(payload["ema20"]),
-            "ema50": float(payload["ema50"]),
-            "adx": float(payload["adx14"]),
-            "rsi": float(payload["rsi14"]),
-            "macd_hist": float(payload["macd_histogram"]),
-            "close": float(latest["close"]),
-            "atr": float(payload["atr14"]),
-            "candle_age_seconds": age_minutes * 60,
-            "timeframe_seconds": INTERVAL_MINUTES[interval] * 60,
-            "previous_high": previous_high,
-            "previous_low": previous_low,
-        }
-        if not all(__import__("math").isfinite(value) for value in frame.values()):
-            return None
-        return frame
-    except (KeyError, TypeError, ValueError, OverflowError):
-        return None
-
-
 @app.route("/api/precision-candidate", methods=["GET"])
 def precision_candidate():
     """Read-only M15/M5 quality gate. Never fetches provider data."""
@@ -766,7 +729,7 @@ def precision_candidate():
             })
         updated_payload = dict(payload)
         updated_payload["candle_age_minutes"] = candle_age
-        frames[interval] = _precision_frame_from_payload(updated_payload, interval)
+        frames[interval] = precision_frame_from_payload(updated_payload, interval)
         if frames[interval] is None:
             return jsonify({
                 "symbol": symbol, "signal": "ESPERAR", "quality": "INSUFICIENTE",
@@ -774,7 +737,7 @@ def precision_candidate():
                 "cache_only": True,
             })
 
-    from precision_engine_v2 import evaluate_m15_m5_setup
+    from precision_engine_v2 import evaluate_m15_m5_setup, precision_frame_from_payload
     result = evaluate_m15_m5_setup(
         symbol=symbol, m15=frames["15min"], m5=frames["5min"]
     )

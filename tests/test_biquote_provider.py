@@ -38,7 +38,9 @@ class BiQuoteProviderTests(unittest.TestCase):
         with patch("app.requests.get", return_value=response) as get:
             candles, candle_time, age = fetch_candles("EUR/USD", "5min")
         self.assertEqual(len(candles), 60)
-        self.assertIn("Z", candle_time)
+        parsed_time = datetime.fromisoformat(candle_time)
+        self.assertIsNotNone(parsed_time.tzinfo)
+        self.assertEqual(parsed_time.utcoffset(), timedelta(0))
         self.assertGreaterEqual(age, 0)
         self.assertIn("biquote.io/api/EURUSD/ohlc", get.call_args.args[0])
         self.assertEqual(get.call_args.kwargs["params"]["interval"], "5m")

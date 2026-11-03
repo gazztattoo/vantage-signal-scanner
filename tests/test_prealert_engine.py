@@ -29,6 +29,13 @@ class PrealertTests(unittest.TestCase):
     def test_confirmation_only_inside_zone(self):
         r=evaluate_prealert(**{**BASE,"current_price":1.1003,"confirmation_valid":True}); self.assertEqual(r["state"],"CONFIRMADA")
         self.assertEqual(evaluate_prealert(**{**BASE,"confirmation_valid":True})["state"],"PREALERTA")
+    def test_inside_zone_without_confirmation_does_not_create_late_prealert(self):
+        self.assertIsNone(evaluate_prealert(**{**BASE,"current_price":1.1003,"previous_price":1.1004}))
+    def test_entering_zone_without_confirmation_cancels_existing_prealert(self):
+        p=evaluate_prealert(**BASE)
+        r=evaluate_prealert(**{**BASE,"current_price":1.1003,"previous_price":1.1004,"previous":p})
+        self.assertEqual(r["state"],"CANCELADA")
+        self.assertEqual(r["reason"],"zona_alcanzada_sin_confirmacion")
     def test_invalidated_setup_cancels_existing_prealert(self):
         p=evaluate_prealert(**BASE); r=evaluate_prealert(**{**BASE,"invalidated":True,"previous":p}); self.assertEqual(r["state"],"CANCELADA")
     def test_price_moving_away_cancels_existing_prealert(self):

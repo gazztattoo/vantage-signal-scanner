@@ -109,7 +109,7 @@ class M15M5PrecisionGateTests(unittest.TestCase):
 
 class CachedPrecisionFrameTests(unittest.TestCase):
     def test_frame_builder_uses_only_closed_candle_payload(self):
-        from app import _precision_frame_from_payload
+        from precision_engine_v2 import precision_frame_from_payload
         payload = {
             "ema20": 100, "ema50": 99, "adx14": 22, "rsi14": 60,
             "macd_histogram": 0.3, "atr14": 1, "candle_age_minutes": 1,
@@ -120,7 +120,7 @@ class CachedPrecisionFrameTests(unittest.TestCase):
                 {"high": 102, "low": 100.5, "close": 101.5},
             ],
         }
-        frame = _precision_frame_from_payload(payload, "5min")
+        frame = precision_frame_from_payload(payload, "5min")
         self.assertEqual(frame["close"], 101.5)
         self.assertEqual(frame["previous_high"], 101.5)
         self.assertEqual(frame["previous_low"], 99.5)
@@ -128,7 +128,7 @@ class CachedPrecisionFrameTests(unittest.TestCase):
 
     def test_frame_builder_fails_closed_when_data_missing(self):
         from app import _precision_frame_from_payload
-        self.assertIsNone(_precision_frame_from_payload({}, "5min"))
+        self.assertIsNone(precision_frame_from_payload({}, "5min"))
 
 
 if __name__ == "__main__":

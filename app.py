@@ -978,8 +978,10 @@ def lab_status():
         subscriptions = exact_count("/rest/v1/push_subscriptions")
         return jsonify({
             "checked_at": datetime.now(timezone.utc).isoformat(),
-            "data_provider": "Twelve Data",
-            "provider_configured": bool(API_KEY),
+            "data_provider": "biquote",
+            "provider_configured": True,
+            "provider_requires_api_key": False,
+            "is_vantage_quote": False,
             "storage_configured": bool(SUPABASE_URL and SUPABASE_SECRET_KEY),
             "engine": {
                 "trend": "EMA 20 / EMA 50",

@@ -1,14 +1,8 @@
 name: Biquote live validation (read-only)
 
 on:
-  push:
-    branches: [biquote-production-ready]
-    paths:
-      - ".github/workflows/biquote-live-validation.yml"
+  # Manual only: no unattended Biquote reads. Run only after Carlos explicitly approves.
   workflow_dispatch:
-  schedule:
-    # Recheck shortly after the usual XAUUSD daily session opens (Vantage winter time).
-    - cron: "10 23 * * 1-5"
 
 permissions:
   contents: read

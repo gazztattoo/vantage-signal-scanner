@@ -57,14 +57,15 @@ def evaluate_prealert(*, symbol, direction, current_price, entry_zone_low, entry
                if previous and previous.get("created_at") else now)
     expires = created + timedelta(seconds=ttl_seconds)
 
-    # Stale/future data must never create or preserve an actionable warning.
-    if (now - data).total_seconds() > max_data_age_seconds or data > now:
-        if previous and previous.get("state") in {"PREALERTA", "CONFIRMADA"}:
-            return {**previous, "state": "CANCELADA", "reason": "datos_obsoletos"}
-        return None
-
+    # Terminal states are immutable, even if later snapshots become stale.
     if previous and previous.get("state") in {"CANCELADA", "EXPIRADA", "CONFIRMADA"}:
         return previous
+
+    # Stale/future data must never create or preserve an actionable warning.
+    if (now - data).total_seconds() > max_data_age_seconds or data > now:
+        if previous and previous.get("state") == "PREALERTA":
+            return {**previous, "state": "CANCELADA", "reason": "datos_obsoletos"}
+        return None
     if previous and now >= _utc(datetime.fromisoformat(previous["expires_at"])):
         return {**previous, "state": "EXPIRADA", "reason": "ventana_de_prealerta_vencida"}
 

@@ -77,5 +77,22 @@ class DukascopyDecoderTests(unittest.TestCase):
         sleep.assert_not_called()
 
 
+    def test_persistent_503_raises_after_bounded_retries(self):
+        class Response:
+            status_code = 503
+            content = b""
+            headers = {}
+            def raise_for_status(self):
+                raise requests.HTTPError("HTTP 503")
+        class Session:
+            calls = 0
+            def get(self, url, timeout):
+                self.calls += 1
+                return Response()
+        session=Session()
+        with patch("research.download_dukascopy_m1.time.sleep"):
+            with self.assertRaises(requests.HTTPError):
+                fetch_day(session,"EURUSD",dt.date(2026,10,1),"ASK")
+        self.assertEqual(session.calls,5)
 if __name__ == "__main__":
     unittest.main()

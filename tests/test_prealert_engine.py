@@ -29,4 +29,26 @@ class PrealertTests(unittest.TestCase):
   r=evaluate_prealert(**{**BASE,"direction":"SELL","current_price":1.0997}); self.assertEqual(r["direction"],"SELL")
  def test_bad_direction(self):
   with self.assertRaises(ValueError): evaluate_prealert(**{**BASE,"direction":"HOLD"})
+ def test_supported_symbols_use_same_local_engine(self):
+  cases = [
+   ("EUR/USD", 1.1008, 1.1000, 1.1005, 0.0005),
+   ("XAU/USD", 2750.8, 2750.0, 2750.5, 0.5),
+   ("BTC/USD", 67000.8, 67000.0, 67000.5, 0.5),
+  ]
+  for symbol, price, low, high, distance in cases:
+   with self.subTest(symbol=symbol):
+    result=evaluate_prealert(**{**BASE,"symbol":symbol,"current_price":price,
+     "entry_zone_low":low,"entry_zone_high":high,"approach_distance":distance})
+    self.assertEqual(result["state"],"PREALERTA")
+    self.assertEqual(result["symbol"],symbol)
+
+ def test_repeated_evaluation_does_not_create_new_alert(self):
+  first=evaluate_prealert(**BASE)
+  second=evaluate_prealert(**{**BASE,"previous":first,"current_price":1.1007})
+  self.assertEqual(second["alert_id"],first["alert_id"])
+  self.assertEqual(second["created_at"],first["created_at"])
+
+ def test_invalid_setup_does_not_create_alert(self):
+  self.assertIsNone(evaluate_prealert(**{**BASE,"setup_valid":False}))
+
 if __name__=="__main__": unittest.main()

@@ -2,7 +2,7 @@ name: Biquote live validation (read-only)
 
 on:
   push:
-    branches: [live-market-data-biquote]
+    branches: [biquote-production-ready]
     paths:
       - ".github/workflows/biquote-live-validation.yml"
   workflow_dispatch:

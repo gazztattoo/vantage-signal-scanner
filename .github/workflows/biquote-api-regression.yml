@@ -2,7 +2,7 @@ name: Biquote API safety regression tests
 
 on:
   push:
-    branches: [live-market-data-biquote]
+    branches: [biquote-production-ready]
     paths:
       - "app.py"
       - "tests/test_biquote_provider.py"

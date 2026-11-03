@@ -1002,7 +1002,7 @@ def lab_status():
                 "volatility": "ATR 14 + Bollinger 20,2",
                 "strength": "ADX 14 (Wilder)",
                 "minimum_confluence": "3/4",
-                "minimum_adx": 18,
+                "minimum_adx": 20,
                 "risk_model": "SL 1.5 × ATR; TP 3 × ATR",
                 "closed_candles_only": True,
                 "automatic_execution": False,

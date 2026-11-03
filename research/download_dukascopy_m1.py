@@ -12,7 +12,6 @@ import datetime as dt
 import lzma
 import math
 import struct
-import sys
 import time
 from pathlib import Path
 
@@ -28,8 +27,15 @@ EXPECTED = {
 }
 
 
+def _decompress(payload: bytes) -> bytes:
+    try:
+        return lzma.decompress(payload)
+    except lzma.LZMAError as exc:
+        raise ValueError("Invalid LZMA/BI5 payload") from exc
+
+
 def decode_day(payload: bytes, day: dt.date, scale: int) -> list[dict]:
-    raw = lzma.decompress(payload)
+    raw = _decompress(payload)
     if len(raw) % RECORD.size:
         raise ValueError(f"Invalid BI5 length: {len(raw)} bytes")
     start = dt.datetime.combine(day, dt.time(), tzinfo=dt.timezone.utc)
@@ -54,7 +60,7 @@ def decode_day(payload: bytes, day: dt.date, scale: int) -> list[dict]:
 
 
 def detect_scale(raw_payload: bytes, symbol: str) -> int:
-    raw = lzma.decompress(raw_payload)
+    raw = _decompress(raw_payload)
     if len(raw) < RECORD.size or len(raw) % RECORD.size:
         raise ValueError("Cannot infer price scale from empty/invalid candle file")
     samples = []

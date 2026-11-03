@@ -671,6 +671,10 @@ function render(m,d,err,marketClosed=false){
   let entry=precision ? precision.entry_reference : first(d,["entry","price"]);
   let sl=precision ? precision.stop_loss_reference : first(d,["stop_loss","stopLoss","sl"]);
   let tp=precision ? precision.take_profit_reference : first(d,["take_profit","takeProfit","tp"]);
+  if(precision && !["BUY","SELL","COMPRA","VENTA"].includes(String(precision.signal||"").toUpperCase())){
+    entry=null; sl=null; tp=null;
+  }
+  const displayPrice=precision ? (["BUY","SELL","COMPRA","VENTA"].includes(String(precision.signal||"").toUpperCase()) ? precision.entry_reference : null) : first(d,["price","entry"]);
   const interval=first(d,["interval"])||document.getElementById("interval").value;
   const candleAge=Number(first(d,["candle_age_minutes"]));
   const maxCandleAge=({ "5min":11.5, "15min":31.5, "30min":61.5 })[interval]||0;
@@ -702,7 +706,7 @@ function render(m,d,err,marketClosed=false){
         <span class="pill ${s.c}">${esc(s.t)}</span>
       </div>
 
-      <div class="price">${fmt(precision ? precision.entry_reference : first(d,["price","entry"]),8)}</div>
+      <div class="price">${fmt(displayPrice,8)}</div>
       <div class="priceLabel">PRECIO / ENTRADA DE REFERENCIA</div>
       <p class="reason">${esc(reason)}</p>
 
@@ -714,12 +718,12 @@ function render(m,d,err,marketClosed=false){
 
       <div class="quality-panel" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0 12px;padding:10px 12px;border:1px solid #28543a;border-radius:11px;background:#09140d">
         <div>
-          <div style="font-size:9px;color:var(--muted);letter-spacing:.7px">CALIDAD DE LA SEÑAL</div>
-          <strong style="display:block;margin-top:3px;font-size:15px;color:${first(d,["quality_grade"])==="A+"?"var(--green)":first(d,["quality_grade"])==="A"?"#a6e8bd":"var(--amber)"}">${esc(first(d,["quality_grade"])||"—")} · ${esc(first(d,["quality_label"])||"Sin clasificar")}</strong>
+          <div style="font-size:9px;color:var(--muted);letter-spacing:.7px">${precision?"CONFLUENCIA M15 + M5":"CALIDAD DEL ANÁLISIS"}</div>
+          <strong style="display:block;margin-top:3px;font-size:15px;color:${hasCandidate?"var(--green)":"var(--amber)"}">${precision?(hasCandidate?"CANDIDATA CONFIRMADA":"SIN CONFLUENCIA"):(esc(first(d,["quality_grade"])||"—")+" · "+esc(first(d,["quality_label"])||"Sin clasificar"))}</strong>
         </div>
         <div style="text-align:right">
-          <strong style="font-size:19px;font-variant-numeric:tabular-nums">${fmt(first(d,["quality_score"]),0)}<span style="font-size:10px;color:var(--muted)">/100</span></strong>
-          <div style="font-size:9px;color:var(--muted)">Puntuación técnica</div>
+          <strong style="font-size:14px;font-variant-numeric:tabular-nums">${precision?"M15 / M5":fmt(first(d,["quality_score"]),0)+"/100"}</strong>
+          <div style="font-size:9px;color:var(--muted)">${precision?"Dos temporalidades": "Puntuación técnica"}</div>
         </div>
       </div>
 

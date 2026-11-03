@@ -86,6 +86,25 @@ class BiQuoteProviderTests(unittest.TestCase):
         result = self.client.get("/api/price?symbol=EUR/USD")
         self.assertEqual(result.status_code, 401)
 
+    def test_analysis_refuses_closed_market_before_fetching_or_using_cache(self):
+        closed = {
+            "open": False,
+            "status": "MERCADO CERRADO",
+            "reason": "Pausa diaria Vantage.",
+            "server_time": "2026-11-03T00:30:00+02:00",
+            "server_utc_offset": "UTC+2",
+        }
+        with patch("app.market_session", return_value=closed), patch("app.fetch_candles") as fetch:
+            result = self.client.get(
+                "/api/analysis?symbol=XAU/USD&interval=5min",
+                headers=self.headers,
+            )
+        self.assertEqual(result.status_code, 409)
+        payload = result.get_json()
+        self.assertTrue(payload["market_closed"])
+        self.assertEqual(payload["market_state"]["status"], "MERCADO CERRADO")
+        fetch.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,6 +1,9 @@
 import unittest
+import csv
+import tempfile
+from pathlib import Path
 from datetime import datetime, timezone, timedelta
-from research.backtest_precision import ema, rsi, aggregate, metrics
+from research.backtest_precision import ema, rsi, aggregate, metrics, load_m1
 
 class PrecisionBacktestTests(unittest.TestCase):
     def test_ema_seed_matches_production_simple_average(self):
@@ -25,5 +28,30 @@ class PrecisionBacktestTests(unittest.TestCase):
         self.assertEqual(report["closed_trades"],2)
         self.assertEqual(report["win_rate"],0.5)
         self.assertEqual(report["open_at_end"],1)
+
+    def _write_m1(self, rows):
+        fields=["timestamp"]+[f"{s}_{k}" for s in ("bid","ask") for k in ("open","high","low","close")]
+        tmp=tempfile.NamedTemporaryFile(mode="w",newline="",encoding="utf-8",delete=False)
+        with tmp:
+            writer=csv.DictWriter(tmp,fieldnames=fields);writer.writeheader();writer.writerows(rows)
+        return Path(tmp.name)
+
+    def test_loader_rejects_duplicate_timestamps(self):
+        row={"timestamp":"2026-01-01T00:00:00Z"}
+        for side in ("bid","ask"):
+            row.update({f"{side}_open":100,f"{side}_high":101,f"{side}_low":99,f"{side}_close":100})
+        path=self._write_m1([row,row.copy()])
+        try:
+            with self.assertRaisesRegex(ValueError,"strictly increasing"):load_m1(path)
+        finally:path.unlink(missing_ok=True)
+
+    def test_loader_rejects_ask_below_bid(self):
+        row={"timestamp":"2026-01-01T00:00:00Z"}
+        row.update({"bid_open":100,"bid_high":101,"bid_low":99,"bid_close":100,
+                    "ask_open":99.9,"ask_high":101,"ask_low":99,"ask_close":100})
+        path=self._write_m1([row])
+        try:
+            with self.assertRaisesRegex(ValueError,"ASK below BID"):load_m1(path)
+        finally:path.unlink(missing_ok=True)
 
 if __name__=="__main__": unittest.main()

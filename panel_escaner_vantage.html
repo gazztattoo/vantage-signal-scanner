@@ -669,6 +669,15 @@ function render(m,d,err,marketClosed=false){
   const entry=first(d,["entry","price"]);
   const sl=first(d,["stop_loss","stopLoss","sl"]);
   const tp=first(d,["take_profit","takeProfit","tp"]);
+  const interval=first(d,["interval"])||document.getElementById("interval").value;
+  const candleAge=Number(first(d,["candle_age_minutes"]));
+  const maxCandleAge=({ "5min":11.5, "15min":31.5, "30min":61.5 })[interval]||0;
+  const signalFresh=Number.isFinite(candleAge)&&candleAge>=0&&candleAge<=maxCandleAge;
+  if((s.t==="COMPRA"||s.t==="VENTA")&&!signalFresh){
+    s.t="SEÑAL ANTIGUA";
+    s.c="";
+  }
+  const hasCandidate=s.t==="COMPRA"||s.t==="VENTA";
   const reason=first(
     d,["reason","explanation","message","warning","method"]
   )||"Análisis recibido desde la API.";
@@ -694,6 +703,12 @@ function render(m,d,err,marketClosed=false){
       <div class="priceLabel">PRECIO / ENTRADA DE REFERENCIA</div>
       <p class="reason">${esc(reason)}</p>
 
+      <div class="quality-panel" style="margin:10px 0;padding:11px 12px;border:1px solid ${hasCandidate?"#765d2b":"#34404b"};border-radius:11px;background:#0b1118">
+        <div style="font-size:10px;letter-spacing:.65px;color:var(--muted)">TIPO DE ORDEN PREFERIDO</div>
+        <strong style="display:block;margin-top:4px;font-size:13px;color:${hasCandidate?"var(--amber)":"var(--muted)"}">${hasCandidate?"MERCADO · CANDIDATA TÉCNICA":"ESPERAR · SIN ENTRADA VÁLIDA"}</strong>
+        <div style="font-size:11px;line-height:1.45;color:var(--muted);margin-top:5px">${hasCandidate?"La entrada mostrada es el cierre de la vela analizada, no una cotización Bid/Ask en vivo. No ejecutar como orden instantánea hasta confirmar el precio y el spread en Vantage/MT5.":"El motor no confirma una entrada ahora. No se recomienda forzar una operación."}</div>
+      </div>
+
       <div class="quality-panel" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0 12px;padding:10px 12px;border:1px solid #28543a;border-radius:11px;background:#09140d">
         <div>
           <div style="font-size:9px;color:var(--muted);letter-spacing:.7px">CALIDAD DE LA SEÑAL</div>
@@ -709,7 +724,7 @@ function render(m,d,err,marketClosed=false){
 
         <div class="level">
           <div class="level-top">
-            <span>ENTRADA</span>
+            <span>ENTRADA DE REFERENCIA</span>
             ${copyButton(entry,"Entrada")}
           </div>
           <strong>${fmt(entry,8)}</strong>

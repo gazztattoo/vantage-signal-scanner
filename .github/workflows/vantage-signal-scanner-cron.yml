@@ -1,8 +1,8 @@
 name: Vantage Signal Scanner (cada 10 minutos; escaneo escalonado)
 
 on:
-  schedule:
-    - cron: "*/10 * * * *"
+  # Production scanning stays paused until Carlos explicitly reactivates it.
+  # Manual dispatch is retained for an intentionally authorized run only.
   workflow_dispatch:
 
 permissions:

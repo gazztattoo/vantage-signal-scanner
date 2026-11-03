@@ -17,6 +17,9 @@ The production response's human-readable `method` string currently says ADX >=18
 ## Data and execution assumptions
 The downloader requests public Dukascopy M1 BID and ASK bars. The backtest aggregates only complete, contiguous M1 groups into M5/M15/M30. Indicators use the midpoint of BID/ASK OHLC. A signal is evaluated only after a completed timeframe candle; entry is at the next timeframe bar's first M1 open. Long entries use ASK and long exits use BID; short entries use BID and short exits use ASK. SL/TP are evaluated against the appropriate exit-side M1 range. If SL and TP are both touched in the same M1 candle, SL is assumed first. Positions do not overlap within one symbol/timeframe experiment. Open trades at dataset end are not counted as wins/losses.
 
+## Fidelity gap versus the production scanner
+The current replay is a **single-timeframe core-strategy baseline**, not yet an exact reproduction of the production push scanner. Production push scanning additionally requires a fresh pending M15 signal in the same direction before an M5 signal can be pushed. This backtest does not yet replay that M5/M15 pending-signal state, freshness window, or Supabase signal-history behavior. Therefore its results must not be presented as expected production alert performance. The next validation stage must model this confirmation rule offline before any production-equivalence claim.
+
 ## Metrics
 Each parameter combination reports train and chronological holdout (70/30 by trade sequence): closed trade count, win rate, expectancy in R, profit factor, max drawdown in R, and open-at-end count. The grid varies ADX floor (18/20/25/30) and minimum score (3/4); it does not change RSI bands or the ATR exits.
 

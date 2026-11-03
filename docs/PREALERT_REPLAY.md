@@ -6,7 +6,7 @@ The replay runner `scripts/replay_prealerts.py` consumes a local CSV. It does no
 
 Required columns:
 
-`timestamp,symbol,direction,price,zone_low,zone_high,setup_valid,confirmation_valid,invalidated`
+`timestamp,symbol,direction,price,zone_low,zone_high,setup_valid,confirmation_valid,invalidated,approach_distance`
 
 Optional `data_timestamp` records the actual quote timestamp separately from the replay timestamp.
 
@@ -14,7 +14,7 @@ Optional `data_timestamp` records the actual quote timestamp separately from the
 - Symbols: EUR/USD, XAU/USD, BTC/USD.
 - direction: BUY or SELL.
 - setup_valid / confirmation_valid / invalidated: true or false.
-- Prices and zones must use the same quote convention and precision as the intended execution venue.
+- Prices and zones must use the same quote convention and precision as the intended execution venue.\n- approach_distance: explicitly calibrated per symbol/strategy; no generic default is invented.
 - Rows may be unordered; replay sorts them chronologically.
 
 ## Example

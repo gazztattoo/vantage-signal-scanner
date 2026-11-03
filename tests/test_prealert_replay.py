@@ -8,7 +8,7 @@ def row(seconds, price, confirm=False, invalid=False):
     return {"timestamp": stamp, "symbol": "EUR/USD", "direction": "BUY",
             "price": str(price), "zone_low": "1.1000", "zone_high": "1.1005",
             "setup_valid": "true", "confirmation_valid": str(confirm).lower(),
-            "invalidated": str(invalid).lower()}
+            "invalidated": str(invalid).lower(), "approach_distance": "0.0005"}
 
 class ReplayTests(unittest.TestCase):
     def test_replay_counts_confirmation_and_lead_time(self):

@@ -40,7 +40,9 @@ def replay_rows(rows, *, approach_distances=None, max_data_age_seconds=90, ttl_s
         data_time = _parse_time(row.get("data_timestamp") or row["timestamp"])
         price = float(row["price"])
         zone_low, zone_high = float(row["zone_low"]), float(row["zone_high"])
-        default_distance = max((zone_high - zone_low) * 2, abs(price) * 0.0002)
+        configured_distance = row.get("approach_distance") or approach_distances.get(symbol)
+        if configured_distance in (None, ""):
+            raise ValueError(f"Missing calibrated approach_distance for {symbol}")
         result = evaluate_prealert(
             symbol=symbol,
             direction=direction,
@@ -52,7 +54,7 @@ def replay_rows(rows, *, approach_distances=None, max_data_age_seconds=90, ttl_s
             invalidated=_parse_bool(row["invalidated"]),
             data_timestamp=data_time,
             now=now,
-            approach_distance=float(approach_distances.get(symbol, default_distance)),
+            approach_distance=float(configured_distance),
             max_data_age_seconds=max_data_age_seconds,
             ttl_seconds=ttl_seconds,
             previous_price=previous_price_by_key.get(key),

@@ -335,6 +335,28 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
   .brand-banner{transform:scale(1.22)}
   .status{top:8px;right:8px;padding:7px 9px;font-size:10px;z-index:2}
 }
+
+/* Vista operativa: prioriza decisión y niveles sin alterar el análisis */
+.trade-mode .market-overview{display:none!important}
+.trade-mode .metrics{display:none!important}
+.trade-mode .card{border-color:#315b40;box-shadow:0 8px 24px rgba(0,0,0,.22)}
+.trade-mode .price{font-size:clamp(28px,6vw,36px);margin:13px 0 2px;font-variant-numeric:tabular-nums}
+.trade-mode .levels{grid-template-columns:1fr;gap:8px}
+.trade-mode .level{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 13px}
+.trade-mode .level-top{flex:1;margin:0}
+.trade-mode .level span{font-size:11px;font-weight:850;letter-spacing:.35px}
+.trade-mode .level strong{font-size:17px;font-variant-numeric:tabular-nums}
+.trade-mode .level-top .copy-btn{padding:8px 11px;font-size:11px;min-height:36px}
+.trade-mode #tradeMode{background:#123b26;color:var(--green);border-color:#58f29a}
+@media(max-width:560px){
+  .toolbar #tradeMode{flex:1}
+  .trade-mode .card{padding:13px}
+  .trade-mode .levels{gap:7px}
+  .trade-mode .level{padding:11px 10px}
+  .trade-mode .level strong{font-size:16px}
+  .trade-mode .reason{min-height:0;margin:8px 0;font-size:11px}
+}
+
 </style>
 </head>
 
@@ -399,6 +421,7 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
     <option value="30min">M30 · manual</option>
   </select>
   <button id="refresh">↻ Actualizar análisis</button>
+  <button id="tradeMode" type="button" aria-pressed="false">◎ Vista operar</button>
   <span class="hint" id="updated">M5 y M15 se escanean automáticamente. M30 solo al solicitarlo.</span>
 </section>
 
@@ -534,6 +557,14 @@ const statusEl=document.getElementById("status");
 const dot=document.getElementById("dot");
 const button=document.getElementById("refresh");
 const updated=document.getElementById("updated");
+
+const tradeModeButton=document.getElementById("tradeMode");
+tradeModeButton.addEventListener("click",()=>{
+  const enabled=document.body.classList.toggle("trade-mode");
+  tradeModeButton.setAttribute("aria-pressed",String(enabled));
+  tradeModeButton.textContent=enabled?"✓ Vista operar activa":"◎ Vista operar";
+});
+
 
 function esc(v){
   return String(v??"").replace(/[&<>"]/g,c=>({

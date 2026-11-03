@@ -6,8 +6,10 @@ on:
     paths:
       - "precision_engine_v2.py"
       - "external_signal_intelligence.py"
+      - "external_technical_signal_adapters.py"
       - "tests/test_precision_engine_v2.py"
       - "tests/test_external_signal_intelligence.py"
+      - "tests/test_external_technical_signal_adapters.py"
       - ".github/workflows/precision-engine-v2-tests.yml"
 
 permissions:
@@ -26,3 +28,4 @@ jobs:
         run: |
           python -m unittest discover -s tests -p "test_precision_engine_v2.py" -v
           python -m unittest discover -s tests -p "test_external_signal_intelligence.py" -v
+          python -m unittest discover -s tests -p "test_external_technical_signal_adapters.py" -v

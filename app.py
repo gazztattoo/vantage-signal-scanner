@@ -511,117 +511,52 @@ def twelve_data_get(endpoint, params=None, timeout=20):
 
 
 def fetch_candles(symbol, interval):
-    if not API_KEY:
-        raise RuntimeError(
-            "Falta configurar TWELVE_DATA_API_KEY en Render"
-        )
-
-    response = twelve_data_get(
-        "time_series",
-        params={
-            "symbol": symbol,
-            "interval": interval,
-            "outputsize": 100,
-            "order": "ASC",
-            "timezone": "Atlantic/Canary",
-        },
-        timeout=20,
+    """Obtiene velas OHLC desde biquote; nunca usa velas Twelve Data como fallback."""
+    provider_symbol = {"EUR/USD": "EURUSD", "XAU/USD": "XAUUSD", "BTC/USD": "BTCUSD"}[symbol]
+    provider_interval = {"5min": "5m", "15min": "15m", "30min": "30m"}[interval]
+    response = requests.get(
+        f"https://biquote.io/api/{provider_symbol}/ohlc",
+        params={"interval": provider_interval, "limit": 120},
+        timeout=15,
     )
-
-    try:
-        data = response.json()
-    except ValueError as exc:
-        raise RuntimeError(
-            "Twelve Data devolvió una respuesta no válida"
-        ) from exc
-
-    if response.status_code != 200 or "values" not in data:
-        message = (
-            data.get("message")
-            or data.get("code")
-            or "No se pudieron obtener velas históricas"
-        )
-        raise RuntimeError(str(message))
-
-    values = data["values"]
-
-    if not values:
-        raise RuntimeError(
-            "Twelve Data no devolvió velas"
-        )
-
-    # Orden cronológico por fecha de apertura.
-    values = sorted(
-        values,
-        key=lambda item: item.get("datetime", "")
-    )
-
+    response.raise_for_status()
+    data = response.json()
+    bars = data.get("bars") if isinstance(data, dict) else None
+    if not isinstance(bars, list):
+        raise RuntimeError("biquote no devolvió velas OHLC válidas.")
+    now = datetime.now(timezone.utc)
+    interval_seconds = INTERVAL_MINUTES[interval] * 60
     candles = []
     valid_times = []
-
-    for item in values:
+    for item in bars:
         try:
-            candle = {
-                key: float(item[key])
-                for key in ("open", "high", "low", "close")
-            }
-            candle_time = parse_candle_time(item["datetime"])
+            candle_time = datetime.fromisoformat(str(item["openTime"]).replace("Z", "+00:00"))
+            if candle_time.tzinfo is None:
+                candle_time = candle_time.replace(tzinfo=timezone.utc)
+            candle = {key: float(item[key]) for key in ("open", "high", "low", "close")}
+            if not all(value > 0 for value in candle.values()):
+                continue
+            if candle["high"] < max(candle["open"], candle["close"], candle["low"]) or candle["low"] > min(candle["open"], candle["close"], candle["high"]):
+                continue
         except (KeyError, TypeError, ValueError):
             continue
-
+        # Use only fully closed bars; never calculate indicators on a forming candle.
+        if item.get("isOpen") is True or candle_time.timestamp() + interval_seconds > now.timestamp():
+            continue
         candle["time"] = candle_time.astimezone(CANARY_TZ).isoformat()
         candles.append(candle)
         valid_times.append(candle_time)
-
-    # Excluir siempre la vela que todavía está formándose.
-    # Twelve Data entrega datetime como hora de apertura de cada vela.
-    now = datetime.now(timezone.utc)
-    interval_seconds = INTERVAL_MINUTES[interval] * 60
-    closed = [
-        (candle, candle_time)
-        for candle, candle_time in zip(candles, valid_times)
-        if candle_time.astimezone(timezone.utc).timestamp() + interval_seconds <= now.timestamp()
-    ]
-    if len(closed) < 55:
-        raise RuntimeError(
-            "Datos insuficientes después de excluir la vela en curso "
-            f"({len(closed)} velas cerradas)"
-        )
-    candles = [item[0] for item in closed]
-    valid_times = [item[1] for item in closed]
-
+    ordered = sorted(zip(valid_times, candles), key=lambda pair: pair[0])
+    valid_times = [pair[0] for pair in ordered]
+    candles = [pair[1] for pair in ordered]
+    if len(candles) < 55:
+        raise RuntimeError(f"biquote devolvió datos insuficientes: {len(candles)} velas cerradas.")
     latest_time = valid_times[-1]
-
-    age_seconds = (
-        now - latest_time.astimezone(timezone.utc)
-    ).total_seconds()
-
-    if age_seconds < -120:
-        raise RuntimeError(
-            "La fecha de la última vela está en el futuro. "
-            "Comprueba la zona horaria del proveedor."
-        )
-
-    # Tolerancia para la vela en curso y retrasos del proveedor.
-    # Si la vela supera este límite, no se genera una señal.
-    max_age_seconds = (
-        INTERVAL_MINUTES[interval] * 60 * 2 + 90
-    )
-
+    age_seconds = max((now - latest_time.astimezone(timezone.utc)).total_seconds(), 0)
+    max_age_seconds = interval_seconds * 2 + 90
     if age_seconds > max_age_seconds:
-        age_minutes = int(age_seconds // 60)
-        raise RuntimeError(
-            f"Datos desactualizados: la última vela comenzó "
-            f"hace aproximadamente {age_minutes} minutos. "
-            "No se genera una señal con estos datos. "
-            "Inténtalo más tarde."
-        )
-
-    return (
-        candles,
-        latest_time.astimezone(CANARY_TZ).isoformat(),
-        round(max(age_seconds, 0) / 60, 2),
-    )
+        raise RuntimeError(f"Velas biquote desactualizadas ({int(age_seconds // 60)} min). No se genera señal.")
+    return candles, latest_time.astimezone(CANARY_TZ).isoformat(), round(age_seconds / 60, 2)
 
 
 @app.route("/")
@@ -644,7 +579,9 @@ def health():
 @app.route("/api/credits/status")
 def credits_status():
     return jsonify({
-        "provider": "Twelve Data",
+        "provider": "biquote",
+        "twelve_data_consumed": False,
+        "note": "El proveedor activo de mercado es externo; no es una cotización Vantage.",
         "daily_limit": TWELVE_DATA_DAILY_LIMIT,
         "warning_threshold": int(TWELVE_DATA_DAILY_LIMIT * 0.70),
         "critical_threshold": TWELVE_DATA_HARD_STOP,
@@ -655,46 +592,34 @@ def credits_status():
 @app.route("/api/price")
 def price():
     symbol = get_symbol(request.args.get("symbol"))
-
     if not symbol:
-        return jsonify({
-            "error": "Símbolo no permitido",
-            "allowed_symbols": sorted(ALLOWED_SYMBOLS),
-        }), 400
-
-    if not API_KEY:
-        return jsonify({
-            "error": "Falta configurar la clave de Twelve Data"
-        }), 503
-
+        return jsonify({"error": "Símbolo no permitido", "allowed_symbols": sorted(ALLOWED_SYMBOLS)}), 400
+    provider_symbol = {"EUR/USD": "EURUSD", "XAU/USD": "XAUUSD", "BTC/USD": "BTCUSD"}[symbol]
     try:
-        response = twelve_data_get(
-            "price",
-            params={"symbol": symbol},
-            timeout=15,
+        response = requests.get(
+            f"https://biquote.io/api/{provider_symbol}",
+            params={"allowStale": "false"},
+            timeout=10,
         )
-
+        if response.status_code == 404:
+            return jsonify({"error": "No hay cotización reciente para este mercado. No se muestra un precio antiguo."}), 503
+        response.raise_for_status()
         data = response.json()
-
-        if response.status_code != 200 or "price" not in data:
-            return jsonify({
-                "error": data.get(
-                    "message",
-                    "No se pudo obtener el precio",
-                )
-            }), 502
-
+        bid, ask = float(data["bid"]), float(data["ask"])
+        timestamp = datetime.fromisoformat(str(data["timestamp"]).replace("Z", "+00:00"))
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=timezone.utc)
+        age = max((datetime.now(timezone.utc) - timestamp.astimezone(timezone.utc)).total_seconds(), 0)
+        if data.get("stale") or data.get("marketState") != "open" or age > 90 or bid <= 0 or ask < bid:
+            return jsonify({"error": "Cotización no operable: mercado cerrado, precio antiguo o Bid/Ask inválido.", "market_state": data.get("marketState"), "quote_age_seconds": round(age, 1)}), 503
         return jsonify({
-            "symbol": symbol,
-            "price": float(data["price"]),
+            "symbol": symbol, "price": (bid + ask) / 2, "bid": bid, "ask": ask,
+            "spread": ask - bid, "timestamp": timestamp.astimezone(timezone.utc).isoformat(),
+            "quote_age_seconds": round(age, 1), "source": data.get("source", "biquote"),
+            "market_state": data.get("marketState"), "is_vantage_quote": False
         })
-
-    except RuntimeError as exc:
-        return jsonify({"error": str(exc)}), 503
-    except (requests.RequestException, ValueError):
-        return jsonify({
-            "error": "No se pudo consultar el proveedor de precios"
-        }), 502
+    except (requests.RequestException, ValueError, KeyError, TypeError):
+        return jsonify({"error": "No se pudo obtener una cotización Bid/Ask reciente del proveedor externo."}), 502
 
 
 @app.route("/api/analysis")
@@ -715,6 +640,19 @@ def analysis():
             "error": "Intervalo no permitido",
             "allowed_intervals": sorted(ALLOWED_INTERVALS),
         }), 400
+
+    # Fail closed at the API boundary too: direct/manual callers must not
+    # receive analysis from a market that Vantage MT5 currently reports closed.
+    session = market_session(symbol)
+    if not session["open"]:
+        return jsonify({
+            "error": "MERCADO CERRADO · No se genera análisis ni señal fuera de la sesión habitual.",
+            "market_closed": True,
+            "market_state": session,
+            "symbol": symbol,
+            "interval": interval,
+            "data_provider": "biquote",
+        }), 409
 
     cache_key = (symbol, interval)
     cached = ANALYSIS_CACHE.get(cache_key)
@@ -800,6 +738,8 @@ def analysis():
         payload = {
             "symbol": symbol,
             "interval": interval,
+            "data_provider": "biquote",
+            "is_vantage_quote": False,
             "signal": signal,
             "reason": reason,
             "price": entry,
@@ -834,11 +774,10 @@ def analysis():
             ],
             "method": (
                 "EMA20/EMA50 + RSI14 + MACD + ADX14 + Bollinger(20,2); "
-                "score mínimo 3/4 y ADX>=18; SL=1.5x ATR; TP=3x ATR"
+                "score mínimo 3/4 y ADX>=20; SL=1.5x ATR; TP=3x ATR"
             ),
             "warning": (
-                "Señal técnica experimental. Verifica datos, "
-                "spread y riesgo antes de operar. "
+                "Feed MT5 externo a Vantage. Verifica precio, spread y riesgo antes de operar. "
                 "No ejecuta órdenes."
             ),
             "cache": {"hit": False, "age_seconds": 0},
@@ -852,7 +791,7 @@ def analysis():
     except requests.RequestException:
         return jsonify({
             "error": (
-                "No se pudo conectar con Twelve Data. "
+                "No se pudo conectar con biquote. "
                 "Inténtalo más tarde."
             )
         }), 502
@@ -1052,8 +991,10 @@ def lab_status():
         subscriptions = exact_count("/rest/v1/push_subscriptions")
         return jsonify({
             "checked_at": datetime.now(timezone.utc).isoformat(),
-            "data_provider": "Twelve Data",
-            "provider_configured": bool(API_KEY),
+            "data_provider": "biquote",
+            "provider_configured": True,
+            "provider_requires_api_key": False,
+            "is_vantage_quote": False,
             "storage_configured": bool(SUPABASE_URL and SUPABASE_SECRET_KEY),
             "engine": {
                 "trend": "EMA 20 / EMA 50",

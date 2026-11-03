@@ -1,0 +1,38 @@
+name: VANTAGE precision offline tests
+
+on:
+  push:
+    branches: [vantage-precision-research]
+    paths:
+      - "research/**"
+      - "tests/test_*precision*.py"
+      - "tests/test_dukascopy_downloader.py"
+      - ".github/workflows/precision-offline-tests.yml"
+      - ".github/workflows/precision-historical-research.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vantage-precision-offline-tests
+  cancel-in-progress: true
+
+jobs:
+  offline-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test-only dependency
+        run: python -m pip install --disable-pip-version-check requests
+      - name: Compile research modules
+        run: |
+          python -m py_compile research/download_dukascopy_m1.py
+          python -m py_compile research/backtest_precision.py
+      - name: Run precision and downloader tests without market-data requests
+        run: |
+          python -m unittest discover -s tests -p "test_*precision*.py" -v
+          python -m unittest discover -s tests -p "test_dukascopy_downloader.py" -v

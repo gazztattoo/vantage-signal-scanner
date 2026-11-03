@@ -126,6 +126,7 @@ def main():
     session = requests.Session()
     session.headers.update({"User-Agent": "VANTAGE-offline-research/1.0"})
     summary = []
+    failures = []
     for display_symbol, instrument in INSTRUMENTS.items():
         all_rows = {}
         scale = None
@@ -134,7 +135,14 @@ def main():
             day = start + dt.timedelta(days=n)
             daily = {}
             for side in ("BID", "ASK"):
-                payload = fetch_day(session, instrument, day, side)
+                try:
+                    payload = fetch_day(session, instrument, day, side)
+                except requests.exceptions.RequestException as exc:
+                    # Keep valid history already downloaded when the provider has a transient outage.
+                    failures.append({"symbol": display_symbol, "date": day.isoformat(), "side": side, "error": str(exc)})
+                    daily[side] = []
+                    print("WARNING: " + display_symbol + " " + day.isoformat() + " " + side + " failed after retries: " + str(exc), flush=True)
+                    continue
                 time.sleep(0.20)
                 if payload is None:
                     daily[side] = []
@@ -165,11 +173,19 @@ def main():
         summary.append({
             "symbol": display_symbol, "instrument": instrument, "scale": scale,
             "days_requested": args.days, "days_with_missing_side": missing,
+            "failed_downloads": sum(1 for x in failures if x["symbol"] == display_symbol),
             "matched_bid_ask_bars": len(rows), "file": str(target) if rows else None,
         })
         print(summary[-1], flush=True)
     summary_path = output / "download_summary.txt"
     summary_path.write_text("\n".join(str(x) for x in summary) + "\n", encoding="utf-8")
+    if failures:
+        failure_path = output / "download_failures.csv"
+        with failure_path.open("w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=["symbol", "date", "side", "error"])
+            writer.writeheader()
+            writer.writerows(failures)
+        print("WARNING: " + str(len(failures)) + " requests failed after retries; see " + str(failure_path), flush=True)
     if not any(x["matched_bid_ask_bars"] for x in summary):
         raise SystemExit("No market data downloaded; refusing an empty successful run")
 

@@ -220,3 +220,42 @@ def evaluate_m15_m5_setup(*, symbol: str, m15: dict, m5: dict,
                     "m5_closed_breakout": True, "m5_strength": True},
         "warning": "Referencia basada en cierre M5; no es cotización Bid/Ask ni orden ejecutable."
     }
+
+
+def precision_frame_from_payload(payload, interval):
+    """Build a closed-candle engine frame from an already cached analysis."""
+    candles = payload.get("recent_candles") or []
+    if len(candles) < 3:
+        return None
+    previous = candles[-4:-1]
+    latest = candles[-1]
+    if len(previous) < 2:
+        return None
+    try:
+        if interval == "5min":
+            previous_high = max(float(item["high"]) for item in previous)
+            previous_low = min(float(item["low"]) for item in previous)
+        else:
+            previous_high = max(float(item["high"]) for item in previous)
+            previous_low = min(float(item["low"]) for item in previous)
+        age_minutes = float(payload.get("candle_age_minutes"))
+        frame = {
+            "ema20": float(payload["ema20"]),
+            "ema50": float(payload["ema50"]),
+            "adx": float(payload["adx14"]),
+            "rsi": float(payload["rsi14"]),
+            "macd_hist": float(payload["macd_histogram"]),
+            "close": float(latest["close"]),
+            "atr": float(payload["atr14"]),
+            "candle_age_seconds": age_minutes * 60,
+            "timeframe_seconds": INTERVAL_MINUTES[interval] * 60,
+            "previous_high": previous_high,
+            "previous_low": previous_low,
+        }
+        if not all(__import__("math").isfinite(value) for value in frame.values()):
+            return None
+        return frame
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return None
+
+

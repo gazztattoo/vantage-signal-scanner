@@ -641,6 +641,19 @@ def analysis():
             "allowed_intervals": sorted(ALLOWED_INTERVALS),
         }), 400
 
+    # Fail closed at the API boundary too: direct/manual callers must not
+    # receive analysis from a market that Vantage MT5 currently reports closed.
+    session = market_session(symbol)
+    if not session["open"]:
+        return jsonify({
+            "error": "MERCADO CERRADO · No se genera análisis ni señal fuera de la sesión habitual.",
+            "market_closed": True,
+            "market_state": session,
+            "symbol": symbol,
+            "interval": interval,
+            "data_provider": "biquote",
+        }), 409
+
     cache_key = (symbol, interval)
     cached = ANALYSIS_CACHE.get(cache_key)
     cache_age = time.monotonic() - cached["stored_at"] if cached else None

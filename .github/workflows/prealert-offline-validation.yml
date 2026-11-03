@@ -1,0 +1,22 @@
+name: Prealert offline validation
+
+on:
+  push:
+    branches: [prealert-production-prep-v2]
+
+permissions:
+  contents: read
+
+jobs:
+  offline-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile production candidate modules
+        run: python -m py_compile app.py prealert_engine.py scripts/replay_prealerts.py
+      - name: Run provider-free prealert tests
+        run: python -m unittest discover -s tests -p "test_prealert*.py" -v

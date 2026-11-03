@@ -99,6 +99,14 @@ def evaluate_prealert(*, symbol, direction, current_price, entry_zone_low, entry
             previous["alert_id"] if previous else _alert_id(symbol, direction, entry_zone_low, entry_zone_high, created),
         ).to_dict()
 
+    # If price has reached the entry zone without full confirmation, the
+    # early warning is already late. Do not create or preserve a prealert
+    # inside the zone while waiting for confirmation.
+    if distance == 0:
+        if previous and previous.get("state") == "PREALERTA":
+            return {**previous, "state": "CANCELADA", "reason": "zona_alcanzada_sin_confirmacion"}
+        return None
+
     # Proximity alone is insufficient: require a fresh prior quote showing
     # movement toward the zone (down for BUY, up for SELL).
     moving_toward_zone = (

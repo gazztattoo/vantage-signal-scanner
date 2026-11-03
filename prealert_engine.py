@@ -1,119 +1,57 @@
-"""Pure, provider-free state machine for VANTAGE early-entry alerts.
+"""Provider-free VANTAGE prealert state machine; accepts local data only."""
+from dataclasses import dataclass, asdict
+from datetime import datetime, timedelta, timezone
 
-This module deliberately does not fetch market data, place orders, send notifications,
-or import the Flask application. Callers must supply a timestamped local snapshot.
-"""
-from __future__ import annotations
+@dataclass(frozen=True)
+class Prealert:
+    state: str
+    direction: str
+    symbol: str
+    entry_zone_low: float
+    entry_zone_high: float
+    current_price: float
+    distance_to_zone: float
+    created_at: str
+    expires_at: str
+    reason: str
+    alert_id: str
+    def to_dict(self):
+        return asdict(self)
 
-from typing import Any, Dict, Optional
+def _utc(value):
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
 
-
-ACTIVE_STATES = {"PREALERTA"}
-TERMINAL_STATES = {"CONFIRMADA", "CANCELADA", "EXPIRADA"}
-
-
-def _result(state: str, previous: Optional[dict], now_ts: float,
-            reason: str, snapshot: dict) -> dict:
-    created_at = (previous or {}).get("created_at", now_ts)
-    return {
-        "state": state,
-        "instrument": snapshot.get("instrument"),
-        "timeframe": snapshot.get("timeframe"),
-        "direction": snapshot.get("direction"),
-        "zone_low": snapshot.get("zone_low"),
-        "zone_high": snapshot.get("zone_high"),
-        "created_at": created_at,
-        "updated_at": now_ts,
-        "reason": reason,
-        "event": state if not previous or previous.get("state") != state else None,
-    }
-
-
-def evaluate_prealert(
-    snapshot: dict,
-    previous: Optional[dict] = None,
-    now_ts: Optional[float] = None,
-) -> dict:
-    """Evaluate one local snapshot and return the next state without side effects.
-
-    Required snapshot fields:
-      instrument, timeframe, timestamp, price, direction, zone_low, zone_high,
-      trend_aligned, momentum_aligned, structure_valid, approach_distance.
-
-    A PREALERTA is an early warning when price approaches (but has not entered)
-    the zone from the expected side. CONFIRMADA means price has entered the zone
-    while all supplied setup conditions remain valid; it is not an order signal.
-    """
-    if now_ts is None:
-        raise ValueError("now_ts is required for deterministic evaluation")
-
-    required = {
-        "instrument", "timeframe", "timestamp", "price", "direction",
-        "zone_low", "zone_high", "trend_aligned", "momentum_aligned",
-        "structure_valid", "approach_distance",
-    }
-    missing = required.difference(snapshot)
-    if missing:
-        raise ValueError(f"missing snapshot fields: {', '.join(sorted(missing))}")
-
-    direction = snapshot["direction"]
-    if direction not in {"BUY", "SELL"}:
-        raise ValueError("direction must be BUY or SELL")
-
-    price = float(snapshot["price"])
-    low = float(snapshot["zone_low"])
-    high = float(snapshot["zone_high"])
-    stamp = float(snapshot["timestamp"])
-    approach = float(snapshot["approach_distance"])
-    if low > high or approach <= 0:
-        raise ValueError("invalid zone or approach_distance")
-
-    previous = previous or None
-    if previous and previous.get("state") in TERMINAL_STATES:
-        return _result(previous["state"], previous, now_ts,
-                       previous.get("reason", "terminal state"), snapshot)
-
-    max_age = float(snapshot.get("max_data_age_seconds", 90))
-    age = float(now_ts) - stamp
-    if age < 0 or age > max_age:
-        return _result("CANCELADA", previous, now_ts,
-                       "datos ausentes, futuros o desactualizados", snapshot)
-
-    valid = bool(snapshot["trend_aligned"] and
-                 snapshot["momentum_aligned"] and
-                 snapshot["structure_valid"])
-    if not valid:
-        return _result("CANCELADA", previous, now_ts,
-                       "la confluencia o la estructura dejó de ser válida",
-                       snapshot)
-
-    inside = low <= price <= high
-    if inside:
-        return _result("CONFIRMADA", previous, now_ts,
-                       "precio dentro de la zona y condiciones vigentes",
-                       snapshot)
-
-    # BUY setups approach the zone from above; SELL setups from below.
-    correct_side = price > high if direction == "BUY" else price < low
-    if not correct_side:
-        return _result("CANCELADA", previous, now_ts,
-                       "el precio atravesó la zona sin confirmación", snapshot)
-
-    distance = price - high if direction == "BUY" else low - price
-    if previous and previous.get("state") == "PREALERTA":
-        ttl = float(snapshot.get("prealert_ttl_seconds", 180))
-        if float(now_ts) - float(previous.get("created_at", now_ts)) > ttl:
-            return _result("EXPIRADA", previous, now_ts,
-                           "venció el tiempo de la prealerta", snapshot)
-
-    if distance <= approach:
-        return _result("PREALERTA", previous, now_ts,
-                       f"precio aproximándose a la zona; distancia={distance:.6g}",
-                       snapshot)
-
-    if previous and previous.get("state") == "PREALERTA":
-        return _result("CANCELADA", previous, now_ts,
-                       "el precio se alejó de la zona de entrada", snapshot)
-
-    return _result("SIN_ALERTA", previous, now_ts,
-                   "todavía fuera del rango de anticipación", snapshot)
+def evaluate_prealert(*, symbol, direction, current_price, entry_zone_low, entry_zone_high,
+                      setup_valid, confirmation_valid, invalidated, data_timestamp, now,
+                      approach_distance, max_data_age_seconds=90, ttl_seconds=180,
+                      previous=None, alert_id="local-test"):
+    """Evaluate a strategy snapshot. Does not promise an exact 60-second lead."""
+    direction=direction.upper()
+    if direction not in {"BUY","SELL"}: raise ValueError("direction must be BUY or SELL")
+    if not symbol or current_price<=0 or approach_distance<0 or ttl_seconds<=0: raise ValueError("invalid input")
+    if entry_zone_low<=0 or entry_zone_high<entry_zone_low: raise ValueError("invalid entry zone")
+    now,data=_utc(now),_utc(data_timestamp)
+    created=_utc(datetime.fromisoformat(previous["created_at"])) if previous and previous.get("created_at") else now
+    expiry=created+timedelta(seconds=ttl_seconds)
+    if (now-data).total_seconds()>max_data_age_seconds or data>now:
+        return ({**previous,"state":"CANCELADA","reason":"datos_obsoletos"}
+                if previous and previous.get("state") in {"PREALERTA","CONFIRMADA"} else None)
+    if previous and previous.get("state") in {"CANCELADA","EXPIRADA","CONFIRMADA"}: return previous
+    if previous and now>=_utc(datetime.fromisoformat(previous["expires_at"])):
+        return {**previous,"state":"EXPIRADA","reason":"ventana_de_prealerta_vencida"}
+    if invalidated or not setup_valid:
+        return ({**previous,"state":"CANCELADA","reason":"configuracion_invalidada"}
+                if previous and previous.get("state")=="PREALERTA" else None)
+    distance=(0.0 if entry_zone_low<=current_price<=entry_zone_high else
+              current_price-entry_zone_high if current_price>entry_zone_high else entry_zone_low-current_price)
+    if confirmation_valid and distance==0:
+        return Prealert("CONFIRMADA",direction,symbol,entry_zone_low,entry_zone_high,current_price,0.0,
+                        created.isoformat(),expiry.isoformat(),"condiciones_confirmadas_en_zona",alert_id).to_dict()
+    if distance>approach_distance:
+        return ({**previous,"state":"CANCELADA","reason":"precio_se_alejo_de_la_zona"}
+                if previous and previous.get("state")=="PREALERTA" else None)
+    if previous and previous.get("state")=="PREALERTA":
+        return {**previous,"current_price":current_price,"distance_to_zone":distance,"reason":"setup_sigue_vigente"}
+    return Prealert("PREALERTA",direction,symbol,entry_zone_low,entry_zone_high,current_price,distance,
+                    now.isoformat(),(now+timedelta(seconds=ttl_seconds)).isoformat(),
+                    "precio_acercandose_a_zona; confirmar_antes_de_entrar",alert_id).to_dict()

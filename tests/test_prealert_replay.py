@@ -17,7 +17,15 @@ class ReplayTests(unittest.TestCase):
         ])
         self.assertEqual(report["alert_lifecycles"], 1)
         self.assertEqual(report["confirmed"], 1)
-        self.assertEqual(report["lead_seconds"]["min"], 40)
+        self.assertEqual(report["lead_seconds"]["min"], 20)
+
+    def test_confirmed_setup_does_not_duplicate_on_following_rows(self):
+        report = replay_rows([
+            row(0, 1.1010), row(20, 1.1008), row(40, 1.1004, confirm=True),
+            row(60, 1.1003, confirm=True)
+        ])
+        self.assertEqual(report["alert_lifecycles"], 1)
+        self.assertEqual(report["confirmed"], 1)
 
     def test_replay_counts_cancellation(self):
         report = replay_rows([row(0, 1.1010), row(20, 1.1008), row(30, 1.1004, invalid=True)])

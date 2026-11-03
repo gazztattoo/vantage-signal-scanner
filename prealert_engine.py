@@ -103,8 +103,8 @@ def evaluate_prealert(*, symbol, direction, current_price, entry_zone_low, entry
     # movement toward the zone (down for BUY, up for SELL).
     moving_toward_zone = (
         previous_price is not None and
-        ((direction == "BUY" and current_price <= previous_price) or
-         (direction == "SELL" and current_price >= previous_price))
+        ((direction == "BUY" and current_price < previous_price) or
+         (direction == "SELL" and current_price > previous_price))
     )
     if distance > approach_distance or not moving_toward_zone:
         if previous and previous.get("state") == "PREALERTA":

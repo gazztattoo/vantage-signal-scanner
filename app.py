@@ -92,7 +92,7 @@ def check_access_token():
 def protect_signal_endpoints():
     if request.method == "OPTIONS":
         return None
-    if request.path not in ("/api/access/check", "/api/analysis", "/api/price", "/api/history", "/api/performance", "/api/lab-status", "/api/push/subscribe", "/api/push/test", "/api/push/unsubscribe"):
+    if request.path not in ("/api/access/check", "/api/analysis", "/api/precision-candidate", "/api/price", "/api/history", "/api/performance", "/api/lab-status", "/api/push/subscribe", "/api/push/test", "/api/push/unsubscribe"):
         return None
     if not ACCESS_TOKEN_SECRET:
         return jsonify({"error": "El acceso privado no está configurado."}), 503
@@ -695,6 +695,97 @@ def price():
         return jsonify({
             "error": "No se pudo consultar el proveedor de precios"
         }), 502
+
+
+
+def _precision_frame_from_payload(payload, interval):
+    """Build a closed-candle engine frame from an already cached analysis."""
+    candles = payload.get("recent_candles") or []
+    if len(candles) < 3:
+        return None
+    previous = candles[-4:-1]
+    latest = candles[-1]
+    if len(previous) < 2:
+        return None
+    try:
+        if interval == "5min":
+            previous_high = max(float(item["high"]) for item in previous)
+            previous_low = min(float(item["low"]) for item in previous)
+        else:
+            previous_high = max(float(item["high"]) for item in previous)
+            previous_low = min(float(item["low"]) for item in previous)
+        age_minutes = float(payload.get("candle_age_minutes"))
+        frame = {
+            "ema20": float(payload["ema20"]),
+            "ema50": float(payload["ema50"]),
+            "adx": float(payload["adx14"]),
+            "rsi": float(payload["rsi14"]),
+            "macd_hist": float(payload["macd_histogram"]),
+            "close": float(latest["close"]),
+            "atr": float(payload["atr14"]),
+            "candle_age_seconds": age_minutes * 60,
+            "timeframe_seconds": INTERVAL_MINUTES[interval] * 60,
+            "previous_high": previous_high,
+            "previous_low": previous_low,
+        }
+        if not all(__import__("math").isfinite(value) for value in frame.values()):
+            return None
+        return frame
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return None
+
+
+@app.route("/api/precision-candidate", methods=["GET"])
+def precision_candidate():
+    """Read-only M15/M5 quality gate. Never fetches provider data."""
+    symbol = get_symbol(request.args.get("symbol"))
+    if not symbol:
+        return jsonify({"error": "Símbolo no permitido."}), 400
+
+    m5_cached = ANALYSIS_CACHE.get((symbol, "5min"))
+    m15_cached = ANALYSIS_CACHE.get((symbol, "15min"))
+    if not m5_cached or not m15_cached:
+        return jsonify({
+            "symbol": symbol, "signal": "ESPERAR", "quality": "INSUFICIENTE",
+            "reason": "Falta M5 o M15 en caché; no se solicitan datos adicionales.",
+            "cache_only": True,
+        })
+
+    now_mono = time.monotonic()
+    frames = {}
+    for interval, cached in (("5min", m5_cached), ("15min", m15_cached)):
+        age = now_mono - cached["stored_at"]
+        payload = cached["payload"]
+        candle_age = float(payload.get("candle_age_minutes", 9999)) + age / 60
+        maximum = INTERVAL_MINUTES[interval] * 2 + 1.5
+        if age > ANALYSIS_CACHE_TTL_SECONDS[interval] or candle_age > maximum:
+            return jsonify({
+                "symbol": symbol, "signal": "ESPERAR", "quality": "INSUFICIENTE",
+                "reason": f"El análisis {interval} está vencido; se necesita el siguiente ciclo normal.",
+                "cache_only": True,
+            })
+        updated_payload = dict(payload)
+        updated_payload["candle_age_minutes"] = candle_age
+        frames[interval] = _precision_frame_from_payload(updated_payload, interval)
+        if frames[interval] is None:
+            return jsonify({
+                "symbol": symbol, "signal": "ESPERAR", "quality": "INSUFICIENTE",
+                "reason": f"Faltan indicadores o velas válidas en {interval}.",
+                "cache_only": True,
+            })
+
+    from precision_engine_v2 import evaluate_m15_m5_setup
+    result = evaluate_m15_m5_setup(
+        symbol=symbol, m15=frames["15min"], m5=frames["5min"]
+    )
+    result["cache_only"] = True
+    result["timeframes"] = ["15min", "5min"]
+    result["execution_ready"] = False
+    result["warning"] = (
+        "Referencia calculada con velas cerradas en caché. "
+        "No es cotización Bid/Ask ni orden ejecutable en MT5."
+    )
+    return jsonify(result)
 
 
 @app.route("/api/analysis")

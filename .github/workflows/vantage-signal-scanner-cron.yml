@@ -1,6 +1,8 @@
-name: Vantage Signal Scanner (cada 10 minutos; escaneo escalonado)
+name: GLOBAL SIGNAL SCANNER — producción (cada 10 minutos)
 
 on:
+  # Se activa al integrar esta migración Biquote validada; el endpoint omite mercados cerrados.
+  # El job solo consulta M5/M15; M30 permanece manual.
   schedule:
     - cron: "*/10 * * * *"
   workflow_dispatch:

@@ -6,13 +6,19 @@ NOW = datetime(2026, 11, 3, 12, 0, tzinfo=timezone.utc)
 BASE = dict(symbol="EUR/USD", direction="BUY", current_price=1.1008,
     entry_zone_low=1.1000, entry_zone_high=1.1005, setup_valid=True,
     confirmation_valid=False, invalidated=False, data_timestamp=NOW,
-    now=NOW, approach_distance=0.0005)
+    now=NOW, approach_distance=0.0005, previous_price=1.1010)
 
 class PrealertTests(unittest.TestCase):
     def test_buy_approaches_from_above(self):
         r = evaluate_prealert(**BASE)
         self.assertEqual(r["state"], "PREALERTA")
         self.assertGreater(r["distance_to_zone"], 0)
+
+    def test_buy_moving_away_does_not_create_prealert(self):
+        self.assertIsNone(evaluate_prealert(**{**BASE, "previous_price": 1.1007}))
+
+    def test_no_previous_quote_does_not_claim_approach(self):
+        self.assertIsNone(evaluate_prealert(**{k:v for k,v in BASE.items() if k != "previous_price"}))
 
     def test_price_too_far(self):
         self.assertIsNone(evaluate_prealert(**{**BASE, "current_price": 1.1020}))
@@ -23,6 +29,15 @@ class PrealertTests(unittest.TestCase):
     def test_sell_approaches_from_below(self):
         r = evaluate_prealert(**{**BASE, "direction": "SELL", "current_price": 1.0997})
         self.assertEqual(r["state"], "PREALERTA")
+
+    def test_sell_moving_toward_zone(self):
+        r = evaluate_prealert(**{**BASE, "direction": "SELL", "current_price": 1.0997,
+            "previous_price": 1.0995})
+        self.assertEqual(r["state"], "PREALERTA")
+
+    def test_sell_moving_away_does_not_create_prealert(self):
+        self.assertIsNone(evaluate_prealert(**{**BASE, "direction": "SELL",
+            "current_price": 1.0997, "previous_price": 1.1000}))
 
     def test_sell_already_above_zone_is_not_prealerted(self):
         self.assertIsNone(evaluate_prealert(**{**BASE, "direction": "SELL", "current_price": 1.1008}))

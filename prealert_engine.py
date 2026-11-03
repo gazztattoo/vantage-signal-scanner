@@ -40,7 +40,7 @@ def _alert_id(symbol, direction, low, high, created_at):
 def evaluate_prealert(*, symbol, direction, current_price, entry_zone_low, entry_zone_high,
                       setup_valid, confirmation_valid, invalidated, data_timestamp, now,
                       approach_distance, max_data_age_seconds=90, ttl_seconds=180,
-                      previous=None):
+                      previous_price=None, previous=None):
     """Evaluate one snapshot; a prealert is not a promise of entry in 60 seconds."""
     direction = direction.upper()
     if direction not in {"BUY", "SELL"}:
@@ -99,7 +99,14 @@ def evaluate_prealert(*, symbol, direction, current_price, entry_zone_low, entry
             previous["alert_id"] if previous else _alert_id(symbol, direction, entry_zone_low, entry_zone_high, created),
         ).to_dict()
 
-    if distance > approach_distance:
+    # Proximity alone is insufficient: require a fresh prior quote showing
+    # movement toward the zone (down for BUY, up for SELL).
+    moving_toward_zone = (
+        previous_price is not None and
+        ((direction == "BUY" and current_price <= previous_price) or
+         (direction == "SELL" and current_price >= previous_price))
+    )
+    if distance > approach_distance or not moving_toward_zone:
         if previous and previous.get("state") == "PREALERTA":
             return {**previous, "state": "CANCELADA", "reason": "precio_se_alejo_de_la_zona"}
         return None
@@ -112,6 +119,6 @@ def evaluate_prealert(*, symbol, direction, current_price, entry_zone_low, entry
         "PREALERTA", direction, symbol, entry_zone_low, entry_zone_high,
         current_price, distance, now.isoformat(),
         (now + timedelta(seconds=ttl_seconds)).isoformat(),
-        "precio_acercandose_a_zona; confirmar_antes_de_entrar",
+        "proximidad_y_movimiento_hacia_zona; confirmar_antes_de_entrar",
         _alert_id(symbol, direction, entry_zone_low, entry_zone_high, now),
     ).to_dict()

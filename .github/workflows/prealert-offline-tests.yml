@@ -18,3 +18,5 @@ jobs:
           python-version: "3.12"
       - name: Run provider-free prealert tests
         run: python -m unittest discover -s tests -p "test_prealert*.py" -v
+
+# Trigger offline validation after workflow registration.

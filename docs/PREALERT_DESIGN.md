@@ -28,6 +28,7 @@ Las transiciones terminales se mantienen idempotentes para evitar reactivar una 
 - SELL: el precio debe aproximarse desde abajo; si ya cruzó por encima de la zona, no se crea una prealerta tardía.
 - La proximidad sin una cotización anterior que demuestre movimiento hacia la zona no basta.
 - Una señal confirmada requiere que el motor de estrategia externo indique confirmación y que el precio esté dentro de la zona.
+- Si el precio entra en la zona sin confirmación completa, no se emite una prealerta tardía; una prealerta activa se cancela con motivo `zona_alcanzada_sin_confirmacion`.
 
 ## Frescura de datos y créditos
 

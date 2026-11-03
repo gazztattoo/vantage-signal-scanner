@@ -666,9 +666,9 @@ function render(m,d,err,marketClosed=false){
         ?{t:"VENTA",c:"sell"}
         :{t:raw.includes("WAIT")?"ESPERAR":raw,c:""};
 
-  const entry=first(d,["entry","price"]);
-  const sl=first(d,["stop_loss","stopLoss","sl"]);
-  const tp=first(d,["take_profit","takeProfit","tp"]);
+  let entry=first(d,["entry","price"]);
+  let sl=first(d,["stop_loss","stopLoss","sl"]);
+  let tp=first(d,["take_profit","takeProfit","tp"]);
   const interval=first(d,["interval"])||document.getElementById("interval").value;
   const candleAge=Number(first(d,["candle_age_minutes"]));
   const maxCandleAge=({ "5min":11.5, "15min":31.5, "30min":61.5 })[interval]||0;
@@ -676,6 +676,7 @@ function render(m,d,err,marketClosed=false){
   if((s.t==="COMPRA"||s.t==="VENTA")&&!signalFresh){
     s.t="SEÑAL ANTIGUA";
     s.c="";
+    entry=null; sl=null; tp=null;
   }
   const hasCandidate=s.t==="COMPRA"||s.t==="VENTA";
   const reason=first(

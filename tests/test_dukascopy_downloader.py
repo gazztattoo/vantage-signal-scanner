@@ -2,8 +2,10 @@ import datetime as dt
 import lzma
 import struct
 import unittest
+from unittest.mock import patch
 
-from research.download_dukascopy_m1 import decode_day, detect_scale
+import requests
+from research.download_dukascopy_m1 import decode_day, detect_scale, fetch_day
 
 RECORD = struct.Struct(">IIIIIf")
 
@@ -33,6 +35,46 @@ class DukascopyDecoderTests(unittest.TestCase):
         payload = self.payload(1, 2, 1, 2)
         with self.assertRaises(ValueError):
             detect_scale(payload, "BTC/USD")
+
+    def test_retries_temporary_503_then_succeeds(self):
+        class Response:
+            def __init__(self, status, content=b"payload"):
+                self.status_code = status
+                self.content = content
+                self.headers = {}
+
+            def raise_for_status(self):
+                if self.status_code >= 400:
+                    raise requests.HTTPError(f"HTTP {self.status_code}")
+
+        class Session:
+            def __init__(self):
+                self.responses = [Response(503), Response(200)]
+
+            def get(self, url, timeout):
+                return self.responses.pop(0)
+
+        with patch("research.download_dukascopy_m1.time.sleep") as sleep:
+            payload = fetch_day(Session(), "EURUSD", dt.date(2026, 10, 1), "BID")
+        self.assertEqual(payload, b"payload")
+        sleep.assert_called_once()
+
+    def test_404_is_treated_as_missing_data_without_retry(self):
+        class Response:
+            status_code = 404
+            content = b""
+            headers = {}
+
+            def raise_for_status(self):
+                raise requests.HTTPError("404")
+
+        class Session:
+            def get(self, url, timeout):
+                return Response()
+
+        with patch("research.download_dukascopy_m1.time.sleep") as sleep:
+            self.assertIsNone(fetch_day(Session(), "EURUSD", dt.date(2026, 10, 1), "ASK"))
+        sleep.assert_not_called()
 
 
 if __name__ == "__main__":

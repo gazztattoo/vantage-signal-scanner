@@ -12,6 +12,8 @@ on:
     paths:
       - "research/download_dukascopy_m1.py"
       - "tests/test_dukascopy_downloader.py"
+      - "research/backtest_precision.py"
+      - "tests/test_precision_backtest.py"
       - ".github/workflows/precision-historical-research.yml"
 
 permissions:
@@ -40,7 +42,17 @@ jobs:
         run: python -m unittest discover -s tests -p "test_*precision*.py" -v && python -m unittest discover -s tests -p "test_dukascopy_downloader.py" -v
       - name: Download public historical bid/ask candles
         run: python research/download_dukascopy_m1.py --days "${{ inputs.days || '28' }}"
-      - name: Upload research dataset
+      - name: Run spread-aware strategy experiments
+        run: |
+          for symbol in EURUSD XAUUSD BTCUSD; do
+            input="research_data/dukascopy_m1/${symbol}_M1_BID_ASK.csv"
+            if [ -s "$input" ]; then
+              python research/backtest_precision.py "$input" --symbol "$symbol" --out "research_data/dukascopy_m1/${symbol}_precision_report.json"
+            else
+              echo "No BID/ASK history for $symbol; skipping this instrument."
+            fi
+          done
+      - name: Upload research dataset and reports
         uses: actions/upload-artifact@v4
         with:
           name: vantage-dukascopy-m1-bid-ask

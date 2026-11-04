@@ -1,0 +1,97 @@
+name: Biquote live validation (read-only)
+
+on:
+  # Manual only: no unattended Biquote reads. Run only after Carlos explicitly approves.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate live Biquote quotes and OHLC (10 requests max)
+        run: |
+          python - <<'PY'
+          import json
+          import sys
+          from datetime import datetime, timezone
+          from urllib.parse import urlencode
+          from urllib.request import Request, urlopen
+
+          BASE = "https://biquote.io"
+          SYMBOLS = ("EURUSD", "XAUUSD", "BTCUSD")
+          INTERVALS = {"5m": 5, "15m": 15, "30m": 30}
+          failures = []
+
+          def get_json(path, params=None):
+              url = BASE + path
+              if params:
+                  url += "?" + urlencode(params, doseq=True)
+              req = Request(url, headers={"User-Agent": "GlobalSignalScanner-Biquote-Validation/1.0"})
+              with urlopen(req, timeout=20) as response:
+                  if response.status != 200:
+                      raise RuntimeError(f"HTTP {response.status}")
+                  return json.loads(response.read().decode("utf-8"))
+
+          # One read-only XAU quote request, using the exact endpoint and schema
+          # consumed by app.py. Together with nine OHLC requests this is 10 max.
+          try:
+              quote = get_json("/api/XAUUSD", {"allowStale": "false"})
+              bid, ask = float(quote["bid"]), float(quote["ask"])
+              stamp = datetime.fromisoformat(str(quote["timestamp"]).replace("Z", "+00:00"))
+              if stamp.tzinfo is None:
+                  raise RuntimeError("timestamp de cotización sin zona horaria")
+              quote_age = (datetime.now(timezone.utc) - stamp.astimezone(timezone.utc)).total_seconds()
+              if bid <= 0 or ask < bid:
+                  raise RuntimeError("Bid/Ask inválidos")
+              if quote.get("stale") or quote.get("marketState") != "open":
+                  raise RuntimeError(f"mercado cerrado o cotización stale (state={quote.get('marketState')})")
+              if quote_age < -5 or quote_age > 90:
+                  raise RuntimeError(f"cotización antigua/futura (age={quote_age:.1f}s)")
+              print(f"QUOTE XAUUSD: bid={bid} ask={ask} state={quote.get('marketState')} age_s={quote_age:.1f}")
+          except Exception as exc:
+              failures.append(f"XAUUSD quote: {type(exc).__name__}: {exc}")
+
+          # Nine read-only OHLC requests: 3 instruments x 3 timeframes.
+          for symbol in SYMBOLS:
+              for interval, minutes in INTERVALS.items():
+                  try:
+                      payload = get_json(f"/api/{symbol}/ohlc", {"interval": interval, "limit": 120})
+                      bars = payload.get("bars") if isinstance(payload, dict) else None
+                      if not isinstance(bars, list):
+                          raise RuntimeError("No existe el array bars")
+                      closed = [b for b in bars if isinstance(b, dict) and b.get("isOpen") is False]
+                      if len(closed) < 55:
+                          raise RuntimeError(f"Solo {len(closed)} velas cerradas; se requieren al menos 55")
+                      newest = max(closed, key=lambda b: b.get("openTime", ""))
+                      stamp = datetime.fromisoformat(str(newest["openTime"]).replace("Z", "+00:00"))
+                      if stamp.tzinfo is None:
+                          raise RuntimeError("openTime sin zona horaria")
+                      age_minutes = (datetime.now(timezone.utc) - stamp.astimezone(timezone.utc)).total_seconds() / 60
+                      max_age = minutes * 2 + 3
+                      if age_minutes < -minutes or age_minutes > max_age:
+                          raise RuntimeError(f"Última vela cerrada antigua/futura: {age_minutes:.1f} min (máx. {max_age})")
+                      for field in ("open", "high", "low", "close"):
+                          value = newest.get(field)
+                          if not isinstance(value, (int, float)) or value <= 0:
+                              raise RuntimeError(f"Campo {field} inválido")
+                      if newest["high"] < max(newest["open"], newest["close"]) or newest["low"] > min(newest["open"], newest["close"]):
+                          raise RuntimeError("OHLC inconsistente")
+                      print(f"OHLC {symbol} {interval}: closed={len(closed)} newest={newest['openTime']} age_min={age_minutes:.1f}")
+                  except Exception as exc:
+                      failures.append(f"{symbol} {interval}: {type(exc).__name__}: {exc}")
+
+          if failures:
+              print("ISSUES:")
+              for failure in failures:
+                  print(" - " + failure)
+              sys.exit(1)
+          print("PASS: XAUUSD live quote and all nine OHLC combinations are fresh and valid (10 read-only requests max).")
+          PY

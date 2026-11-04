@@ -14,6 +14,12 @@ class BiQuoteProviderTests(unittest.TestCase):
         self.client = app.test_client()
         self.token = access_serializer().dumps({"access": True})
         self.headers = {"Authorization": "Bearer " + self.token}
+        quota = patch("app.reserve_biquote_request", return_value={
+            "allowed": True, "used": 1, "daily_limit": 100,
+            "remaining": 99, "reset_at_utc": "2026-11-05T00:00:00+00:00",
+        })
+        quota.start()
+        self.addCleanup(quota.stop)
 
     def _bars(self, interval_minutes=5, count=60):
         now = datetime.now(timezone.utc)

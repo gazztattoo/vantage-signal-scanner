@@ -1,10 +1,8 @@
-name: GLOBAL SIGNAL SCANNER — producción (cada 10 minutos)
+name: GLOBAL SIGNAL SCANNER — producción (pausado)
 
 on:
-  # Se activa al integrar esta migración Biquote validada; el endpoint omite mercados cerrados.
-  # El job solo consulta M5/M15; M30 permanece manual.
-  schedule:
-    - cron: "*/10 * * * *"
+  # Producción permanece pausada tras el despliegue. Solo ejecución manual
+  # después de autorización explícita de Carlos; no activar schedule aquí.
   workflow_dispatch:
 
 permissions:

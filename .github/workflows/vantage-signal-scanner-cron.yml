@@ -1,8 +1,8 @@
-name: Vantage Signal Scanner (cada 10 minutos; escaneo escalonado)
+name: GLOBAL SIGNAL SCANNER — producción (pausado)
 
 on:
-  # Production scanning stays paused until Carlos explicitly reactivates it.
-  # Manual dispatch is retained for an intentionally authorized run only.
+  # Producción permanece pausada tras el despliegue. Solo ejecución manual
+  # después de autorización explícita de Carlos; no activar schedule aquí.
   workflow_dispatch:
 
 permissions:

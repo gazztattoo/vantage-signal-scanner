@@ -1,7 +1,7 @@
 """Safe entry point for the scheduled production scanner.
 
 Runs one market/timeframe per HTTP request and spaces requests to respect
-the free Twelve Data limit of 8 credits per minute. It never places broker orders.
+the external Biquote feed without consuming Twelve Data credits. It never places broker orders.
 """
 import os
 import sys
@@ -55,8 +55,8 @@ def main():
     started_at = datetime.now(timezone.utc)
     # Ejecutar M5 y M15 en cada ciclo de GitHub Actions.
     # No dependemos del minuto exacto de inicio (GitHub puede retrasar
-    # los cron): la caché del API limita las consultas reales a Twelve Data
-    # con TTL de 18 min para M5 y 28 min para M15.
+    # los cron): el backend usa Biquote y rechaza cotizaciones/velas antiguas.
+    # No hay fallback a Twelve Data; TEST no utiliza proveedores live.
     # M30 queda reservado exclusivamente al análisis manual del panel.
     due_intervals = ["5min", "15min"]
 
@@ -68,7 +68,7 @@ def main():
 
     for interval in due_intervals:
         for symbol in symbols:
-            # Keep at least 9 seconds between requests.
+            # Separar las llamadas para no sobrecargar el proveedor ni la API.
             if request_count:
                 time.sleep(9)
             request_count += 1

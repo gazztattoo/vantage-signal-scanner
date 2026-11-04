@@ -1,0 +1,43 @@
+name: Biquote API safety regression tests
+
+on:
+  push:
+    branches: [biquote-production-ready]
+    paths:
+      - "app.py"
+      - "tests/test_biquote_provider.py"
+      - "tests/test_market_session.py"
+      - "tests/test_api_safety.py"
+      - ".github/workflows/biquote-api-regression.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "app.py"
+      - "tests/test_biquote_provider.py"
+      - "tests/test_market_session.py"
+      - "tests/test_api_safety.py"
+      - ".github/workflows/biquote-api-regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: pip install flask requests flask-cors itsdangerous
+      - name: Run no-network API and market-session regression tests
+        env:
+          ACCESS_TOKEN_SECRET: regression-test-secret
+          PANEL_ACCESS_CODE: regression-test-code
+        run: |
+          python -m unittest discover -s tests -p "test_biquote_provider.py" -v
+          python -m unittest discover -s tests -p "test_market_session.py" -v
+          python -m unittest discover -s tests -p "test_api_safety.py" -v

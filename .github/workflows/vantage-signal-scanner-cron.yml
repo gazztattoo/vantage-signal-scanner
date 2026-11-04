@@ -1,10 +1,10 @@
 name: GLOBAL SIGNAL SCANNER — prueba controlada de 7 días
 
 on:
-  # Prueba autorizada: un ciclo cada 2 horas. El script aplica un corte UTC
-  # obligatorio para que ninguna ejecución consulte la API fuera de la ventana.
+  # Prueba autorizada: un ciclo cada 2 horas, fuera del minuto 00 para
+  # reducir retrasos de alta demanda de GitHub Actions. Corte UTC en el runner.
   schedule:
-    - cron: "0 */2 * * *"
+    - cron: "17 */2 * * *"
   workflow_dispatch:
 
 permissions:

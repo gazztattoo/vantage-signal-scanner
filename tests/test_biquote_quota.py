@@ -1,4 +1,5 @@
 import unittest
+import requests
 from unittest.mock import Mock, patch
 
 import biquote_quota
@@ -52,7 +53,7 @@ class BiquoteQuotaTests(unittest.TestCase):
 
     @patch("biquote_quota.requests.post")
     def test_fails_closed_when_supabase_is_unavailable(self, post):
-        post.side_effect = TimeoutError("simulated timeout")
+        post.side_effect = requests.Timeout("simulated timeout")
         with self.assertRaises(biquote_quota.BiquoteQuotaError):
             biquote_quota.reserve_biquote_request()
 

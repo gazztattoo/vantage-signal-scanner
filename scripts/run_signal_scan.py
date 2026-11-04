@@ -45,6 +45,31 @@ def write_step_summary(lines):
 
 
 def main():
+    # Fail closed: no hay consultas a la API si la ventana de prueba falta,
+    # tiene formato inválido o ya terminó.
+    start_raw = os.environ.get("SCANNER_TRIAL_START_UTC", "").strip()
+    end_raw = os.environ.get("SCANNER_TRIAL_END_UTC", "").strip()
+    try:
+        trial_start = datetime.fromisoformat(start_raw.replace("Z", "+00:00"))
+        trial_end = datetime.fromisoformat(end_raw.replace("Z", "+00:00"))
+        if trial_start.tzinfo is None or trial_end.tzinfo is None or trial_end <= trial_start:
+            raise ValueError("trial timestamps must be timezone-aware and ordered")
+    except ValueError:
+        print("Invalid or missing scanner trial window; refusing to contact the API.", file=sys.stderr)
+        return 2
+
+    now = datetime.now(timezone.utc)
+    if now < trial_start.astimezone(timezone.utc):
+        message = f"Trial has not started; no scan sent. Starts at {trial_start.astimezone(timezone.utc).isoformat()}."
+        print(message, flush=True)
+        write_step_summary(["## GLOBAL SIGNAL SCANNER", f"- {message}"])
+        return 0
+    if now >= trial_end.astimezone(timezone.utc):
+        message = f"Trial ended; automatic stop active. No scan sent. Ended at {trial_end.astimezone(timezone.utc).isoformat()}."
+        print(message, flush=True)
+        write_step_summary(["## GLOBAL SIGNAL SCANNER", f"- {message}"])
+        return 0
+
     base_url = os.environ.get("SCANNER_API_URL", "").strip().rstrip("/")
     secret = os.environ.get("SIGNAL_CRON_SECRET", "").strip()
     if not base_url or not secret:

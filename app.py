@@ -12,6 +12,8 @@ import hmac
 import logging
 import threading
 
+from biquote_quota import BiquoteQuotaError, reserve_biquote_request, get_biquote_usage
+
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
 CORS(app, resources={
@@ -514,6 +516,8 @@ def fetch_candles(symbol, interval):
     """Obtiene velas OHLC desde biquote; nunca usa velas Twelve Data como fallback."""
     provider_symbol = {"EUR/USD": "EURUSD", "XAU/USD": "XAUUSD", "BTC/USD": "BTCUSD"}[symbol]
     provider_interval = {"5min": "5m", "15min": "15m", "30min": "30m"}[interval]
+    # Count every outbound attempt globally; cached analysis never reaches here.
+    reserve_biquote_request()
     response = requests.get(
         f"https://biquote.io/api/{provider_symbol}/ohlc",
         params={"interval": provider_interval, "limit": 120},
@@ -578,14 +582,25 @@ def health():
 
 @app.route("/api/credits/status")
 def credits_status():
+    try:
+        usage = get_biquote_usage()
+    except BiquoteQuotaError as exc:
+        return jsonify({
+            "provider": "biquote",
+            "twelve_data_consumed": False,
+            "quota_status": "unavailable_fail_closed",
+            "error": str(exc),
+        }), 503
     return jsonify({
         "provider": "biquote",
         "twelve_data_consumed": False,
-        "note": "El proveedor activo de mercado es externo; no es una cotización Vantage.",
-        "daily_limit": TWELVE_DATA_DAILY_LIMIT,
-        "warning_threshold": int(TWELVE_DATA_DAILY_LIMIT * 0.70),
-        "critical_threshold": TWELVE_DATA_HARD_STOP,
-        **TWELVE_DATA_CREDITS,
+        "note": "El proveedor activo es externo; no es una cotización Vantage.",
+        "biquote_requests_used": usage["used"],
+        "biquote_daily_limit": usage["daily_limit"],
+        "biquote_requests_left": usage["remaining"],
+        "biquote_blocked": not usage["allowed"],
+        "reset_at_utc": usage["reset_at_utc"],
+        "quota_status": "ok",
     })
 
 
@@ -596,6 +611,8 @@ def price():
         return jsonify({"error": "Símbolo no permitido", "allowed_symbols": sorted(ALLOWED_SYMBOLS)}), 400
     provider_symbol = {"EUR/USD": "EURUSD", "XAU/USD": "XAUUSD", "BTC/USD": "BTCUSD"}[symbol]
     try:
+        # Quote calls share the same global daily budget as OHLC calls.
+        reserve_biquote_request()
         response = requests.get(
             f"https://biquote.io/api/{provider_symbol}",
             params={"allowStale": "false"},
@@ -618,6 +635,8 @@ def price():
             "quote_age_seconds": round(age, 1), "source": data.get("source", "biquote"),
             "market_state": data.get("marketState"), "is_vantage_quote": False
         })
+    except BiquoteQuotaError as exc:
+        return jsonify({"error": str(exc), "provider": "biquote", "quota_blocked": True}), 429
     except (requests.RequestException, ValueError, KeyError, TypeError):
         return jsonify({"error": "No se pudo obtener una cotización Bid/Ask reciente del proveedor externo."}), 502
 
@@ -787,6 +806,13 @@ def analysis():
             "payload": payload,
         }
         return jsonify(payload)
+
+    except BiquoteQuotaError as exc:
+        return jsonify({
+            "error": str(exc),
+            "provider": "biquote",
+            "quota_blocked": True,
+        }), 429
 
     except requests.RequestException:
         return jsonify({

@@ -5,6 +5,8 @@ on:
     branches: [biquote-production-ready]
     paths:
       - "app.py"
+      - "biquote_quota.py"
+      - "tests/test_biquote_quota.py"
       - "tests/test_biquote_provider.py"
       - "tests/test_market_session.py"
       - "tests/test_api_safety.py"
@@ -41,3 +43,4 @@ jobs:
           python -m unittest discover -s tests -p "test_biquote_provider.py" -v
           python -m unittest discover -s tests -p "test_market_session.py" -v
           python -m unittest discover -s tests -p "test_api_safety.py" -v
+          python -m unittest discover -s tests -p "test_biquote_quota.py" -v

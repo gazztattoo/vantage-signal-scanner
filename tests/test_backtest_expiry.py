@@ -1,0 +1,51 @@
+import unittest
+from unittest.mock import patch
+
+from tools import backtest_current_strategy as backtest
+
+
+class BacktestExpiryOutcomeTests(unittest.TestCase):
+    def candles(self, count=125, final_close=105.0):
+        result = []
+        for index in range(count):
+            close = final_close if index == 101 else 100.0
+            result.append({
+                "time": f"2026-10-01T{index // 12:02d}:{(index % 12) * 5:02d}:00+00:00",
+                "open": 100.0,
+                "high": max(100.0, close) + 1.0,
+                "low": min(100.0, close) - 1.0,
+                "close": close,
+            })
+        return result
+
+    def test_expired_buy_uses_close_to_calculate_r(self):
+        signal = {"side": "BUY", "entry": 100.0, "sl": 90.0,
+                  "tp": 120.0, "adx": 25.0, "score": 3}
+        with patch.object(backtest, "build_signal", side_effect=[signal] + [None] * 30):
+            result = backtest.run_backtest(self.candles(), expiry=2)
+        trade = result["trades"][0]
+        self.assertEqual(trade["outcome"], "EXPIRED")
+        self.assertEqual(trade["exit_price"], 105.0)
+        self.assertEqual(trade["result_r"], 0.5)
+
+    def test_expired_sell_uses_close_to_calculate_r(self):
+        signal = {"side": "SELL", "entry": 100.0, "sl": 110.0,
+                  "tp": 80.0, "adx": 25.0, "score": 3}
+        with patch.object(backtest, "build_signal", side_effect=[signal] + [None] * 30):
+            result = backtest.run_backtest(self.candles(final_close=95.0), expiry=2)
+        trade = result["trades"][0]
+        self.assertEqual(trade["outcome"], "EXPIRED")
+        self.assertEqual(trade["exit_price"], 95.0)
+        self.assertEqual(trade["result_r"], 0.5)
+
+    def test_incomplete_expiry_window_is_not_counted_as_expired(self):
+        signal = {"side": "BUY", "entry": 100.0, "sl": 90.0,
+                  "tp": 120.0, "adx": 25.0, "score": 3}
+        with patch.object(backtest, "build_signal", return_value=signal):
+            result = backtest.run_backtest(self.candles(count=101), expiry=2)
+        self.assertEqual(result["summary"]["signals_traded"], 0)
+        self.assertEqual(result["summary"]["expired"], 0)
+
+
+if __name__ == "__main__":
+    unittest.main()

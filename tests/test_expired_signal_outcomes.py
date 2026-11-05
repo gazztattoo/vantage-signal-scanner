@@ -19,11 +19,10 @@ class ExpiredSignalOutcomeTests(unittest.TestCase):
         # Signal candle opens at 00:00 UTC. The following 24 candles
         # are five-minute candles and none touches SL=90 or TP=120.
         for index in range(1, 25):
+            minute = index * 5
             close = final_close if index == 24 else 100.0
             candles.append({
-                "time": f"2026-10-01T00:{index * 5:02d}:00+00:00"
-                if index * 5 < 60 else
-                f"2026-10-01T{index * 5 // 60:02d}:{index * 5 % 60:02d}:00+00:00",
+                "time": f"2026-10-01T{minute // 60:02d}:{minute % 60:02d}:00+00:00",
                 "open": 100.0,
                 "high": max(100.0, close) + 1.0,
                 "low": min(100.0, close) - 1.0,
@@ -43,11 +42,11 @@ class ExpiredSignalOutcomeTests(unittest.TestCase):
             "status": "PENDIENTE",
         }]
         patch_response = Mock(status_code=204)
-        with patch.object(app.requests, "get", return_value=pending_response), \\
-             patch.object(app.requests, "patch", return_value=patch_response) as patch_call:
-            result = app.resolve_pending_signal_outcomes(
-                "EUR/USD", "5min", self.make_candles(final_close)
-            )
+        with patch.object(app.requests, "get", return_value=pending_response):
+            with patch.object(app.requests, "patch", return_value=patch_response) as patch_call:
+                result = app.resolve_pending_signal_outcomes(
+                    "EUR/USD", "5min", self.make_candles(final_close)
+                )
         return result, patch_call.call_args.kwargs["json"]
 
     def test_expired_buy_is_marked_to_market(self):
@@ -74,11 +73,11 @@ class ExpiredSignalOutcomeTests(unittest.TestCase):
             "take_profit": 120.0,
             "status": "PENDIENTE",
         }]
-        with patch.object(app.requests, "get", return_value=pending_response), \\
-             patch.object(app.requests, "patch") as patch_call:
-            result = app.resolve_pending_signal_outcomes(
-                "EUR/USD", "5min", self.make_candles(105.0)
-            )
+        with patch.object(app.requests, "get", return_value=pending_response):
+            with patch.object(app.requests, "patch") as patch_call:
+                result = app.resolve_pending_signal_outcomes(
+                    "EUR/USD", "5min", self.make_candles(105.0)
+                )
         self.assertEqual(result["errors"], 1)
         patch_call.assert_not_called()
 

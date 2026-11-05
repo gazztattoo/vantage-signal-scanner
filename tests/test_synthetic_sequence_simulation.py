@@ -64,7 +64,8 @@ class SyntheticSequenceSimulationTests(unittest.TestCase):
         self.assertEqual(candidate["quality"], "CANDIDATA")
         future = [
             {"open": 101.8, "high": 103.0, "low": 101.2, "close": 102.8},
-            {"open": 102.8, "high": 105.2, "low": 102.4, "close": 104.9},
+            {"open": 102.8, "high": candidate["take_profit_reference"] + 0.1,
+             "low": 102.4, "close": candidate["take_profit_reference"]},
         ]
         self.assertEqual(resolve_future_outcome(candidate, future), "TP")
 
@@ -72,7 +73,9 @@ class SyntheticSequenceSimulationTests(unittest.TestCase):
         candidate = evaluate_closed_m5(self.breakout, self.history)
         self.assertEqual(candidate["signal"], "BUY")
         future = [
-            {"open": 101.8, "high": 102.0, "low": 99.9, "close": 100.2},
+            {"open": 101.8, "high": 102.0,
+             "low": candidate["stop_loss_reference"] - 0.1,
+             "close": candidate["stop_loss_reference"]},
         ]
         self.assertEqual(resolve_future_outcome(candidate, future), "SL")
 

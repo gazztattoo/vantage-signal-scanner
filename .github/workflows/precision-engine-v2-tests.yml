@@ -4,7 +4,9 @@ on:
   push:
     branches: [precision-engine-v2]
     paths:
-      - "precision_engine_v2.py"\n      - "anticipatory_signal_v2.py"\n      - "tests/test_anticipatory_signal_v2.py"
+      - "precision_engine_v2.py"
+      - "anticipatory_signal_v2.py"
+      - "tests/test_anticipatory_signal_v2.py"
       - "panel_escaner_vantage.html"
       - "tests/test_panel_script.py"
       - "external_signal_intelligence.py"
@@ -41,7 +43,8 @@ jobs:
           PANEL_ACCESS_CODE: precision-test-code
         run: |
           python -m unittest discover -s tests -p "test_panel_script.py" -v
-          python -m unittest discover -s tests -p "test_precision_engine_v2.py" -v\n          python -m unittest discover -s tests -p "test_anticipatory_signal_v2.py" -v
+          python -m unittest discover -s tests -p "test_precision_engine_v2.py" -v
+          python -m unittest discover -s tests -p "test_anticipatory_signal_v2.py" -v
           python -m unittest discover -s tests -p "test_precision_candidate_endpoint.py" -v
           python -m unittest discover -s tests -p "test_external_signal_intelligence.py" -v
           python -m unittest discover -s tests -p "test_external_technical_signal_adapters.py" -v

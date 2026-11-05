@@ -1,6 +1,6 @@
 import unittest
 
-from anticipatory_signal_v2 import evaluate_preparation, validate_entry
+from anticipatory_signal_v2 import evaluate_preparation, validate_entry, cancel_preparation
 
 
 class AnticipatorySignalTests(unittest.TestCase):
@@ -59,6 +59,27 @@ class AnticipatorySignalTests(unittest.TestCase):
             atr=2.0, trigger_confirmed=True, structure_valid=True)
         self.assertEqual(result["status"], "VALIDATED")
         self.assertEqual(result["notification"], "ENTRADA VALIDADA")
+
+    def test_invalidated_preparation_emits_manual_cancel_notice(self):
+        preparation = self.setup_buy_breakout()
+        cancelled = cancel_preparation(
+            preparation=preparation, reason="Ruptura fallida y cierre dentro del rango.")
+        self.assertEqual(cancelled["status"], "CANCELLED")
+        self.assertEqual(cancelled["notification"], "CANCELAR PREPARACIÓN")
+        self.assertTrue(cancelled["manual_action_required"])
+        self.assertIn("manualmente", cancelled["warning"])
+
+    def test_expired_preparation_emits_cancel_notice(self):
+        preparation = self.setup_buy_breakout()
+        cancelled = cancel_preparation(preparation=preparation, reason="", expired=True)
+        self.assertEqual(cancelled["status"], "CANCELLED")
+        self.assertIn("venció", cancelled["reason"])
+
+    def test_cannot_cancel_non_active_preparation(self):
+        cancelled = cancel_preparation(
+            preparation={"status": "VALIDATED"}, reason="Already validated")
+        self.assertEqual(cancelled["status"], "NO_ACTIVE_PREPARATION")
+        self.assertIsNone(cancelled["notification"])
 
     def test_price_runaway_is_not_chased(self):
         preparation = self.setup_buy_breakout()

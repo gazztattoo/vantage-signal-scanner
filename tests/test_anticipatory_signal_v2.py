@@ -9,7 +9,7 @@ class AnticipatorySignalTests(unittest.TestCase):
             symbol="XAU/USD", side="BUY", setup_type="BREAKOUT",
             current_price=2650.0, entry=2651.0, stop_loss=2649.0,
             take_profit=2655.0, atr=2.0,
-            approach_speed_per_second=1.0, spread=0.1,
+            approach_speed_per_second=(1.0 / 240.0), spread=0.1,
         )
         values.update(changes)
         return evaluate_preparation(**values)

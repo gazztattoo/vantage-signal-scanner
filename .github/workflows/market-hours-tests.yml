@@ -1,12 +1,13 @@
-name: Market hours tests
+name: Market hours and signal outcome tests
 
 on:
   push:
     branches:
       - market-hours-test
+      - push-test
 
 jobs:
-  test-market-hours:
+  test-market-hours-and-outcomes:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,5 +16,5 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Run market session tests
+      - name: Run unit tests
         run: python -m unittest discover -s tests -p "test_*.py" -v

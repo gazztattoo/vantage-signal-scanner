@@ -40,7 +40,7 @@ def evaluate_preparation(*, symbol, side, setup_type, current_price, entry,
 
     names = ("current_price", "entry", "stop_loss", "take_profit", "atr",
              "approach_speed_per_second", "spread")
-    values = {name: _number(locals()[name]) for name in names}
+    raw_values = {\n        "current_price": current_price, "entry": entry, "stop_loss": stop_loss,\n        "take_profit": take_profit, "atr": atr,\n        "approach_speed_per_second": approach_speed_per_second, "spread": spread,\n    }\n    values = {name: _number(raw_values[name]) for name in names}
     if any(value is None for value in values.values()):
         return {"status": "WAIT", "reason": "Hay precios o métricas ausentes/no finitos."}
     current = values["current_price"]

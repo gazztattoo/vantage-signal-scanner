@@ -21,7 +21,7 @@ class AnticipatorySignalTests(unittest.TestCase):
         self.assertEqual(result["order_type"], "BUY_STOP")
 
     def test_too_late_does_not_send_prepare_notice(self):
-        result = self.setup_buy_breakout(approach_speed_per_second=0.01)
+        result = self.setup_buy_breakout(approach_speed_per_second=0.001)
         self.assertEqual(result["status"], "WAIT")  # Entry too far for 5-minute window.
         result = self.setup_buy_breakout(
             current_price=2650.9, approach_speed_per_second=1.0)

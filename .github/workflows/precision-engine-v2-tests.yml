@@ -7,6 +7,7 @@ on:
       - "precision_engine_v2.py"
       - "anticipatory_signal_v2.py"
       - "tests/test_anticipatory_signal_v2.py"
+      - "tests/test_synthetic_sequence_simulation.py"
       - "panel_escaner_vantage.html"
       - "tests/test_panel_script.py"
       - "external_signal_intelligence.py"
@@ -45,6 +46,7 @@ jobs:
           python -m unittest discover -s tests -p "test_panel_script.py" -v
           python -m unittest discover -s tests -p "test_precision_engine_v2.py" -v
           python -m unittest discover -s tests -p "test_anticipatory_signal_v2.py" -v
+          python -m unittest discover -s tests -p "test_synthetic_sequence_simulation.py" -v
           python -m unittest discover -s tests -p "test_precision_candidate_endpoint.py" -v
           python -m unittest discover -s tests -p "test_external_signal_intelligence.py" -v
           python -m unittest discover -s tests -p "test_external_technical_signal_adapters.py" -v

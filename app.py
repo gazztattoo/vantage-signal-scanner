@@ -1046,11 +1046,10 @@ def resolve_pending_signal_outcomes(symbol, interval, recent_candles):
     """Cierra TP/SL o caduca señales tras 24 velas cerradas posteriores."""
     if not recent_candles:
         return {"resolved": 0, "expired": 0, "errors": 0}
-
     response = requests.get(
         SUPABASE_URL + "/rest/v1/signal_history",
         params={
-            "select": "id,direction,candle_time,stop_loss,take_profit,status",
+            "select": "id,direction,candle_time,entry_price,stop_loss,take_profit,status",
             "symbol": "eq." + symbol,
             "timeframe": "eq." + interval,
             "status": "eq.PENDIENTE",
@@ -1121,12 +1120,19 @@ def resolve_pending_signal_outcomes(symbol, interval, recent_candles):
 
             patch_data = {
                 "status": outcome,
-                "exit_price": None if is_expired else (stop if outcome == "SL" else target),
+                "exit_price": close_price if is_expired else (stop if outcome == "SL" else target),
                 "closed_at": closed_at,
-                "result_r": None if is_expired else (2.0 if outcome == "TP" else -1.0),
+                "result_r": (
+                    round(
+                        ((close_price - float(signal["entry_price"])) if direction == "COMPRA"
+                         else (float(signal["entry_price"]) - close_price))
+                        / abs(float(signal["entry_price"]) - stop), 6
+                    ) if is_expired and abs(float(signal["entry_price"]) - stop) > 0
+                    else (2.0 if outcome == "TP" else -1.0)
+                ),
                 "result_source": (
-                    "CADUCADA tras 24 velas cerradas posteriores a la señal; "
-                    "sin tocar TP ni SL."
+                    "CADUCADA tras 24 velas cerradas; resultado R calculado al cierre "
+                    "de la vela 24 usando el riesgo inicial y el precio de entrada."
                     if is_expired else
                     "Velas OHLC cerradas posteriores a la señal; "
                     "si TP y SL coinciden en una vela, se cuenta SL primero."

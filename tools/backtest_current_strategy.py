@@ -169,14 +169,18 @@ def run_backtest(candles, expiry=24):
     trades = []
     i = 99
     while i < len(candles) - 1:
+        # Do not label a trade EXPIRED unless the full expiry horizon exists.
+        # A dataset ending early leaves that would-be trade unobserved.
+        if i + expiry >= len(candles):
+            break
         signal = build_signal(candles[:i + 1])
         if not signal:
             i += 1
             continue
         outcome = "EXPIRED"
-        exit_index = min(i + expiry, len(candles) - 1)
+        exit_index = i + expiry
         exit_price = candles[exit_index]["close"]
-        for j in range(i + 1, min(i + expiry, len(candles) - 1) + 1):
+        for j in range(i + 1, i + expiry + 1):
             bar = candles[j]
             if signal["side"] == "BUY":
                 sl_hit, tp_hit = bar["low"] <= signal["sl"], bar["high"] >= signal["tp"]
@@ -193,12 +197,18 @@ def run_backtest(candles, expiry=24):
         elif outcome == "SL":
             result_r = -1.0
         else:
-            result_r = 0.0
+            initial_risk = abs(signal["entry"] - signal["sl"])
+            if not math.isfinite(initial_risk) or initial_risk <= 0:
+                raise ValueError("Riesgo inicial inválido: entry y stop_loss deben ser distintos.")
+            directional_move = (exit_price - signal["entry"] if signal["side"] == "BUY"
+                                else signal["entry"] - exit_price)
+            result_r = directional_move / initial_risk
         trades.append({
             "signal_time": candles[i]["time"], "exit_time": candles[exit_index]["time"],
             "side": signal["side"], "entry": round(signal["entry"], 8),
             "stop_loss": round(signal["sl"], 8), "take_profit": round(signal["tp"], 8),
-            "outcome": outcome, "result_r": result_r, "adx": round(signal["adx"], 3),
+            "exit_price": round(exit_price, 8),
+            "outcome": outcome, "result_r": round(result_r, 6), "adx": round(signal["adx"], 3),
             "score": signal["score"]
         })
         i = exit_index + 1  # single open position; no overlapping trades
@@ -219,7 +229,7 @@ def run_backtest(candles, expiry=24):
         "net_result_r": round(sum(t["result_r"] for t in trades), 3),
         "average_r_per_trade": round(sum(t["result_r"] for t in trades) / len(trades), 3) if trades else None,
         "max_drawdown_r": round(max_dd, 3),
-        "note": "Prueba histórica offline; no incluye spread, comisión, slippage ni ejecución real. SL se prioriza si SL y TP tocan en la misma vela."
+        "note": "Prueba histórica offline; caducadas valoradas al cierre de la vela 24 (mark-to-market). No incluye spread, comisión, slippage ni ejecución real. Señales sin horizonte completo se omiten. SL se prioriza si SL y TP tocan en la misma vela."
     }
     return {"summary": summary, "trades": trades}
 

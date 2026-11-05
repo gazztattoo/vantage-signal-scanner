@@ -133,3 +133,30 @@ def validate_entry(*, preparation, current_price, spread, atr,
         "take_profit": preparation.get("take_profit"),
         "warning": "Validación técnica; comprobar Bid/Ask, spread y condiciones de Vantage antes de operar manualmente.",
     }
+
+def cancel_preparation(*, preparation, reason, expired=False):
+    """Mark a pending preparation as cancelled; never places/cancels broker orders.
+
+    This is a research-state notification only. The user must manually remove
+    any pending order they may already have entered in MT5.
+    """
+    if not isinstance(preparation, dict) or preparation.get("status") != "PREPARE":
+        return {"status": "NO_ACTIVE_PREPARATION", "notification": None,
+                "reason": "No existe una preparación activa que cancelar."}
+    if expired:
+        detail = "La preparación venció antes de activarse."
+    else:
+        detail = str(reason or "").strip() or "La estructura dejó de ser válida."
+    return {
+        "status": "CANCELLED",
+        "notification": "CANCELAR PREPARACIÓN",
+        "symbol": preparation.get("symbol"),
+        "side": preparation.get("side"),
+        "order_type": preparation.get("order_type"),
+        "entry": preparation.get("entry"),
+        "stop_loss": preparation.get("stop_loss"),
+        "take_profit": preparation.get("take_profit"),
+        "reason": detail,
+        "manual_action_required": True,
+        "warning": "Aviso informativo: si ya introdujiste una orden pendiente en MT5, debes cancelarla manualmente.",
+    }

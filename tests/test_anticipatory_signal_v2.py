@@ -15,7 +15,7 @@ class AnticipatorySignalTests(unittest.TestCase):
         return evaluate_preparation(**values)
 
     def test_prepare_notice_when_lead_time_is_three_to_five_minutes(self):
-        result = self.setup_buy_breakout(approach_speed_per_second=1.0)
+        result = self.setup_buy_breakout()  # Default speed estimates a 4-minute lead.
         self.assertEqual(result["status"], "PREPARE")
         self.assertEqual(result["notification"], "PREPARAR MT5")
         self.assertEqual(result["order_type"], "BUY_STOP")

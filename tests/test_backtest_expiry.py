@@ -47,6 +47,21 @@ class BacktestExpiryOutcomeTests(unittest.TestCase):
         self.assertEqual(result["summary"]["expired"], 0)
 
 
+    def test_hypothetical_cost_reduces_net_and_increases_drawdown(self):
+        signal = {"side": "BUY", "entry": 100.0, "sl": 90.0,
+                  "tp": 120.0, "adx": 25.0, "score": 3}
+        with patch.object(backtest, "build_signal", side_effect=[signal] + [None] * 30):
+            result = backtest.run_backtest(self.candles(), expiry=2,
+                                           cost_per_trade_r=0.1)
+        self.assertEqual(result["summary"]["cost_per_trade_r"], 0.1)
+        self.assertEqual(result["summary"]["net_after_cost_r"], 0.4)
+        self.assertEqual(result["summary"]["max_drawdown_after_cost_r"], 0.0)
+
+    def test_negative_cost_is_rejected(self):
+        with self.assertRaises(ValueError):
+            backtest.run_backtest(self.candles(), expiry=2,
+                                  cost_per_trade_r=-0.01)
+
     def test_filtered_signal_does_not_block_next_eligible_entry(self):
         rejected = {"side": "BUY", "entry": 100.0, "sl": 90.0,
                     "tp": 120.0, "adx": 25.0, "score": 4}

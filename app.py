@@ -65,6 +65,16 @@ def access_serializer():
     return URLSafeTimedSerializer(ACCESS_TOKEN_SECRET, salt="global-signal-panel-access-v1")
 
 
+@app.after_request
+def disable_api_caching(response):
+    # Evita reutilizar respuestas de autenticación o datos protegidos en PWA/navegadores.
+    if request.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+
 @app.route("/api/access", methods=["POST"])
 def create_access_token():
     if not PANEL_ACCESS_CODE or not ACCESS_TOKEN_SECRET:

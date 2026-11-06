@@ -165,7 +165,7 @@ def build_signal(window):
     return None
 
 
-def run_backtest(candles, expiry=24, variant='BASELINE'):
+def run_backtest(candles, expiry=24, variant='BASELINE', cost_per_trade_r=0.0):
     trades = []
     i = 99
     while i < len(candles) - 1:
@@ -218,6 +218,14 @@ def run_backtest(candles, expiry=24, variant='BASELINE'):
         })
         i = exit_index + 1  # single open position; no overlapping trades
 
+    if not math.isfinite(cost_per_trade_r) or cost_per_trade_r < 0:
+        raise ValueError("El coste por operación debe ser un número finito >= 0 R.")
+    net_after_cost = sum(t["result_r"] - cost_per_trade_r for t in trades)
+    cost_equity = cost_peak = cost_max_dd = 0.0
+    for trade in trades:
+        cost_equity += trade["result_r"] - cost_per_trade_r
+        cost_peak = max(cost_peak, cost_equity)
+        cost_max_dd = max(cost_max_dd, cost_peak - cost_equity)
     wins = sum(t["outcome"] == "TP" for t in trades)
     losses = sum(t["outcome"] == "SL" for t in trades)
     expired = sum(t["outcome"] == "EXPIRED" for t in trades)
@@ -234,6 +242,9 @@ def run_backtest(candles, expiry=24, variant='BASELINE'):
         "net_result_r": round(sum(t["result_r"] for t in trades), 3),
         "average_r_per_trade": round(sum(t["result_r"] for t in trades) / len(trades), 3) if trades else None,
         "max_drawdown_r": round(max_dd, 3),
+        "cost_per_trade_r": round(cost_per_trade_r, 6),
+        "net_after_cost_r": round(net_after_cost, 3),
+        "max_drawdown_after_cost_r": round(cost_max_dd, 3),
         "note": "Prueba histórica offline; caducadas valoradas al cierre de la vela 24 (mark-to-market). No incluye spread, comisión, slippage ni ejecución real. Señales sin horizonte completo se omiten. SL se prioriza si SL y TP tocan en la misma vela."
     }
     return {"summary": summary, "trades": trades}
@@ -244,12 +255,13 @@ def main():
     parser.add_argument("csv_file", help="CSV OHLC exportado; no se realizan llamadas externas.")
     parser.add_argument("--expiry", type=int, default=24, help="Velas máximas para alcanzar SL/TP (default: 24).")
     parser.add_argument("--variant", choices=["BASELINE", "XAU_BUY_SCORE3"], default="BASELINE", help="Filtro experimental; solo TEST.")
+    parser.add_argument("--cost-r", type=float, default=0.0, help="Coste hipotético por operación expresado en R; no representa costes reales del broker.")
     parser.add_argument("--out", default="backtest_result.json", help="Archivo JSON de salida.")
     args = parser.parse_args()
     if args.expiry < 1:
         parser.error("--expiry debe ser mayor que cero.")
     candles = load_csv(Path(args.csv_file))
-    result = run_backtest(candles, args.expiry, args.variant)
+    result = run_backtest(candles, args.expiry, args.variant, args.cost_r)
     Path(args.out).write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(result["summary"], ensure_ascii=False, indent=2))
     print(f"Detalle de operaciones guardado en: {args.out}")

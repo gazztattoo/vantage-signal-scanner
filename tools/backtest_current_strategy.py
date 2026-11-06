@@ -165,7 +165,7 @@ def build_signal(window):
     return None
 
 
-def run_backtest(candles, expiry=24):
+def run_backtest(candles, expiry=24, variant='BASELINE'):
     trades = []
     i = 99
     while i < len(candles) - 1:
@@ -175,6 +175,11 @@ def run_backtest(candles, expiry=24):
             break
         signal = build_signal(candles[:i + 1])
         if not signal:
+            i += 1
+            continue
+        # Experimental TEST-only filter: rejected signals do not block later entries.
+        if variant == "XAU_BUY_SCORE3" and not (
+                signal["side"] == "BUY" and signal["score"] == 3):
             i += 1
             continue
         outcome = "EXPIRED"
@@ -223,7 +228,7 @@ def run_backtest(candles, expiry=24):
         peak = max(peak, equity)
         max_dd = max(max_dd, peak - equity)
     summary = {
-        "candles": len(candles), "signals_traded": len(trades),
+        "variant": variant, "candles": len(candles), "signals_traded": len(trades),
         "wins_tp": wins, "losses_sl": losses, "expired": expired,
         "win_rate_resolved_pct": round(100 * wins / resolved, 2) if resolved else None,
         "net_result_r": round(sum(t["result_r"] for t in trades), 3),
@@ -238,12 +243,13 @@ def main():
     parser = argparse.ArgumentParser(description="Backtest offline del motor actual Vantage.")
     parser.add_argument("csv_file", help="CSV OHLC exportado; no se realizan llamadas externas.")
     parser.add_argument("--expiry", type=int, default=24, help="Velas máximas para alcanzar SL/TP (default: 24).")
+    parser.add_argument("--variant", choices=["BASELINE", "XAU_BUY_SCORE3"], default="BASELINE", help="Filtro experimental; solo TEST.")
     parser.add_argument("--out", default="backtest_result.json", help="Archivo JSON de salida.")
     args = parser.parse_args()
     if args.expiry < 1:
         parser.error("--expiry debe ser mayor que cero.")
     candles = load_csv(Path(args.csv_file))
-    result = run_backtest(candles, args.expiry)
+    result = run_backtest(candles, args.expiry, args.variant)
     Path(args.out).write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(result["summary"], ensure_ascii=False, indent=2))
     print(f"Detalle de operaciones guardado en: {args.out}")

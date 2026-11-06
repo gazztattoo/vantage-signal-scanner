@@ -23,16 +23,21 @@ VARIANTS = {
 def read_trades(path):
     with Path(path).open(newline="", encoding="utf-8-sig") as handle:
         reader = csv.DictReader(handle)
-        required = {"signal_time", "side", "score", "result_r"}
+        required = {"signal_time", "side", "score"}
         if not reader.fieldnames or not required.issubset(reader.fieldnames):
             raise ValueError(f"{path}: required columns are {sorted(required)}")
+        # Prefer corrected mark-to-market R when available; legacy R may leave
+        # expired trades at zero. Fall back only for compatible clean exports.
+        r_column = "R_adjusted" if "R_adjusted" in reader.fieldnames else ("result_r" if "result_r" in reader.fieldnames else "R")
+        if r_column not in reader.fieldnames:
+            raise ValueError(f"{path}: expected R_adjusted, result_r, or R")
         rows = []
         for line, raw in enumerate(reader, start=2):
             side = raw["side"].strip().upper()
             if side not in {"BUY", "SELL"}:
                 raise ValueError(f"{path}:{line}: invalid side {side!r}")
             score = int(raw["score"])
-            result_r = float(raw["result_r"])
+            result_r = float(raw[r_column])
             if not math.isfinite(result_r):
                 raise ValueError(f"{path}:{line}: non-finite result_r")
             rows.append({"signal_time": raw["signal_time"], "side": side,
@@ -64,7 +69,7 @@ def compare(path, costs):
     result = {
         "source_file": str(path),
         "trades_in_baseline_file": len(trades),
-        "warning": "Filtered variants are subsets of baseline trades; skipped entries are not regenerated. Costs are hypothetical R/trade, not broker quotes.",
+        "warning": "Filtered variants are subsets of baseline trades; skipped entries are not regenerated. Prefer R_adjusted for corrected expiry mark-to-market. Costs are hypothetical R/trade, not broker quotes.",
         "variants": {},
     }
     for name, predicate in VARIANTS.items():

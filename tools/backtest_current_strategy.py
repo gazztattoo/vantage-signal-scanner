@@ -169,10 +169,6 @@ def run_backtest(candles, expiry=24, variant='BASELINE', cost_per_trade_r=0.0):
     trades = []
     i = 99
     while i < len(candles) - 1:
-        # Do not label a trade EXPIRED unless the full expiry horizon exists.
-        # A dataset ending early leaves that would-be trade unobserved.
-        if i + expiry >= len(candles):
-            break
         signal = build_signal(candles[:i + 1])
         if not signal:
             i += 1
@@ -185,7 +181,8 @@ def run_backtest(candles, expiry=24, variant='BASELINE', cost_per_trade_r=0.0):
         outcome = "EXPIRED"
         exit_index = i + expiry
         exit_price = candles[exit_index]["close"]
-        for j in range(i + 1, i + expiry + 1):
+        horizon_end = min(i + expiry, len(candles) - 1)
+        for j in range(i + 1, horizon_end + 1):
             bar = candles[j]
             if signal["side"] == "BUY":
                 sl_hit, tp_hit = bar["low"] <= signal["sl"], bar["high"] >= signal["tp"]
@@ -197,6 +194,10 @@ def run_backtest(candles, expiry=24, variant='BASELINE', cost_per_trade_r=0.0):
             if tp_hit:
                 outcome, exit_price, exit_index = "TP", signal["tp"], j
                 break
+        # If the dataset ends before expiry, retain only trades that already
+        # reached SL/TP. An unresolved position has no complete outcome.
+        if outcome == "EXPIRED" and i + expiry >= len(candles):
+            break
         if outcome == "TP":
             result_r = 2.0
         elif outcome == "SL":

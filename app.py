@@ -77,6 +77,25 @@ def create_access_token():
     return jsonify({"token": token, "expires_in": TOKEN_MAX_AGE_SECONDS})
 
 
+@app.route("/api/access/verify", methods=["GET"])
+def verify_access_token():
+    authorization = request.headers.get("Authorization", "")
+    if not authorization.startswith("Bearer "):
+        return jsonify({"valid": False, "stage": "missing_bearer"}), 401
+    try:
+        data = access_serializer().loads(
+            authorization[7:].strip(),
+            max_age=TOKEN_MAX_AGE_SECONDS
+        )
+        if data.get("access") is not True:
+            raise BadSignature("Token no válido")
+        return jsonify({"valid": True, "service": "global-signal-push-test"})
+    except SignatureExpired:
+        return jsonify({"valid": False, "stage": "expired"}), 401
+    except (BadSignature, RuntimeError):
+        return jsonify({"valid": False, "stage": "invalid_signature"}), 401
+
+
 @app.route("/api/access/status", methods=["GET"])
 def access_configuration_status():
     # Diagnóstico no sensible: nunca devuelve códigos, secretos ni tokens.

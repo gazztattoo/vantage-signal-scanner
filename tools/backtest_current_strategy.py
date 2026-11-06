@@ -179,7 +179,7 @@ def run_backtest(candles, expiry=24, variant='BASELINE', cost_per_trade_r=0.0):
             i += 1
             continue
         outcome = "EXPIRED"
-        exit_index = i + expiry
+        exit_index = min(i + expiry, len(candles) - 1)
         exit_price = candles[exit_index]["close"]
         horizon_end = min(i + expiry, len(candles) - 1)
         for j in range(i + 1, horizon_end + 1):

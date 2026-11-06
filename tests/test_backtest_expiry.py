@@ -47,5 +47,19 @@ class BacktestExpiryOutcomeTests(unittest.TestCase):
         self.assertEqual(result["summary"]["expired"], 0)
 
 
+    def test_filtered_signal_does_not_block_next_eligible_entry(self):
+        rejected = {"side": "BUY", "entry": 100.0, "sl": 90.0,
+                    "tp": 120.0, "adx": 25.0, "score": 4}
+        accepted = {"side": "BUY", "entry": 100.0, "sl": 90.0,
+                    "tp": 120.0, "adx": 25.0, "score": 3}
+        with patch.object(backtest, "build_signal",
+                          side_effect=[rejected, accepted] + [None] * 30):
+            result = backtest.run_backtest(self.candles(), expiry=2,
+                                           variant="XAU_BUY_SCORE3")
+        self.assertEqual(result["summary"]["signals_traded"], 1)
+        self.assertEqual(result["trades"][0]["score"], 3)
+        self.assertEqual(result["trades"][0]["signal_time"], self.candles()[100]["time"])
+
+
 if __name__ == "__main__":
     unittest.main()

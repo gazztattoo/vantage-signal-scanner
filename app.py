@@ -77,6 +77,19 @@ def create_access_token():
     return jsonify({"token": token, "expires_in": TOKEN_MAX_AGE_SECONDS})
 
 
+@app.route("/api/access/status", methods=["GET"])
+def access_configuration_status():
+    # Diagnóstico no sensible: nunca devuelve códigos, secretos ni tokens.
+    return jsonify({
+        "service": "global-signal-push-test",
+        "data_mode": DATA_MODE,
+        "market_api_enabled": bool(API_KEY),
+        "panel_code_configured": bool(PANEL_ACCESS_CODE),
+        "token_secret_configured": bool(ACCESS_TOKEN_SECRET),
+        "token_ttl_seconds": TOKEN_MAX_AGE_SECONDS,
+    })
+
+
 @app.before_request
 def protect_signal_endpoints():
     if request.method == "OPTIONS":

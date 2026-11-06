@@ -47,6 +47,17 @@ class BacktestExpiryOutcomeTests(unittest.TestCase):
         self.assertEqual(result["summary"]["expired"], 0)
 
 
+    def test_early_stop_is_counted_even_when_full_expiry_horizon_is_missing(self):
+        signal = {"side": "BUY", "entry": 100.0, "sl": 90.0,
+                  "tp": 120.0, "adx": 25.0, "score": 3}
+        candles = self.candles(count=101)
+        candles[100]["low"] = 89.0
+        with patch.object(backtest, "build_signal", return_value=signal):
+            result = backtest.run_backtest(candles, expiry=24)
+        self.assertEqual(result["summary"]["signals_traded"], 1)
+        self.assertEqual(result["trades"][0]["outcome"], "SL")
+        self.assertEqual(result["trades"][0]["result_r"], -1.0)
+
     def test_hypothetical_cost_reduces_net_and_increases_drawdown(self):
         signal = {"side": "BUY", "entry": 100.0, "sl": 90.0,
                   "tp": 120.0, "adx": 25.0, "score": 3}

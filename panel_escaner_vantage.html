@@ -597,20 +597,33 @@ function render(m,d,err,marketClosed=false){
   const raw=String(
     first(d,["signal","action","recommendation","side"])||"ESPERAR"
   ).toUpperCase();
+  const isPreSignal=Boolean(first(d,["pre_signal"]));
+  const preSide=String(first(d,["pre_signal_side"])||"").toUpperCase();
 
-  const s=
-    raw.includes("COMPRA")||raw.includes("BUY")
+  const s=isPreSignal
+    ?{t:"PRESEÑAL "+(preSide==="BUY"?"COMPRA":preSide==="SELL"?"VENTA":"EN FORMACIÓN"),c:preSide==="BUY"?"buy":preSide==="SELL"?"sell":""}
+    :raw.includes("COMPRA")||raw.includes("BUY")
       ?{t:"COMPRA",c:"buy"}
       :raw.includes("VENTA")||raw.includes("SELL")
         ?{t:"VENTA",c:"sell"}
         :{t:raw.includes("WAIT")?"ESPERAR":raw,c:""};
 
-  const entry=first(d,["entry","price"]);
+  const entry=isPreSignal?null:first(d,["entry","price"]);
   const sl=first(d,["stop_loss","stopLoss","sl"]);
   const tp=first(d,["take_profit","takeProfit","tp"]);
   const reason=first(
     d,["reason","explanation","message","warning","method"]
   )||"Análisis recibido desde la API.";
+  const mtf=first(d,["mtf"])||{};
+  const biasLabel=b=>b==="BULL"?"ALCISTA":b==="BEAR"?"BAJISTA":b==="NEUTRAL"?"NEUTRAL":b==="INSUFFICIENT"?"SIN DATOS":"—";
+  const mtfLabel=mtf.timeframe_1
+    ?mtf.timeframe_1+" "+biasLabel(mtf.bias_1)+" · "+mtf.timeframe_2+" "+biasLabel(mtf.bias_2)
+    :"Sin confirmación MTF";
+  const structure=first(d,["structure"])||{};
+  const structureType=String(first(d,["structure_trigger"])||structure.type||"NONE").toUpperCase();
+  const structureLabel=structureType==="BREAKOUT"?"RUPTURA":structureType==="RETEST"?"RETEST":structureType==="PENDING"?"ZONA PRÓXIMA":"SIN CONFIRMAR";
+  const regime=String(first(d,["regime"])||"—").toUpperCase();
+  const regimeLabel=regime==="TREND"?"TENDENCIA":regime==="RANGE"?"LATERAL":regime==="TRANSITION"?"TRANSICIÓN":regime;
 
   return `
     <article class="card">
@@ -641,6 +654,21 @@ function render(m,d,err,marketClosed=false){
         <div style="text-align:right">
           <strong style="font-size:19px;font-variant-numeric:tabular-nums">${fmt(first(d,["quality_score"]),0)}<span style="font-size:10px;color:var(--muted)">/100</span></strong>
           <div style="font-size:9px;color:var(--muted)">Puntuación técnica</div>
+        </div>
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <span>RÉGIMEN</span>
+          <strong>${esc(regimeLabel)}</strong>
+        </div>
+        <div class="metric">
+          <span>ESTRUCTURA</span>
+          <strong>${esc(structureLabel)} ${esc(biasLabel(structure.direction==="BUY"?"BULL":structure.direction==="SELL"?"BEAR":"NEUTRAL"))}</strong>
+        </div>
+        <div class="metric">
+          <span>CONFIRMACIÓN MTF</span>
+          <strong>${esc(mtfLabel)}</strong>
         </div>
       </div>
 

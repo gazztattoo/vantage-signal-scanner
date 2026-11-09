@@ -331,13 +331,15 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "") -> dict:
     best_side = max(("BUY", "SELL"), key=lambda s: sides[s]["score"])
     best = sides[best_side]
     score = int(best["score"])
-    grade = (
-        "A+" if score == 7 and adx_now >= 28
-        else "A" if score >= 6 and adx_now >= 20
-        else "B" if score >= 5
-        else "C"
-    )
     structure_ok = structure["direction"] == best_side and structure["type"] in ("BREAKOUT", "RETEST")
+    if structure_ok and best["mtf_aligned"] and score == 7 and adx_now >= 28 and regime == "TREND":
+        grade = "A+"
+    elif structure_ok and best["mtf_aligned"] and score >= 6 and adx_now >= 20 and regime == "TREND":
+        grade = "A"
+    elif best["mtf_aligned"] and score >= 5 and regime == "TREND":
+        grade = "B"
+    else:
+        grade = "C"
     common = {
         "symbol": symbol, "timeframe": timeframe,
         "price": closes[-1], "ema20": e20, "ema50": e50, "rsi14": rsi_now,

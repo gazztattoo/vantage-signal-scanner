@@ -340,7 +340,7 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 
 <body>
 
-<section class="access-gate" id="accessGate" aria-label="Acceso privado" hidden></section>
+<section class="access-gate" id="accessGate" aria-label="Acceso privado" hidden><form class="access-box" id="accessForm"><h1>VANTAGE TEST</h1><p>Plataforma de acceso privado. Introduce el código que te compartió el administrador.</p><input id="accessCode" type="password" autocomplete="current-password" placeholder="Código de acceso" required><button id="accessSubmit" type="submit">ENTRAR AL SCANNER</button><p class="access-error" id="accessError" role="alert"></p></form></section>
 <main class="wrap">
 
 <header class="top">
@@ -483,8 +483,10 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 <script>
 const API_BASE="https://global-signal-push-test.onrender.com";
 let accessToken="";
-const accessGate=document.getElementById("accessGate");
+const accessGate=document.getElementById("accessGate"), accessForm=document.getElementById("accessForm"), accessCodeInput=document.getElementById("accessCode"), accessError=document.getElementById("accessError"), accessSubmit=document.getElementById("accessSubmit");
 function showAccessGate(){accessGate.hidden=true;} function hideAccessGate(){accessGate.hidden=true;}
+async function requestAccess(code){const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),20000);try{const response=await fetch(API_BASE+"/api/access",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json","Cache-Control":"no-cache"},body:JSON.stringify({code}),signal:controller.signal});const data=await response.json().catch(()=>({}));if(!response.ok||!data.token)throw new Error(data.error||`No se pudo validar el código (HTTP ${response.status}).`);const check=await fetch(API_BASE+"/api/access/verify",{cache:"no-store",headers:{"Authorization":"Bearer "+data.token,"Cache-Control":"no-cache"},signal:controller.signal});const verification=await check.json().catch(()=>({}));if(!check.ok||verification.valid!==true)throw new Error("El servidor aceptó el código, pero rechazó la sesión ("+(verification.stage||"verificación fallida")+", HTTP "+check.status+").");accessToken=data.token;sessionStorage.setItem("gss_access_token",accessToken);}catch(error){if(error.name==="AbortError")throw new Error("El servidor TEST no respondió en 20 segundos.");throw error;}finally{clearTimeout(timeout);}}
+accessForm.addEventListener("submit",async event=>{event.preventDefault();accessSubmit.disabled=true;accessError.textContent="Verificando acceso…";try{await requestAccess(accessCodeInput.value);hideAccessGate();await update();if(accessGate.hidden){accessCodeInput.value="";}}catch(error){showAccessGate();accessError.textContent=error.message||"Código incorrecto."; }finally{accessSubmit.disabled=false;}});
 
 const markets=[
   {symbol:"EUR/USD",category:"FOREX"},
@@ -938,6 +940,7 @@ async function update(){
     accessToken="";
     sessionStorage.removeItem("gss_access_token");
     showAccessGate();
+    accessError.textContent="Tu sesión ha caducado. Introduce de nuevo el código de acceso.";
     statusEl.textContent="Acceso requerido";
     dot.style.background="var(--amber)";
     button.disabled=false;
@@ -1119,7 +1122,7 @@ document.getElementById("historyRefresh").addEventListener("click",loadHistory);
 
 button.addEventListener("click",update);
 document.getElementById("interval").addEventListener("change",update);
-accessGate.hidden=true; update();
+hideAccessGate();update();
 
 const pushStatus=document.getElementById("pushStatus");
 const enablePushButton=document.getElementById("enablePush");
@@ -1181,7 +1184,6 @@ enablePushButton.addEventListener("click",async()=>{
     if(!("serviceWorker" in navigator)||!("PushManager" in window)){
       throw new Error("Este navegador no admite notificaciones push.");
     }
-    
     const permission=await Notification.requestPermission();
     if(permission!=="granted")throw new Error("No se concedió permiso para notificaciones.");
     const registration=await navigator.serviceWorker.ready;
@@ -1219,6 +1221,7 @@ disablePushButton.addEventListener("click",async()=>{
   disablePushButton.disabled=true;
   pushStatus.textContent="Desactivando notificaciones en este dispositivo…";
   try{
+    if(!accessToken)throw new Error("Primero debes entrar al scanner.");
     const registration=await navigator.serviceWorker.ready;
     const subscription=await registration.pushManager.getSubscription();
     if(!subscription)throw new Error("No hay una suscripción activa en este dispositivo.");

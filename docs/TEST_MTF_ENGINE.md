@@ -48,3 +48,29 @@ Los resultados históricos del motor anterior no se transfieren a este motor nue
 La reconciliación EURUSD de octubre 2026 permanece abierta por duplicados conflictivos y diferencias de registros; el informe de corrección retira la afirmación anterior de equivalencia 60/60. El material OOS de BTC/XAU disponible cubre solo dos días, insuficiente para validar rentabilidad.
 
 **Estado:** motor experimental en TEST. No validado para trading real. Antes de proponer cambios a producción hacen falta backtest completo de este motor con costes del broker, validación fuera de muestra comparable y comprobación de feed Vantage.
+
+## Backtesting reproducible del motor nuevo
+
+Se añadió \`tools/backtest_mtf_strategy.py\`. El evaluador:
+- Evalúa al cierre de la vela y entra en la apertura de la vela siguiente.
+- Usa el stop estructural y recalcula el objetivo a 2R desde la entrada real.
+- Resuelve empates intrabar priorizando SL.
+- Marca a mercado las operaciones que expiran después de 24 velas.
+- Mantiene una sola operación abierta y no cuenta horizontes incompletos.
+- Informa escenarios matemáticos de costes por operación (0,05 R y 0,10 R); no son spreads medidos.
+
+\`tests/test_mtf_backtest.py\` prueba entrada siguiente, objetivo 2R, prioridad de SL, expiración MTM, horizontes incompletos y deducción de costes.
+
+## Primera comprobación fuera de muestra disponible
+
+Para EUR/USD se usó octubre de 2026, no incluido en la exploración base 2025. Se descartaron todos los registros M1 involucrados en timestamps duplicados en lugar de escoger uno arbitrariamente; luego solo se agregaron grupos M5/M15/M30 completos y consecutivos.
+
+| Marco | Cobertura evaluada | Operaciones | TP | SL | Expiradas MTM | Neto bruto | PF bruto | Neto con coste hipotético 0,10 R |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| M5 | Primeras 2.000 velas de 6.190 | 9 | 3 | 6 | 0 | 0,00 R | 1,00 | -0,90 R |
+| M15 | Mes completo, 2.035 velas | 36 | 14 | 20 | 2 | +8,61 R | 1,43 | +5,01 R |
+| M30 | Mes completo, 999 velas | 0 | 0 | 0 | 0 | 0,00 R | — | 0,00 R |
+
+La ejecución completa de M5 excedió el límite local de tiempo y se deja expresamente como parcial; no se extrapola. M15 es una muestra de solo 36 operaciones y un mes, no basta para afirmar ventaja estadística. Costes de 0,05/0,10 R son sensibilidad hipotética, no cotizaciones Vantage. Ningún resultado autoriza activar señales reales.
+
+Los resultados deben reproducirse con el script antes de cualquier cambio en la estrategia. Los datos BTCUSDT Spot, HistData FX/oro y CFD Vantage no son instrumentos equivalentes.

@@ -608,7 +608,7 @@ function render(m,d,err,marketClosed=false){
         ?{t:"VENTA",c:"sell"}
         :{t:raw.includes("WAIT")?"ESPERAR":raw,c:""};
 
-  const entry=isPreSignal?null:first(d,["entry","price"]);
+  const entry=(isPreSignal||raw==="WAIT"||raw==="ESPERAR"||raw==="PRESEÑAL")?null:first(d,["entry","price"]);
   const sl=first(d,["stop_loss","stopLoss","sl"]);
   const tp=first(d,["take_profit","takeProfit","tp"]);
   const reason=first(

@@ -9,6 +9,7 @@ from flask_cors import CORS
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 import hmac
 import math
+from strategy_engine import analyze as analyze_strategy
 
 app = Flask(__name__)
 CORS(app, resources={
@@ -210,6 +211,22 @@ def market_session(symbol, now=None):
 @app.route("/api/market-status", methods=["GET"])
 def market_status():
     now = datetime.now(timezone.utc)
+    if DATA_MODE == "mock":
+        # TEST uses synthetic candles, so real-world exchange hours must not hide its cards.
+        return jsonify({
+            "checked_at": now.isoformat(),
+            "data_mode": "mock",
+            "markets": {
+                symbol: {
+                    "open": True,
+                    "status": "SIMULADO",
+                    "reason": "Datos sintéticos de TEST; no representa una sesión real.",
+                    "server_time": now.astimezone(CANARY_TZ).isoformat(),
+                    "server_utc_offset": "SIMULADO",
+                }
+                for symbol in sorted(ALLOWED_SYMBOLS)
+            },
+        })
     return jsonify({
         "checked_at": now.isoformat(),
         "markets": {symbol: market_session(symbol, now) for symbol in sorted(ALLOWED_SYMBOLS)}
@@ -387,7 +404,7 @@ def parse_candle_time(raw_time):
     return parsed
 
 
-def generate_mock_candles(symbol, interval, count=100):
+def generate_mock_candles(symbol, interval, count=1200):
     """Velas sintéticas deterministas para probar la interfaz sin datos de mercado."""
     now = datetime.now(timezone.utc)
     step = INTERVAL_MINUTES[interval] * 60
@@ -632,108 +649,110 @@ def analysis():
         )
 
         closes = [candle["close"] for candle in candles]
-
         ema20 = ema(closes, 20)
         ema50 = ema(closes, 50)
         rsi14 = rsi(closes, 14)
         atr14 = atr(candles, 14)
-        adx14 = adx(candles, 14)
         macd_line, macd_signal, macd_hist = macd(closes)
         bb_upper, bb_middle, bb_lower = bollinger(closes, 20, 2.0)
 
-        entry = closes[-1]
-
         if (
-            None in (ema20, ema50, rsi14, atr14, adx14, macd_line, macd_signal, macd_hist, bb_upper, bb_middle, bb_lower)
+            None in (ema20, ema50, rsi14, atr14, macd_line, macd_signal, macd_hist,
+                     bb_upper, bb_middle, bb_lower)
             or atr14 <= 0
         ):
             raise RuntimeError(
-                "No hay suficientes datos válidos "
-                "para calcular los indicadores"
+                "No hay suficientes datos válidos para calcular los indicadores."
             )
 
-        # Motor multicriterio experimental: tendencia, fuerza y momentum.
-        buy_checks = {'EMA20 > EMA50': ema20 > ema50, 'RSI 52-68': 52 <= rsi14 <= 68, 'MACD positivo': macd_hist > 0, 'Precio sobre media Bollinger': entry > bb_middle}
-        sell_checks = {'EMA20 < EMA50': ema20 < ema50, 'RSI 32-48': 32 <= rsi14 <= 48, 'MACD negativo': macd_hist < 0, 'Precio bajo media Bollinger': entry < bb_middle}
-        buy_score = sum(buy_checks.values())
-        sell_score = sum(sell_checks.values())
-        # Filtro de calidad: solo A/A+ pueden convertirse en señales operables.
-        # La puntuación mide confluencia técnica, no probabilidad de acierto.
-        buy_adx_ok = adx14 >= 20
-        sell_adx_ok = adx14 >= 20
-        buy_quality = buy_score * 20 + (20 if adx14 >= 25 else 10 if adx14 >= 20 else 0)
-        sell_quality = sell_score * 20 + (20 if adx14 >= 25 else 10 if adx14 >= 20 else 0)
-        signal = 'ESPERAR'
-        reason = 'Filtro A/A+: falta confluencia o fuerza suficiente; se espera.'
-        if buy_adx_ok and buy_score >= 3 and buy_score > sell_score:
-            signal = 'COMPRA'
-            reason = 'Confluencia alcista A/A+: ' + ', '.join(k for k,v in buy_checks.items() if v) + '. ADX ' + str(round(adx14,1))
-        elif sell_adx_ok and sell_score >= 3 and sell_score > buy_score:
-            signal = 'VENTA'
-            reason = 'Confluencia bajista A/A+: ' + ', '.join(k for k,v in sell_checks.items() if v) + '. ADX ' + str(round(adx14,1))
-        selected_score = buy_score if signal == 'COMPRA' else sell_score if signal == 'VENTA' else max(buy_score, sell_score)
-        selected_quality = buy_quality if signal == 'COMPRA' else sell_quality if signal == 'VENTA' else max(buy_quality, sell_quality)
-        quality_grade = 'A+' if selected_score == 4 and adx14 >= 25 else 'A' if selected_score >= 3 and adx14 >= 20 else 'B' if selected_score >= 2 else 'C'
-        if signal == 'ESPERAR':
-            reason += ' Calidad actual: ' + quality_grade + ' (' + str(selected_quality) + '/100).'
-        stop_loss = None
-        take_profit = None
+        strategy = analyze_strategy(candles, interval, symbol)
+        raw_signal = strategy.get("signal", "WAIT")
+        pre_signal = bool(strategy.get("pre_signal"))
+        if pre_signal:
+            signal = "PRESEÑAL"
+        elif raw_signal == "BUY":
+            signal = "COMPRA"
+        elif raw_signal == "SELL":
+            signal = "VENTA"
+        else:
+            signal = "ESPERAR"
 
-        if signal == "COMPRA":
-            stop_loss = entry - 1.5 * atr14
-            take_profit = entry + 3.0 * atr14
-
-        elif signal == "VENTA":
-            stop_loss = entry + 1.5 * atr14
-            take_profit = entry - 3.0 * atr14
+        quality_grade = strategy.get("quality_grade", "C")
+        quality_score = strategy.get("quality_score", 0)
+        quality_label = {
+            "A+": "Excelente confluencia",
+            "A": "Buena confluencia",
+            "B": "Preseñal / vigilancia",
+            "C": "Confluencia insuficiente",
+        }.get(quality_grade, "Sin clasificar")
+        warning = (
+            "DATOS SIMULADOS: entorno TEST. No usar para operar ni enviar órdenes."
+            if DATA_MODE == "mock"
+            else "Señal técnica experimental. Verifica feed, costes y ejecución; no envía órdenes."
+        )
 
         return jsonify({
             "symbol": symbol,
             "interval": interval,
             "signal": signal,
-            "reason": reason,
-            "price": entry,
-            "entry": entry if signal != "ESPERAR" else None,
-            "stop_loss": stop_loss,
-            "take_profit": take_profit,
-            "ema20": ema20,
-            "ema50": ema50,
-            "rsi14": rsi14,
-            "atr14": atr14,
-            "adx14": adx14,
+            "reason": strategy.get("reason", "Esperando confirmación."),
+            "price": strategy.get("price", closes[-1]),
+            "entry": strategy.get("entry"),
+            "stop_loss": strategy.get("stop_loss"),
+            "take_profit": strategy.get("take_profit"),
+            "risk_distance": strategy.get("risk_distance"),
+            "risk_reward": strategy.get("risk_reward"),
+            "ema20": strategy.get("ema20", ema20),
+            "ema50": strategy.get("ema50", ema50),
+            "rsi14": strategy.get("rsi14", rsi14),
+            "atr14": strategy.get("atr14", atr14),
+            "adx14": strategy.get("adx14"),
+            "plus_di": strategy.get("plus_di"),
+            "minus_di": strategy.get("minus_di"),
             "macd": macd_line,
             "macd_signal": macd_signal,
-            "macd_histogram": macd_hist,
+            "macd_histogram": strategy.get("macd_histogram", macd_hist),
             "bollinger_upper": bb_upper,
             "bollinger_middle": bb_middle,
             "bollinger_lower": bb_lower,
-            "buy_score": buy_score,
-            "sell_score": sell_score,
-            "score_max": 4,
+            "buy_score": strategy.get("buy_score", 0),
+            "sell_score": strategy.get("sell_score", 0),
+            "score": strategy.get("score", 0),
+            "score_max": 7,
             "quality_grade": quality_grade,
-            "quality_score": selected_quality,
+            "quality_score": quality_score,
             "quality_max": 100,
-            "quality_label": {"A+": "Excelente", "A": "Buena", "B": "Débil", "C": "Insuficiente"}[quality_grade],
-            "quality_rule": "Solo COMPRA/VENTA con al menos 3/4 criterios y ADX>=20; A+ exige 4/4 y ADX>=25.",
+            "quality_label": quality_label,
+            "quality_rule": (
+                "A/A+: 6–7 de 7, MTF alineado y ruptura/retest; "
+                "B: vigilancia/preseñal sin entrada; C: esperar. "
+                "La puntuación no es una probabilidad de acierto."
+            ),
+            "pre_signal": pre_signal,
+            "pre_signal_side": strategy.get("pre_signal_side"),
+            "primary_bias": strategy.get("primary_bias"),
+            "mtf": strategy.get("mtf"),
+            "regime": strategy.get("regime"),
+            "structure": strategy.get("structure"),
+            "structure_trigger": strategy.get("structure_trigger"),
+            "score_components": strategy.get("score_components"),
+            "status_code": strategy.get("status_code"),
             "candle_time": candle_time,
             "candle_age_minutes": candle_age_minutes,
             "candles": len(candles),
             "recent_candles": [
-                {"time": candle["time"], "high": candle["high"], "low": candle["low"], "close": candle["close"]}
-                for candle in candles
+                {"time": candle["time"], "high": candle["high"],
+                 "low": candle["low"], "close": candle["close"]}
+                for candle in candles[-120:]
             ],
             "method": (
-                "EMA20/EMA50 + RSI14 + MACD + ADX14 + Bollinger(20,2); "
-                "score mínimo 3/4 y ADX>=18; SL=1.5x ATR; TP=3x ATR"
+                "MTF EMA20/50 (dos marcos superiores) + RSI14 + MACD + DI/ADX; "
+                "filtro de régimen; ruptura/retest de rango 20; SL estructural "
+                "con buffer ATR; TP objetivo 2R."
             ),
             "data_mode": DATA_MODE,
-            "warning": (
-                "DATOS SIMULADOS: panel de pruebas. No usar estas señales para operar."
-                if DATA_MODE == "mock" else
-                "Señal técnica experimental. Verifica datos, spread y riesgo antes de operar. No ejecuta órdenes."
-            ),
+            "warning": warning,
         })
-
     except requests.RequestException:
         return jsonify({
             "error": (

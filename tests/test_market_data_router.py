@@ -97,8 +97,13 @@ class RouterSafetyTests(unittest.TestCase):
 
     def test_stale_series_never_returns_a_signal_eligible_result(self):
         rows = sample_rows(self.now)
-        rows[-1]["time"] = (self.now - timedelta(hours=2)).isoformat()
-        with self.assertRaises(ValueError):
+        rows = [
+            {**row, "time": (
+                datetime.fromisoformat(row["time"]) - timedelta(hours=2)
+            ).isoformat()}
+            for row in rows
+        ]
+        with self.assertRaisesRegex(ValueError, "desactualizados"):
             normalize_closed_candles(rows, "5min", self.now)
 
     def test_quota_exhaustion_does_not_call_provider(self):

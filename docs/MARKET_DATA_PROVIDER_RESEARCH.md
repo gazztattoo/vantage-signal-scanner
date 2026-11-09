@@ -60,3 +60,15 @@ A provider that exposes the same ticker name is not automatically equivalent to 
 ## Immediate conclusion
 
 No free public API has been verified as a broker-equivalent, reliable live source for all three Vantage instruments. The safest practical route is the Vantage MT5 terminal feed as primary, with biquote as a possible all-three shadow comparator, AlgoSpecial/Dukascopy for historical cross-checks and Coinbase for BTC-USD spot comparison. This research did not call any market-data endpoint and did not consume Twelve Data credits.
+
+## Current code status in TEST
+
+The research branch also contains a vendor-neutral scaffold:
+
+- `market_data_router.py` defines the normalized closed-candle contract, process cache, provider policy, provider selection and freshness/OHLC validation.
+- Provider policies are disabled by default. The router refuses to run unless `mode="live"`, `live_enabled=True` and a shared atomic quota store have all been supplied.
+- The only included quota implementation is `InMemoryQuotaStore`, explicitly test-only; it is not accepted as a production global hard cap.
+- No vendor HTTP adapters are included, no provider endpoint is called, and the module is not wired into `app.py`.
+- `tests/test_market_data_router.py` uses fake adapters and a fake clock only. It covers mock-mode hard stop, shared-quota requirement, caching, provider budgets, open-bar filtering, OHLC validation, duplicate timestamps, stale data and whole-series failover.
+
+The existing TEST API remains `DATA_MODE="mock"` and `API_KEY=None`; its current analysis route continues to use local synthetic candles. Production was not modified. This is a tested-by-design scaffold, not a live market-data service; vendor adapters and a persistent quota implementation remain unapproved work.

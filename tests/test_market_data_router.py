@@ -78,11 +78,18 @@ class RouterSafetyTests(unittest.TestCase):
         self.assertTrue(second["cached"])
         self.assertEqual(len(calls), 1)
 
-    def test_incomplete_and_invalid_bars_are_rejected(self):
+    def test_open_bar_is_dropped_and_invalid_ohlc_is_rejected(self):
         rows = sample_rows(self.now)
         rows[-1]["is_closed"] = False
-        with self.assertRaises(ValueError):
-            normalize_closed_candles(rows, "5min", self.now)
+        closed = normalize_closed_candles(rows, "5min", self.now)
+        self.assertEqual(len(closed), 2)
+        self.assertNotEqual(closed[-1]["time"], rows[-1]["time"])
+
+        all_open = sample_rows(self.now)
+        for row in all_open:
+            row["is_closed"] = False
+        with self.assertRaisesRegex(ValueError, "velas cerradas"):
+            normalize_closed_candles(all_open, "5min", self.now)
 
         rows = sample_rows(self.now)
         rows[-1]["high"] = rows[-1]["low"] - 1

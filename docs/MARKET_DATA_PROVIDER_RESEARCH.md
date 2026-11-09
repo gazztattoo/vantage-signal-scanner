@@ -1,6 +1,7 @@
 # Market-data provider research and safe router plan
 
 **Prepared:** 2026-11-09  
+**Important limit note:** AlgoSpecial's general and category documentation disagree; conservative limits apply pending a permitted validation.
 **Branch:** `push-test`  
 **Decision status:** research complete; no live provider is approved or activated.
 
@@ -15,8 +16,8 @@ A provider that exposes the same ticker name is not automatically equivalent to 
 | Provider | Relevant coverage | Cost / limits stated in docs | Assessment |
 |---|---|---|---|
 | **Vantage MT5 terminal feed** | Exact broker symbols and broker OHLC, if exported from a logged-in MT5 terminal | No public, self-service market-data REST API found. Vantage Connect advertises institutional market-data / execution connectivity over FIX and MT bridges. | **Best source of truth.** A small MQL5 exporter running in desktop MT5 or a VPS can push closed M5/M15/M30 candles to the scanner. The iPhone MT5 app alone cannot host an Expert Advisor. |
-| **biquote** | EURUSD, XAUUSD, BTCUSD; documented M1/M5/M15/M30 and up to 1,000 bars per request | Public read endpoints, no key; documentation claims 15,000 requests/minute per IP | **Best all-three candidate for a controlled shadow evaluation, not approved for trading.** Its docs say candles combine Yahoo Finance bootstrap, live tick aggregation and MT5 historical feeds; the symbol catalogue says only around 280 of roughly 1,700 instruments quote at a time. Feed lineage and broker identity need validation. Always discard `isOpen=true` bars and inspect source/freshness. |
-| **AlgoSpecial preview API** | EURUSD, XAUUSD and BTCUSDT datasets; M5/M15/M30 | 60 requests/minute, 1,000/day per IP, 2,000 rows and 31-day range per request | **Historical/research candidate.** Documentation says timestamps use broker-server time, some legacy FX data has zero tick-volume/spread, and data is supplied as-is. Good for cross-checking and short backtests after timezone/quality reconciliation; not documented as a live feed. |
+| **biquote** | EURUSD, XAUUSD, BTCUSD; documented M1/M5/M15/M30 and up to 1,000 bars per request | Public read endpoints, no key; documentation claims 15,000 requests/minute per IP | **Best all-three candidate for a controlled shadow evaluation, not approved for trading.** Its docs say candles combine Yahoo Finance bootstrap, live tick aggregation and MT5 historical feeds; the symbol catalogue says only around 280 of roughly 1,700 instruments quote at a time. Feed lineage and broker identity need validation. A clear public redistribution/usage licence was not identified in the reviewed API reference, so legal/terms review is a prerequisite. Always discard `isOpen=true` bars and inspect source/freshness. |
+| **AlgoSpecial preview API** | EURUSD, XAUUSD and BTCUSDT datasets; M5/M15/M30 | 60 requests/minute and 1,000/day per IP. Its overview says 2,000 rows / 31 days, while category/rate-limit pages say up to 50,000 rows / 366 days. | **Historical/research candidate.** Documentation is internally inconsistent on row/date caps; use the stricter 2,000 rows / 31 days until reconciled. Timestamps use broker-server time, some legacy FX data has zero tick-volume/spread, and data is supplied as-is. Not documented as a live feed. |
 | **Dukascopy historical data** | EURUSD and XAUUSD history at M1/M5/M15/M30; BTCUSD historical candles are also exposed by the community dukascopy-node client | Historical downloads are free through the documented open-source client; large tick downloads involve many hourly batches | **Strong offline validation source.** Use bid/ask-aware history for backtests, not as a guaranteed live provider. The wrapper labels its real-time retrieval experimental, so do not use that path for live signals. |
 | **Coinbase Exchange public candles** | BTC-USD spot; 5-minute and 15-minute granularity are documented. M30 can be derived from complete M15 bars. | Public endpoint; historic-rate guidance says not to poll it frequently; historical response is capped at 300 candles per request in the published API spec | **Crypto-only comparator.** More transparent exchange provenance than a generic aggregator, but BTC-USD spot is not Vantage BTC/USD CFD. Do not use it to set Vantage entry/SL/TP levels. |
 | **Alpha Vantage** | FX intraday intervals include 5/15/30 minutes in the API schema | The official docs mark FX_INTRADAY as a premium function | **Not a free-tier replacement.** |
@@ -30,7 +31,8 @@ A provider that exposes the same ticker name is not automatically equivalent to 
 - AlgoSpecial free preview API (coverage, rate limits, timezone and usage terms): https://www.algospecial.com/data-api/
 - Dukascopy historical instrument example: https://www.dukascopy-node.app/instrument/eurusd
 - Dukascopy-node real-time method (explicitly experimental): https://www.dukascopy-node.app/downloading-real-time-data
-- Coinbase public API FAQ: https://help.coinbase.com/en/pro/other-topics/api/faq-on-api
+- Coinbase official candles endpoint (granularity and 300-candle cap): https://docs.cdp.coinbase.com/api-reference/exchange-api/rest-api/products/get-product-candles
+- Coinbase API FAQ (historic candles should not be polled frequently): https://help.coinbase.com/en/pro/other-topics/api/faq-on-api
 - Alpha Vantage API docs: https://www.alphavantage.co/documentation/
 - TraderMade free-tier guide: https://marketdata.tradermade.com/docs/restful-api/free-tier.pdf
 - OHLC plan limits: https://ohlc.io/docs/limits and https://ohlc.io/pricing

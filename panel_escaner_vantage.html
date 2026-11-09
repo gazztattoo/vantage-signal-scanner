@@ -938,7 +938,6 @@ async function update(){
     accessToken="";
     sessionStorage.removeItem("gss_access_token");
     showAccessGate();
-    accessError.textContent="Tu sesión ha caducado. Introduce de nuevo el código de acceso.";
     statusEl.textContent="Acceso requerido";
     dot.style.background="var(--amber)";
     button.disabled=false;
@@ -1220,7 +1219,6 @@ disablePushButton.addEventListener("click",async()=>{
   disablePushButton.disabled=true;
   pushStatus.textContent="Desactivando notificaciones en este dispositivo…";
   try{
-    if(!accessToken)throw new Error("Primero debes entrar al scanner.");
     const registration=await navigator.serviceWorker.ready;
     const subscription=await registration.pushManager.getSubscription();
     if(!subscription)throw new Error("No hay una suscripción activa en este dispositivo.");

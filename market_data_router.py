@@ -249,11 +249,22 @@ class MarketDataRouter:
             cache_key = (policy.name, symbol, interval, count)
             cached = self.cache.get(cache_key)
             if cached is not None:
-                return {
-                    "symbol": symbol, "interval": interval,
-                    "provider": policy.name, "cached": True,
-                    "candles": cached,
-                }
+                try:
+                    # Recheck freshness when serving cache; a short TTL must not
+                    # allow an otherwise stale series to become signal-eligible.
+                    cached = normalize_closed_candles(
+                        cached, interval, self.now(),
+                        max_age_intervals=policy.max_age_intervals,
+                        max_age_grace_seconds=policy.max_age_grace_seconds,
+                    )
+                except ValueError:
+                    cached = None
+                if cached is not None:
+                    return {
+                        "symbol": symbol, "interval": interval,
+                        "provider": policy.name, "cached": True,
+                        "candles": cached,
+                    }
 
             if not self.quota_store.reserve(
                 policy.name, policy.calls_per_day, policy.reserve_calls, self.now()

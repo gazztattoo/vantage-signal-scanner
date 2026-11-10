@@ -10,6 +10,7 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 import hmac
 import math
 from strategy_engine import analyze as analyze_strategy
+from mt5_ingest import normalize_mt5_batch
 
 app = Flask(__name__)
 CORS(app, resources={
@@ -23,6 +24,9 @@ CORS(app, resources={
 # Esta rama es exclusivamente de pruebas: no consulta proveedores de mercado.
 DATA_MODE = "mock"
 API_KEY = None
+# MT5 ingestion is a separate shadow feed; it never changes DATA_MODE or signal inputs.
+MT5_INGEST_TOKEN = os.environ.get("MT5_INGEST_TOKEN", "")
+MT5_TEST_SUPABASE_URL = "https://viiraygjdqwiuawnzyrc.supabase.co"
 PANEL_ACCESS_CODE = os.environ.get("PANEL_ACCESS_CODE", "")
 ACCESS_TOKEN_SECRET = os.environ.get("ACCESS_TOKEN_SECRET", "")
 TOKEN_MAX_AGE_SECONDS = 12 * 60 * 60
@@ -566,6 +570,69 @@ def health():
         "status": "ok",
         "analysis": True,
     })
+
+
+@app.route("/api/mt5/ingest", methods=["POST"])
+def ingest_mt5_candles():
+    """Accept closed Vantage MT5 candles into TEST-only shadow storage."""
+    if not MT5_INGEST_TOKEN:
+        return jsonify({"error": "La recepción MT5 no está habilitada en TEST."}), 503
+
+    supplied_token = request.headers.get("X-MT5-Token", "")
+    if not hmac.compare_digest(supplied_token, MT5_INGEST_TOKEN):
+        return jsonify({"error": "Token de ingestión no válido."}), 401
+
+    if request.content_length is not None and request.content_length > 256_000:
+        return jsonify({"error": "El lote supera el tamaño máximo permitido."}), 413
+    if not request.is_json:
+        return jsonify({"error": "El contenido debe ser JSON."}), 415
+
+    payload = request.get_json(silent=True)
+    try:
+        rows = normalize_mt5_batch(payload)
+    except (TypeError, ValueError) as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    # Hard boundary: even a misconfigured Render variable cannot write to production.
+    if SUPABASE_URL.rstrip("/") != MT5_TEST_SUPABASE_URL:
+        return jsonify({
+            "error": "Destino de base de datos no autorizado. Se exige el proyecto Supabase TEST."
+        }), 503
+    if not SUPABASE_SECRET_KEY:
+        return jsonify({"error": "Falta la clave de servidor de Supabase TEST."}), 503
+
+    try:
+        headers = {
+            **supabase_headers(),
+            "Prefer": "resolution=merge-duplicates,return=minimal",
+        }
+        response = requests.post(
+            SUPABASE_URL + "/rest/v1/mt5_market_candles",
+            params={"on_conflict": "symbol,timeframe,open_time"},
+            json=rows,
+            headers=headers,
+            timeout=15,
+        )
+    except (requests.RequestException, RuntimeError):
+        app.logger.error("Falló el transporte de ingestión MT5 hacia el almacenamiento TEST.")
+        return jsonify({"error": "No se pudo guardar el lote MT5 en TEST."}), 502
+
+    if response.status_code not in (200, 201, 204):
+        app.logger.error(
+            "Supabase TEST rechazó un lote MT5 con HTTP %s.",
+            response.status_code,
+        )
+        return jsonify({"error": "Supabase TEST rechazó el lote MT5."}), 502
+
+    return jsonify({
+        "ok": True,
+        "stored": len(rows),
+        "symbol": rows[0]["symbol"],
+        "timeframe": rows[0]["timeframe"],
+        "source": "VANTAGE_MT5",
+        "data_mode": DATA_MODE,
+        "signals_activated": False,
+    }), 200
 
 
 @app.route("/api/price")

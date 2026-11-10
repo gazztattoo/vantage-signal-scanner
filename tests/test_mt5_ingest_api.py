@@ -3,7 +3,6 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, patch
 
 import app
-from tests.test_mt5_ingest import Mt5IngestValidationTests
 
 
 def valid_payload():

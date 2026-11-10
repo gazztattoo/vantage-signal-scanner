@@ -6,8 +6,9 @@ import app
 
 
 def valid_payload():
-    now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
-    stamp = now - timedelta(minutes=5)
+    now = datetime.now(timezone.utc)
+    bucket = (int(now.timestamp()) // 300) * 300
+    stamp = datetime.fromtimestamp(bucket - 300, timezone.utc)
     server = stamp + timedelta(hours=2)
     return {
         "symbol": "EUR/USD",

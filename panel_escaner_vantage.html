@@ -479,6 +479,19 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 <script>
 const API_BASE="https://global-signal-push-test.onrender.com";
 const TEST_RESULTS_URL="https://viiraygjdqwiuawnzyrc.supabase.co/functions/v1/gss-test-results";
+const TEST_DASHBOARD_URL="https://viiraygjdqwiuawnzyrc.supabase.co/functions/v1/gss-test-dashboard";
+let dashboardPromise=null;
+async function readTestDashboard(){
+  if(!dashboardPromise){
+    dashboardPromise=(async()=>{
+      const response=await fetch(TEST_DASHBOARD_URL,{cache:"no-store",headers:{"apikey":SUPABASE_ANON_KEY,"Authorization":"Bearer "+SUPABASE_ANON_KEY}});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok||data.error)throw new Error(data.detail||data.error||"No se pudo leer el resumen TEST.");
+      return data;
+    })();
+  }
+  return dashboardPromise;
+}
 const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpaXJheWdqZHF3aXVhd256eXJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NTkxNDQsImV4cCI6MjEwOTAzNTE0NH0.aRyOsuKO7wqZNz6A_pn1ZVaLlR0LssoQHb3qdFzLfpE";
 let accessToken="";
 let storedResultsPromise=null;
@@ -1058,29 +1071,16 @@ document.getElementById("analysisSymbol").addEventListener("change",loadTechnica
 document.getElementById("analysisTimeframe").addEventListener("change",loadTechnicalAnalysis);
 
 async function loadLabStatus(){
-  const message=document.getElementById("labMessage");
-  const stats=document.getElementById("labStats");
-  const details=document.getElementById("labDetails");
-  message.textContent="Consultando almacenamiento y configuración del motor…";
-  stats.innerHTML="";details.innerHTML="";
+  const message=document.getElementById("labMessage"),stats=document.getElementById("labStats"),details=document.getElementById("labDetails");
+  message.textContent="Consultando estado de Supabase TEST…";stats.innerHTML="";details.innerHTML="";
   try{
-    const response=await fetch(API_BASE+"/api/lab-status",{headers:authHeaders()});
-    const data=await response.json().catch(()=>({}));
-    if(response.status===401){message.textContent="Sesión caducada. Vuelve a entrar al panel.";showAccessGate();return;}
-    if(!response.ok)throw new Error(data.error||"No se pudo cargar el diagnóstico.");
-    const records=data.records||{};
-    const values=[
-      ["Señales registradas",records.total_signals??0],
-      ["Pendientes",records.pending_signals??0],
-      ["Cerradas",records.closed_signals??0],
-      ["Dispositivos push",records.push_devices??0],
-      ["Proveedor de datos",data.provider_configured?"Configurado":"No configurado"],
-      ["Almacenamiento",data.storage_configured?"Conectado":"No conectado"]
-    ];
+    dashboardPromise=null;
+    const data=await readTestDashboard(),lab=data.lab||{},runs=data.runs||[],latest=data.latest_run;
+    const values=[["Ejecuciones completadas",runs.filter(x=>x.status==="completed").length],["Último ciclo",latest?new Date(latest.started_at).toLocaleTimeString("es-ES"):"—"],["Análisis guardados",data.stats?.total_analyses??0],["Llamadas a proveedores",lab.provider_calls??0],["Notificaciones",lab.notifications_enabled?"Habilitadas":"Deshabilitadas"],["Órdenes al broker",lab.broker_execution?"Habilitadas":"Deshabilitadas"],["Render necesario para analizar",lab.render_dependency?"Sí":"No"],["Modo de datos",data.mode==="mock"?"Simulados":"Desconocido"]];
     stats.innerHTML=values.map(([label,value])=>'<div class="stat-box"><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong></div>').join("");
-    const engine=data.engine||{};
-    details.innerHTML='<strong style="font-size:13px">Configuración activa del motor</strong><div class="data-list" style="margin-top:10px">'+Object.entries(engine).map(([key,value])=>'<div class="data-row"><div style="grid-column:1/-1"><span>'+esc(key.replaceAll("_"," "))+'</span><strong>'+esc(value)+'</strong></div></div>').join("")+'</div>';
-    message.textContent="Diagnóstico actualizado: "+new Date(data.checked_at).toLocaleString("es-ES")+" · "+(data.data_provider||"Proveedor no indicado");
+    const rows=[["Motor",lab.strategy||"—"],["Símbolos",(lab.symbols||[]).join(", ")],["Temporalidades",(lab.timeframes||[]).join(", ")],["Programación Cron",lab.cron_schedule||"—"],["Última ejecución",latest?latest.status+" · "+latest.results_count+" resultados":"Sin ejecución"],["Fuente de datos",lab.provider||"—"]];
+    details.innerHTML='<strong style="font-size:13px">Configuración de TEST</strong><div class="data-list" style="margin-top:10px">'+rows.map(([key,value])=>'<div class="data-row"><div style="grid-column:1/-1"><span>'+esc(key)+'</span><strong>'+esc(value)+'</strong></div></div>').join("")+'</div>';
+    message.textContent="Diagnóstico TEST actualizado · datos sintéticos · producción intacta.";
   }catch(error){message.textContent=error.message||"Error al consultar el laboratorio.";}
 }
 document.getElementById("labRefresh").addEventListener("click",loadLabStatus);
@@ -1088,71 +1088,36 @@ document.getElementById("labRefresh").addEventListener("click",loadLabStatus);
 function authHeaders(){return {"Authorization":"Bearer "+accessToken};}
 function statusClass(status){return status==="TP"?"tp":status==="SL"?"sl":"";}
 async function loadHistory(){
-  const message=document.getElementById("historyMessage");
-  const list=document.getElementById("historyList");
-  message.textContent="Consultando historial…";list.innerHTML="";
-  const params=new URLSearchParams({limit:"100"});
-  const deepLink=new URLSearchParams(window.location.search);
-  const symbol=deepLink.get("symbol")||document.getElementById("historySymbol").value;
-  const timeframe=deepLink.get("timeframe")||document.getElementById("historyTimeframe").value;
-  const candleTime=deepLink.get("candle_time")||"";
-  const state=document.getElementById("historyStatus").value;
-  if(symbol){params.set("symbol",symbol);document.getElementById("historySymbol").value=symbol;}
-  if(timeframe){params.set("timeframe",timeframe);document.getElementById("historyTimeframe").value=timeframe;}
-  if(candleTime)params.set("candle_time",candleTime);
-  if(state)params.set("status",state);
-  const controller=new AbortController();
-  const timeoutId=setTimeout(()=>controller.abort(),60000);
+  const message=document.getElementById("historyMessage"),list=document.getElementById("historyList");
+  message.textContent="Consultando ciclos de análisis TEST…";list.innerHTML="";
   try{
-    const response=await fetch(API_BASE+"/api/history?"+params,{headers:authHeaders(),signal:controller.signal});
-    const data=await response.json().catch(()=>({}));
-    if(response.status===401){message.textContent="Sesión caducada. Vuelve a entrar al panel.";showAccessGate();return;}
-    if(!response.ok)throw new Error(data.error||"No se pudo cargar el historial.");
-    const rows=data.signals||[];
-    message.textContent=deepLink.has("candle_time")?"Señal de la notificación · "+rows.length+" registro(s) exacto(s).":rows.length+" señal(es) encontrada(s).";
-    if(!rows.length){list.innerHTML='<div class="empty-state">Todavía no hay señales guardadas con estos filtros.<br>Cuando aparezca una nueva señal COMPRA o VENTA, se registrará aquí.</div>';return;}
+    dashboardPromise=null;
+    const data=await readTestDashboard();
+    const symbol=document.getElementById("historySymbol").value,timeframe=document.getElementById("historyTimeframe").value,state=document.getElementById("historyStatus").value;
+    let rows=data.history||[];
+    if(symbol)rows=rows.filter(x=>x.symbol===symbol);
+    if(timeframe)rows=rows.filter(x=>x.timeframe===timeframe);
+    if(state&&state!=="PENDIENTE")rows=[];
+    message.textContent=rows.length+" análisis simulados encontrados · no son operaciones ni señales históricas reales.";
+    if(!rows.length){list.innerHTML='<div class="empty-state">No hay análisis TEST con estos filtros.</div>';return;}
     list.innerHTML=rows.map(row=>{
-      const date=row.signal_at?new Date(row.signal_at).toLocaleString("es-ES"):"—";
-      const timeframeLabel=({"5min":"M5","15min":"M15","30min":"M30"})[row.timeframe]||row.timeframe;
-      return '<article class="data-row"><div><span>Mercado · '+esc(timeframeLabel)+'</span><strong>'+esc(row.symbol)+' · '+esc(row.direction)+'</strong><span>'+esc(date)+'</span></div><div><span>Entrada</span><strong>'+fmt(row.entry_price,8)+'</strong><span>SL '+fmt(row.stop_loss,8)+'</span></div><div><span>Take profit</span><strong>'+fmt(row.take_profit,8)+'</strong><span class="data-status '+statusClass(row.status)+'">'+esc(row.status)+'</span></div></article>';
+      const date=row.scanned_at?new Date(row.scanned_at).toLocaleString("es-ES"):"—",tf=({"5min":"M5","15min":"M15","30min":"M30"})[row.timeframe]||row.timeframe;
+      const signal=row.pre_signal?"PRESEÑAL "+(row.pre_signal_side||""):(row.signal==="BUY"?"COMPRA":row.signal==="SELL"?"VENTA":"ESPERAR");
+      return '<article class="data-row"><div><span>TEST · '+esc(tf)+'</span><strong>'+esc(row.symbol)+' · '+esc(signal)+'</strong><span>'+esc(date)+'</span></div><div><span>Precio simulado</span><strong>'+fmt(row.price,8)+'</strong><span>Puntuación '+esc(row.score??"—")+'/7</span></div><div><span>Calidad</span><strong>'+esc(row.quality_grade||"—")+'</strong><span class="data-status">'+esc(row.status_code||"SIMULADO")+'</span></div></article>';
     }).join("");
-  }catch(error){
-    message.textContent=error.name==="AbortError"
-      ?"El servidor tardó demasiado en responder. Pulsa Actualizar para intentarlo de nuevo."
-      :(error.message||"Error al consultar el historial.");
-    list.innerHTML="";
-  }finally{
-    clearTimeout(timeoutId);
-  }
+  }catch(error){message.textContent=error.message||"Error al consultar los ciclos TEST.";}
 }
 async function loadPerformance(){
-  const message=document.getElementById("performanceMessage");
-  const stats=document.getElementById("performanceStats");
-  const breakdown=document.getElementById("performanceBreakdown");
-  message.textContent="Calculando efectividad…";stats.innerHTML="";breakdown.innerHTML="";
+  const message=document.getElementById("performanceMessage"),stats=document.getElementById("performanceStats"),breakdown=document.getElementById("performanceBreakdown");
+  message.textContent="Calculando métricas de prueba…";stats.innerHTML="";breakdown.innerHTML="";
   try{
-    const response=await fetch(API_BASE+"/api/performance",{headers:authHeaders()});
-    const data=await response.json().catch(()=>({}));
-    if(response.status===401){message.textContent="Sesión caducada. Vuelve a entrar al panel.";showAccessGate();return;}
-    if(!response.ok)throw new Error(data.error||"No se pudieron cargar las estadísticas.");
-    const values=[
-      ["Señales registradas",data.total_signals??0],
-      ["Pendientes",data.pending??0],
-      ["Resultados cerrados",data.closed_trades??0],
-      ["Ganadas (TP)",data.wins??0],
-      ["Perdidas (SL)",data.losses??0],
-      ["Porcentaje de acierto",data.win_rate===null?"—":data.win_rate+"%"],
-      ["Expectativa media",data.expectancy_r===null?"—":data.expectancy_r+" R"],
-      ["Factor de beneficio",data.profit_factor==="inf"?"∞":data.profit_factor??"—"]
-    ];
+    dashboardPromise=null;
+    const data=await readTestDashboard(),s=data.stats||{};
+    const values=[["Análisis realizados",s.total_analyses??0],["Señales confirmadas",s.confirmed_signals??0],["Preseñales",s.pre_signals??0],["En espera",s.waiting??0],["Operaciones cerradas",s.closed_trades??0],["Ganadas","No disponible"],["Perdidas","No disponible"],["Porcentaje de acierto","No disponible"]];
     stats.innerHTML=values.map(([label,value])=>'<div class="stat-box"><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong></div>').join("");
-    const groups=Object.entries(data.breakdown||{});
-    const groupHtml=groups.length?'<div class="data-panel"><strong style="font-size:12px">Resultados por mercado y temporalidad</strong></div>'+groups.map(([name,item])=>'<article class="data-row"><div><span>Mercado / temporalidad · señales '+item.total+'</span><strong>'+esc(name)+'</strong></div><div><span>Ganadas / perdidas</span><strong>'+item.wins+' / '+item.losses+'</strong></div><div><span>Pendientes</span><strong>'+item.pending+'</strong></div></article>').join(""):'<div class="empty-state">Todavía no hay señales registradas.</div>';
-    const sides=Object.entries(data.direction_breakdown||{});
-    const sideHtml=sides.length?'<div class="data-panel"><strong style="font-size:12px">Efectividad por dirección</strong></div>'+sides.map(([name,item])=>'<article class="data-row"><div><span>Dirección · señales '+item.total+'</span><strong>'+esc(name)+'</strong></div><div><span>Ganadas</span><strong>'+item.wins+'</strong></div><div><span>Perdidas</span><strong>'+item.losses+'</strong></div></article>').join(""):"";
-    breakdown.innerHTML=groupHtml+sideHtml;
-    message.textContent=(data.sample_note?data.sample_note+" ":"")+(data.note||"Resultados simulados del scanner.")+(data.truncated?" Atención: se alcanzó el límite de lectura; la estadística puede estar incompleta.":"");
-  }catch(error){message.textContent=error.message||"Error al calcular rendimiento.";}
+    breakdown.innerHTML='<div class="empty-state">'+esc(s.performance_note||"No hay resultados de operaciones cerradas.")+'<br>Los análisis utilizan velas sintéticas; no calculamos rentabilidad ni win rate con estos datos.</div>';
+    message.textContent="Estadísticas de ejecución TEST · "+(data.runs||[]).length+" ciclos almacenados.";
+  }catch(error){message.textContent=error.message||"Error al calcular estadísticas TEST.";}
 }
 document.getElementById("historyRefresh").addEventListener("click",loadHistory);
 ["historySymbol","historyTimeframe","historyStatus"].forEach(id=>document.getElementById(id).addEventListener("change",loadHistory));

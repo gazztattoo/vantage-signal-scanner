@@ -575,6 +575,8 @@ def health():
 @app.route("/api/mt5/ingest", methods=["POST"])
 def ingest_mt5_candles():
     """Accept closed Vantage MT5 candles into TEST-only shadow storage."""
+    if DATA_MODE != "mock":
+        return jsonify({"error": "La ingestión MT5 está limitada al entorno TEST."}), 403
     if not MT5_INGEST_TOKEN:
         return jsonify({"error": "La recepción MT5 no está habilitada en TEST."}), 503
 

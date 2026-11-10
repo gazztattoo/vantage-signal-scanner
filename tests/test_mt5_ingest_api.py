@@ -60,6 +60,16 @@ class TestMt5IngestEndpoint(unittest.TestCase):
         self.assertEqual(response.status_code, 503)
         db_post.assert_not_called()
 
+    def test_ingestion_is_refused_outside_mock_test_mode(self):
+        with patch.object(app, "DATA_MODE", "live"):
+            with patch.object(app.requests, "post") as db_post:
+                response = self.client.post(
+                    "/api/mt5/ingest", json=valid_payload(),
+                    headers={"X-MT5-Token": "test-only-mt5-token"},
+                )
+        self.assertEqual(response.status_code, 403)
+        db_post.assert_not_called()
+
     def test_rejects_unconfigured_token_and_database_credentials(self):
         with patch.object(app, "MT5_INGEST_TOKEN", ""):
             response = self.client.post("/api/mt5/ingest", json=valid_payload())

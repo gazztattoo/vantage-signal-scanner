@@ -397,8 +397,7 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
     <option value="5min">M5 · automático</option>
     <option value="15min">M15 · automático</option>
     <option value="30min">M30 · manual</option>
-  </select>
-  <button id="refresh">↻ Actualizar análisis</button>
+  </select>  <button id="refresh">↻ Actualizar análisis</button>
   <span class="hint" id="updated">M5 y M15 se escanean automáticamente. M30 solo al solicitarlo.</span>
 </section>
 
@@ -482,7 +481,52 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 
 <script>
 const API_BASE="https://global-signal-push-test.onrender.com";
+const TEST_RESULTS_URL="https://viiraygjdqwiuawnzyrc.supabase.co/functions/v1/gss-test-results";
+const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpaXJheWdqZHF3aXVhd256eXJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NTkxNDQsImV4cCI6MjEwOTAzNTE0NH0.aRyOsuKO7wqZNz6A_pn1ZVaLlR0LssoQHb3qdFzLfpE";
 let accessToken="";
+let storedResultsPromise=null;
+
+async function readLatestTestResults(){
+  if(!storedResultsPromise){
+    storedResultsPromise=(async()=>{
+      const response=await fetch(TEST_RESULTS_URL,{
+        cache:"no-store",
+        headers:{"apikey":SUPABASE_ANON_KEY,"Authorization":"Bearer "+SUPABASE_ANON_KEY}
+      });
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok||data.error)throw new Error(data.detail||data.error||"No se pudieron leer los resultados de Supabase TEST.");
+      if(!data.latest_run)throw new Error("Supabase TEST todavía no tiene una ejecución completada.");
+      return data;
+    })();
+  }
+  return storedResultsPromise;
+}
+
+async function loadStoredTestAnalysis(symbol,interval){
+  const snapshot=await readLatestTestResults();
+  const row=(snapshot.results||[]).find(item=>item.symbol===symbol&&item.timeframe===interval);
+  if(!row)throw new Error("Aún no hay resultados guardados para "+symbol+" · "+interval.toUpperCase()+".");
+  const details=row.details||{};
+  const displaySignal=row.pre_signal?"PRESEÑAL":row.signal==="BUY"?"COMPRA":row.signal==="SELL"?"VENTA":"ESPERAR";
+  return {
+    ...details,
+    symbol:row.symbol,
+    interval:row.timeframe,
+    signal:displaySignal,
+    pre_signal:row.pre_signal===true,
+    pre_signal_side:row.pre_signal_side||null,
+    price:row.price??details.price,
+    entry:row.entry??null,
+    stop_loss:row.stop_loss??null,
+    take_profit:row.take_profit??null,
+    risk_reward:row.risk_reward??null,
+    candle_time:row.candle_time??details.candle_time,
+    quality_grade:row.quality_grade??details.quality_grade,
+    score:row.score??details.score,
+    warning:"DATOS SIMULADOS: entorno TEST. No usar para operar ni enviar órdenes.",
+    method:"Motor MTF · EMA 20/50 · RSI 14 · ATR 14 · ADX/DI · MACD · ruptura/retest · objetivo 2R."
+  };
+}
 const accessGate=document.getElementById("accessGate"), accessForm=document.getElementById("accessForm"), accessCodeInput=document.getElementById("accessCode"), accessError=document.getElementById("accessError"), accessSubmit=document.getElementById("accessSubmit");
 function showAccessGate(){accessGate.hidden=true;} function hideAccessGate(){accessGate.hidden=true;}
 async function requestAccess(code){const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),20000);try{const response=await fetch(API_BASE+"/api/access",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json","Cache-Control":"no-cache"},body:JSON.stringify({code}),signal:controller.signal});const data=await response.json().catch(()=>({}));if(!response.ok||!data.token)throw new Error(data.error||`No se pudo validar el código (HTTP ${response.status}).`);const check=await fetch(API_BASE+"/api/access/verify",{cache:"no-store",headers:{"Authorization":"Bearer "+data.token,"Cache-Control":"no-cache"},signal:controller.signal});const verification=await check.json().catch(()=>({}));if(!check.ok||verification.valid!==true)throw new Error("El servidor aceptó el código, pero rechazó la sesión ("+(verification.stage||"verificación fallida")+", HTTP "+check.status+").");accessToken=data.token;sessionStorage.setItem("gss_access_token",accessToken);}catch(error){if(error.name==="AbortError")throw new Error("El servidor TEST no respondió en 20 segundos.");throw error;}finally{clearTimeout(timeout);}}
@@ -796,27 +840,7 @@ cards.addEventListener("click",async event=>{
 });
 
 async function load(m){
-  const p=new URLSearchParams({
-    symbol:m.symbol,
-    interval:document.getElementById("interval").value
-  });
-
-  const r=await fetch(`${API_BASE}/api/analysis?${p}`,{cache:"no-store",headers:{"Authorization":"Bearer "+accessToken,"Cache-Control":"no-cache"}});
-
-  let d;
-  try{
-    d=await r.json();
-  }catch{
-    throw Error("La API no devolvió JSON válido");
-  }
-
-  if(!r.ok||d.error){
-    const error=new Error(d.error||`Error HTTP ${r.status}`);
-    error.status=r.status;
-    throw error;
-  }
-
-  return d;
+  return await loadStoredTestAnalysis(m.symbol,document.getElementById("interval").value);
 }
 
 
@@ -904,6 +928,7 @@ function updateOverview(results){
 }
 
 async function update(){
+  storedResultsPromise=null;
   button.disabled=true;
   statusEl.textContent="Consultando análisis…";
   dot.style.background="var(--amber)";
@@ -915,22 +940,7 @@ async function update(){
     </article>
   `).join("");
 
-  let marketState={};
-  try{
-    const marketResponse=await fetch(API_BASE+"/api/market-status");
-    if(marketResponse.ok){
-      const marketData=await marketResponse.json();
-      marketState=marketData.markets||{};
-    }
-  }catch(error){
-    console.warn("No se pudo consultar el horario de mercado",error);
-  }
-
   const out=await Promise.all(markets.map(async m=>{
-    const session=marketState[m.symbol];
-    if(session && !session.open){
-      return {m,marketClosed:true,err:"MERCADO CERRADO · No se generan señales ni alertas fuera de la sesión habitual."};
-    }
     try{
       return {m,d:await load(m)};
     }catch(e){
@@ -979,14 +989,19 @@ async function update(){
 
   statusEl.textContent=
     fails===0
-      ?"Motor conectado"
+      ?"Supabase TEST conectado"
       :fails===markets.length
-        ?"Error de conexión"
+        ?"Error de conexión con Supabase"
         :"Conexión parcial";
 
   dot.style.background=fails===0?"var(--green)":"var(--red)";
-  updated.textContent="Actualizado: "+
-    new Date().toLocaleTimeString("es-ES");
+  try{
+    const snapshot=await readLatestTestResults();
+    updated.textContent="Último ciclo automático: "+
+      new Date(snapshot.latest_run.started_at).toLocaleTimeString("es-ES");
+  }catch{
+    updated.textContent="No se pudo leer la hora del último ciclo";
+  }
 
   button.disabled=false;
 }
@@ -1019,11 +1034,8 @@ async function loadTechnicalAnalysis(){
   const interval=document.getElementById("analysisTimeframe").value;
   message.textContent="Consultando indicadores…";result.innerHTML="";
   try{
-    const params=new URLSearchParams({symbol,interval});
-    const response=await fetch(API_BASE+"/api/analysis?"+params,{headers:authHeaders()});
-    const data=await response.json().catch(()=>({}));
-    if(response.status===401){message.textContent="Sesión caducada. Vuelve a entrar al panel.";showAccessGate();return;}
-    if(!response.ok||data.error)throw new Error(data.error||"No se pudo obtener el análisis.");
+    storedResultsPromise=null;
+    const data=await loadStoredTestAnalysis(symbol,interval);
     const fields=[
       ["Señal",first(data,["signal","direction","recommendation"])||"—"],
       ["Precio",fmt(first(data,["price","entry"]),8)],
@@ -1197,7 +1209,6 @@ async function restorePushState(){
   }
 }
 restorePushState();
-
 function urlBase64ToUint8Array(value){
   const padding="=".repeat((4-value.length%4)%4);
   const base64=(value+padding).replace(/-/g,"+").replace(/_/g,"/");

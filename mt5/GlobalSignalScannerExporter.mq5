@@ -265,7 +265,9 @@ void SyncTimeframe(const int timeframe_index)
    int cursor = 0;
    while(cursor < copied)
    {
-      int end_index = MathMin(cursor + InpBatchSize, copied);
+      int end_index = cursor + InpBatchSize;
+      if(end_index > copied)
+         end_index = copied;
       if(!SendBatch(timeframe_index, rates, cursor, end_index))
          return; // Keep the last confirmed timestamp; retry this chunk next timer.
       cursor = end_index;

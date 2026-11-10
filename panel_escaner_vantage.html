@@ -1162,6 +1162,8 @@ document.getElementById("historyRefresh").addEventListener("click",loadHistory);
 
 button.addEventListener("click",update);
 document.getElementById("interval").addEventListener("change",update);
+// Keep an open TEST panel synchronized with Supabase scheduled scans.
+setInterval(()=>{if(!document.hidden)update();},5*60*1000);
 hideAccessGate();update();
 
 const pushStatus=document.getElementById("pushStatus");

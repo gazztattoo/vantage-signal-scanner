@@ -38,12 +38,30 @@ class TestMockStrategyAPI(unittest.TestCase):
                         response = self.client.get(
                             f"/api/analysis?symbol={symbol}&interval={interval}"
                         )
-                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(
+                        response.status_code, 200,
+                        response.get_data(as_text=True),
+                    )
                     network_get.assert_not_called()
                     payload = response.get_json()
                     self.assertEqual(payload["data_mode"], "mock")
+                    self.assertEqual(payload["symbol"], symbol)
                     self.assertEqual(payload["interval"], interval)
                     self.assertEqual(payload["candles"], 1200)
+                    self.assertIn(
+                        payload["signal"],
+                        {"COMPRA", "VENTA", "ESPERAR", "PRESEÑAL"},
+                    )
+                    for field in (
+                        "price", "ema20", "ema50", "rsi14", "atr14",
+                        "macd", "bollinger_upper", "bollinger_middle",
+                        "bollinger_lower", "mtf", "regime", "structure",
+                        "pre_signal", "candle_time", "candle_age_minutes",
+                        "recent_candles", "warning",
+                    ):
+                        self.assertIn(field, payload, f"Falta {field} para {symbol} {interval}")
+                    self.assertTrue(payload["recent_candles"])
+                    self.assertIn("DATOS SIMULADOS", payload["warning"])
 
 
 if __name__ == "__main__":

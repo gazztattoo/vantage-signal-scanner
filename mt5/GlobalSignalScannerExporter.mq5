@@ -321,9 +321,9 @@ int OnInit()
    g_base_url = InpApiBaseUrl;
    while(StringLen(g_base_url) > 0 &&
          StringSubstr(g_base_url, StringLen(g_base_url) - 1, 1) == "/")
-      StringResize(g_base_url, StringLen(g_base_url) - 1);
+      g_base_url = StringSubstr(g_base_url, 0, StringLen(g_base_url) - 1);
 
-   if(StringFind(g_base_url, "https://global-signal-push-test.onrender.com") != 0)
+   if(g_base_url != "https://global-signal-push-test.onrender.com")
    {
       Print("GSS MT5: por seguridad, este EA solo acepta la URL del backend TEST.");
       return INIT_PARAMETERS_INCORRECT;

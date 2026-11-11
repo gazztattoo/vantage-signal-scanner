@@ -11,6 +11,7 @@ import hmac
 import math
 from strategy_engine import analyze as analyze_strategy
 from mt5_ingest import normalize_mt5_batch
+from experimental_gate import evaluate_shadow_gate
 
 app = Flask(__name__)
 CORS(app, resources={
@@ -760,7 +761,7 @@ def analysis():
             else "Señal técnica experimental. Verifica feed, costes y ejecución; no envía órdenes."
         )
 
-        return jsonify({
+        response_payload = {
             "symbol": symbol,
             "interval": interval,
             "signal": signal,
@@ -821,7 +822,12 @@ def analysis():
             ),
             "data_mode": DATA_MODE,
             "warning": warning,
-        })
+        }
+        # Shadow-only comparison: the original signal is never modified or activated.
+        response_payload["experimental_shadow"] = evaluate_shadow_gate(
+            symbol=symbol, timeframe=interval, signal=raw_signal, data_mode=DATA_MODE
+        )
+        return jsonify(response_payload)
     except requests.RequestException:
         return jsonify({
             "error": (

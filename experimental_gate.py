@@ -7,8 +7,7 @@ from __future__ import annotations
 
 POLICY_VERSION = "shadow-allowlist-v0"
 ALLOWED_COMBINATIONS = frozenset({
-    ("EURUSD", "15min", "BUY"),
-    ("XAUUSD", "15min", "SELL"),
+    ("XAUUSD", "15min", "BUY"),
 })
 
 def evaluate_shadow_gate(symbol: str, timeframe: str, signal: str, data_mode: str = "mock") -> dict:

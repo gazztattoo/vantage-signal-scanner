@@ -678,6 +678,11 @@ function render(m,d,err,marketClosed=false){
   const structureLabel=structureType==="BREAKOUT"?"RUPTURA":structureType==="RETEST"?"RETEST":structureType==="PENDING"?"ZONA PRÓXIMA":"SIN CONFIRMAR";
   const regime=String(first(d,["regime"])||"—").toUpperCase();
   const regimeLabel=regime==="TREND"?"TENDENCIA":regime==="RANGE"?"LATERAL":regime==="TRANSITION"?"TRANSICIÓN":regime;
+  const shadow=first(d,["experimental_shadow"])||{};
+  const shadowLabel=shadow.decision==="WOULD_ALLOW"?"LA DEJARÍA PASAR":shadow.decision==="WOULD_BLOCK"?"LA BLOQUEARÍA":"SIN ENTRADA QUE FILTRAR";
+  const shadowPanel=shadow.mode==="shadow"
+    ? '<div style="margin:10px 0;padding:10px 12px;border:1px dashed #68716b;border-radius:10px;background:#101512"><div style="font-size:9px;letter-spacing:.7px;color:var(--muted)">FILTRO EXPERIMENTAL · MODO SOMBRA · NO APLICA BLOQUEOS</div><strong style="display:block;margin-top:4px;font-size:13px">'+esc(shadowLabel)+'</strong><div style="font-size:10px;color:var(--muted);margin-top:3px">'+esc(shadow.reason||"Comparación informativa.")+'</div></div>'
+    : "";
 
   return `
     <article class="card">
@@ -710,6 +715,8 @@ function render(m,d,err,marketClosed=false){
           <div style="font-size:9px;color:var(--muted)">Puntuación técnica</div>
         </div>
       </div>
+
+      ${shadowPanel}
 
       <div class="metrics">
         <div class="metric">

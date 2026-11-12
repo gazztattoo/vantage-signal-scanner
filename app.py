@@ -1283,6 +1283,54 @@ def resolve_pending_signal_outcomes(symbol, interval, recent_candles):
 
 SIGNAL_CRON_SECRET = os.environ.get("SIGNAL_CRON_SECRET", "")
 
+
+def build_test_alert_event(analysis):
+    """Build a TEST-only alert preview; never sends a push or creates an order."""
+    if not isinstance(analysis, dict):
+        raise ValueError("analysis must be an object")
+    symbol = get_symbol(analysis.get("symbol"))
+    interval = analysis.get("interval")
+    if not symbol or interval not in ALLOWED_INTERVALS:
+        raise ValueError("unsupported symbol or timeframe")
+    if analysis.get("pre_signal") is True:
+        side = analysis.get("pre_signal_side")
+        if side not in ("BUY", "SELL"):
+            return None
+        return {
+            "event_type": "PREALERTA",
+            "symbol": symbol, "interval": interval, "side": side,
+            "entry": None, "stop_loss": None, "take_profit": None,
+            "message": f"{symbol} · {interval}: posible {side}. Prepara MT5; todavía no hay entrada confirmada.",
+        }
+    direction = analysis.get("signal")
+    if direction in ("BUY", "SELL"):
+        return {
+            "event_type": "ENTRADA_VALIDADA",
+            "symbol": symbol, "interval": interval, "side": direction,
+            "entry": analysis.get("entry"), "stop_loss": analysis.get("stop_loss"),
+            "take_profit": analysis.get("take_profit"),
+            "message": f"{symbol} · {interval}: {direction} confirmada.",
+        }
+    return None
+
+
+@app.route("/api/test/alert-preview", methods=["POST"])
+def test_alert_preview():
+    """Offline preview of the two-stage alert contract. No push, provider or broker."""
+    if DATA_MODE != "mock":
+        return jsonify({"error": "Este endpoint es exclusivo de TEST."}), 403
+    payload = request.get_json(silent=True) or {}
+    try:
+        event = build_test_alert_event(payload.get("analysis"))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({
+        "ok": True, "dry_run": True, "push_sent": False,
+        "provider_calls": 0, "orders_sent": False,
+        "event": event,
+    })
+
+
 @app.route("/api/push/scan", methods=["POST"])
 def push_scan():
     if DATA_MODE == "mock":

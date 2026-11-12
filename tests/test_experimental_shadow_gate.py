@@ -20,8 +20,9 @@ class ExperimentalShadowGateTests(unittest.TestCase):
         self.assertFalse(result["safety"]["orders_enabled"])
 
     def test_wrong_direction_would_be_blocked(self):
-        result = evaluate_shadow_gate("XAU/USD", "15min", "BUY")
+        result = evaluate_shadow_gate("XAU/USD", "15min", "SELL")
         self.assertEqual(result["decision"], "WOULD_BLOCK")
+        self.assertTrue(result["would_block"])
 
     def test_wait_is_not_counted_as_blocked(self):
         result = evaluate_shadow_gate("BTC/USD", "5min", "WAIT")

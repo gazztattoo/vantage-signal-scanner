@@ -6,9 +6,14 @@ Input CSV is already aggregated to M5, M15, or M30 and must contain UTC timestam
 Signals are evaluated at candle close; execution is at the next candle open.
 """
 from __future__ import annotations
-import argparse, csv, json, math
+import argparse, csv, json, math, sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+# Make direct execution work from repository root or tools/.
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 from strategy_engine import analyze
 
 TF_MAP = {"M5": "5min", "M15": "15min", "M30": "30min"}

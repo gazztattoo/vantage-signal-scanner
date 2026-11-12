@@ -2,15 +2,15 @@ import unittest
 from experimental_gate import evaluate_shadow_gate
 
 class ExperimentalShadowGateTests(unittest.TestCase):
-    def test_eur_buy_is_observed_as_allowed(self):
-        result = evaluate_shadow_gate("EUR/USD", "15min", "BUY")
+    def test_xau_buy_is_the_only_research_candidate(self):
+        result = evaluate_shadow_gate("XAU/USD", "15min", "BUY")
         self.assertEqual(result["decision"], "WOULD_ALLOW")
         self.assertFalse(result["would_block"])
         self.assertFalse(result["enabled"])
 
-    def test_xau_sell_is_observed_as_allowed(self):
-        result = evaluate_shadow_gate("XAU/USD", "15min", "SELL")
-        self.assertEqual(result["decision"], "WOULD_ALLOW")
+    def test_eur_buy_is_not_allowlisted(self):
+        result = evaluate_shadow_gate("EUR/USD", "15min", "BUY")
+        self.assertEqual(result["decision"], "WOULD_BLOCK")
 
     def test_btc_signal_would_be_blocked_without_changing_original(self):
         result = evaluate_shadow_gate("BTC/USD", "5min", "BUY")

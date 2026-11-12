@@ -1085,9 +1085,17 @@ async function loadLabStatus(){
     const data=await readTestDashboard(),lab=data.lab||{},runs=data.runs||[],latest=data.latest_run;
     const values=[["Ejecuciones completadas",runs.filter(x=>x.status==="completed").length],["Último ciclo",latest?new Date(latest.started_at).toLocaleTimeString("es-ES"):"—"],["Análisis guardados",data.stats?.total_analyses??0],["Llamadas a proveedores",lab.provider_calls??0],["Notificaciones",lab.notifications_enabled?"Habilitadas":"Deshabilitadas"],["Órdenes al broker",lab.broker_execution?"Habilitadas":"Deshabilitadas"],["Render necesario para analizar",lab.render_dependency?"Sí":"No"],["Modo de datos",data.mode==="mock"?"Simulados":"Desconocido"]];
     stats.innerHTML=values.map(([label,value])=>'<div class="stat-box"><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong></div>').join("");
-    const rows=[["Motor",lab.strategy||"—"],["Símbolos",(lab.symbols||[]).join(", ")],["Temporalidades",(lab.timeframes||[]).join(", ")],["Programación Cron",lab.cron_schedule||"—"],["Última ejecución",latest?latest.status+" · "+latest.results_count+" resultados":"Sin ejecución"],["Fuente de datos",lab.provider||"—"]];
-    details.innerHTML='<strong style="font-size:13px">Configuración de TEST</strong><div class="data-list" style="margin-top:10px">'+rows.map(([key,value])=>'<div class="data-row"><div style="grid-column:1/-1"><span>'+esc(key)+'</span><strong>'+esc(value)+'</strong></div></div>').join("")+'</div>';
-    message.textContent="Diagnóstico TEST actualizado · datos sintéticos · producción intacta.";
+    const alertEvents=data.alert_events||[],alertStats=data.alert_event_stats||{};
+    const rows=[["Motor",lab.strategy||"—"],["Símbolos",(lab.symbols||[]).join(", ")],["Temporalidades",(lab.timeframes||[]).join(", ")],["Programación Cron",lab.cron_schedule||"—"],["Última ejecución",latest?latest.status+" · "+latest.results_count+" resultados":"Sin ejecución"],["Fuente de datos",lab.provider||"—"],["Alertas de prueba",alertStats.total??0],["PREALERTAS",alertStats.prealerts??0],["ENTRADAS VALIDADAS",alertStats.confirmed_entries??0],["Entrega","Solo vista previa · sin push"],["Llamadas a proveedores",alertStats.provider_calls??0],["Órdenes al broker",alertStats.broker_orders_sent??0]];
+    const alertCards=alertEvents.map(event=>{
+      const payload=event.event_payload||{},isPre=event.event_type==="PREALERTA";
+      const label=isPre?"PREALERTA":"ENTRADA VALIDADA";
+      const levels=isPre?"Sin entrada, SL ni TP":("Entrada "+fmt(payload.entry,8)+" · SL "+fmt(payload.stop_loss,8)+" · TP "+fmt(payload.take_profit,8));
+      const fixture=payload.fixture===true?" · EJEMPLO":"";
+      return '<article class="data-row"><div style="grid-column:1/-1"><span>'+esc(label+fixture)+' · '+esc(event.symbol)+' · '+esc(event.timeframe)+'</span><strong>'+esc(event.side)+' · '+esc(payload.message||"")+'</strong><span>'+esc(levels)+' · '+esc(event.delivery_status||"PREVIEW_ONLY")+'</span></div></article>';
+    }).join("");
+    details.innerHTML='<strong style="font-size:13px">Configuración de TEST</strong><div class="data-list" style="margin-top:10px">'+rows.map(([key,value])=>'<div class="data-row"><div style="grid-column:1/-1"><span>'+esc(key)+'</span><strong>'+esc(value)+'</strong></div></div>').join("")+'</div><strong style="display:block;font-size:13px;margin-top:16px">Vista previa de alertas · no enviadas</strong><div class="data-list" style="margin-top:10px">'+(alertCards||'<div class="empty-state">Todavía no hay eventos de alerta.</div>')+'</div>';
+    message.textContent="Diagnóstico TEST actualizado · alertas en vista previa · producción intacta.";
   }catch(error){message.textContent=error.message||"Error al consultar el laboratorio.";}
 }
 document.getElementById("labRefresh").addEventListener("click",loadLabStatus);

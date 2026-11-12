@@ -5,7 +5,7 @@ or submits broker orders. It reports what the experimental allowlist would do.
 """
 from __future__ import annotations
 
-POLICY_VERSION = "shadow-allowlist-v0"
+POLICY_VERSION = "shadow-allowlist-v1"
 ALLOWED_COMBINATIONS = frozenset({
     ("XAUUSD", "15min", "BUY"),
 })

@@ -8,6 +8,40 @@ class TestMockStrategyAPI(unittest.TestCase):
     def setUp(self):
         self.client = app.app.test_client()
 
+    def test_test_alert_preview_builds_prealert_without_trade_levels_or_push(self):
+        response = self.client.post("/api/test/alert-preview", json={"analysis": {
+            "symbol": "EUR/USD", "interval": "5min",
+            "pre_signal": True, "pre_signal_side": "BUY",
+        }})
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["dry_run"])
+        self.assertFalse(payload["push_sent"])
+        self.assertEqual(payload["provider_calls"], 0)
+        self.assertEqual(payload["event"]["event_type"], "PREALERTA")
+        self.assertIsNone(payload["event"]["entry"])
+        self.assertIsNone(payload["event"]["stop_loss"])
+        self.assertIsNone(payload["event"]["take_profit"])
+
+    def test_test_alert_preview_builds_confirmed_entry_with_levels(self):
+        response = self.client.post("/api/test/alert-preview", json={"analysis": {
+            "symbol": "XAU/USD", "interval": "15min", "signal": "BUY",
+            "entry": 2350.0, "stop_loss": 2340.0, "take_profit": 2370.0,
+        }})
+        self.assertEqual(response.status_code, 200)
+        event = response.get_json()["event"]
+        self.assertEqual(event["event_type"], "ENTRADA_VALIDADA")
+        self.assertEqual(event["entry"], 2350.0)
+        self.assertEqual(event["stop_loss"], 2340.0)
+        self.assertEqual(event["take_profit"], 2370.0)
+
+    def test_test_alert_preview_rejects_unknown_market(self):
+        response = self.client.post("/api/test/alert-preview", json={"analysis": {
+            "symbol": "US30", "interval": "5min", "pre_signal": True,
+            "pre_signal_side": "BUY",
+        }})
+        self.assertEqual(response.status_code, 400)
+
     def test_mock_market_status_keeps_test_cards_visible(self):
         response = self.client.get("/api/market-status")
         self.assertEqual(response.status_code, 200)

@@ -1,41 +1,47 @@
-"""Compact signal gate using only ADX, MACD histogram and RSI."""
+"""Balanced signal gate using ADX, MACD histogram and RSI."""
 from math import isfinite
 
 
 def evaluate_three_indicator_filter(*, adx14, macd_hist, rsi14):
-    """Return signal and confluence scores; no EMA/Bollinger dependencies."""
-    values = (adx14, macd_hist, rsi14)
+    """Validate with 2/3 confluence, ADX>=18 and no double momentum opposition."""
     try:
-        adx14, macd_hist, rsi14 = (float(value) for value in values)
-        if not all(isfinite(value) for value in (adx14, macd_hist, rsi14)):
+        adx14, macd_hist, rsi14 = (float(v) for v in (adx14, macd_hist, rsi14))
+        if not all(isfinite(v) for v in (adx14, macd_hist, rsi14)):
             raise ValueError
     except (TypeError, ValueError, OverflowError):
         raise ValueError("ADX, MACD y RSI deben ser valores numéricos válidos.")
 
+    adx_ok = adx14 >= 18
     buy_checks = {
-        "ADX >= 20": adx14 >= 20,
+        "ADX >= 18": adx_ok,
         "MACD positivo": macd_hist > 0,
         "RSI 50-70": 50 <= rsi14 <= 70,
     }
     sell_checks = {
-        "ADX >= 20": adx14 >= 20,
+        "ADX >= 18": adx_ok,
         "MACD negativo": macd_hist < 0,
         "RSI 30-50": 30 <= rsi14 <= 50,
     }
     buy_score = sum(buy_checks.values())
     sell_score = sum(sell_checks.values())
 
+    # Two confirmations are enough, but MACD and RSI cannot both oppose the trade.
+    buy_candidate = adx_ok and buy_score >= 2 and not (macd_hist < 0 and rsi14 < 50)
+    sell_candidate = adx_ok and sell_score >= 2 and not (macd_hist > 0 and rsi14 > 50)
+
     signal = "ESPERAR"
-    reason = "Filtro de 3 indicadores: falta fuerza o confirmación de momentum."
-    if buy_score == 3 and buy_score > sell_score:
+    reason = "Falta fuerza ADX o confluencia direccional suficiente."
+    if buy_candidate and not sell_candidate:
         signal = "COMPRA"
-        reason = f"Confirmación alcista ADX + MACD + RSI. ADX {adx14:.1f}"
-    elif sell_score == 3 and sell_score > buy_score:
+        reason = f"Confluencia alcista 2/3 o superior. ADX {adx14:.1f}"
+    elif sell_candidate and not buy_candidate:
         signal = "VENTA"
-        reason = f"Confirmación bajista ADX + MACD + RSI. ADX {adx14:.1f}"
+        reason = f"Confluencia bajista 2/3 o superior. ADX {adx14:.1f}"
+    elif buy_candidate and sell_candidate:
+        reason = "Lecturas mixtas: no hay dirección dominante."
 
     selected_score = buy_score if signal == "COMPRA" else sell_score if signal == "VENTA" else max(buy_score, sell_score)
-    selected_quality = selected_score * 30 + (10 if adx14 >= 20 else 0)
+    selected_quality = min(100, selected_score * 30 + (10 if adx_ok else 0))
     quality_grade = (
         "A+" if selected_score == 3 and adx14 >= 25
         else "A" if selected_score == 3

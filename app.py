@@ -719,30 +719,37 @@ def analysis():
                 "para calcular los indicadores"
             )
 
-        # Motor multicriterio experimental: tendencia, fuerza y momentum.
-        buy_checks = {'EMA20 > EMA50': ema20 > ema50, 'RSI 52-68': 52 <= rsi14 <= 68, 'MACD positivo': macd_hist > 0, 'Precio sobre media Bollinger': entry > bb_middle}
-        sell_checks = {'EMA20 < EMA50': ema20 < ema50, 'RSI 32-48': 32 <= rsi14 <= 48, 'MACD negativo': macd_hist < 0, 'Precio bajo media Bollinger': entry < bb_middle}
+        # Filtro simplificado: solo ADX, MACD y RSI deciden la señal.
+        # ADX mide fuerza; MACD y RSI confirman dirección/momentum.
+        # EMA y Bollinger se conservan en la respuesta por compatibilidad visual,
+        # pero ya no intervienen en la puntuación ni bloquean entradas.
+        buy_checks = {
+            'ADX >= 20': adx14 >= 20,
+            'MACD positivo': macd_hist > 0,
+            'RSI 50-70': 50 <= rsi14 <= 70,
+        }
+        sell_checks = {
+            'ADX >= 20': adx14 >= 20,
+            'MACD negativo': macd_hist < 0,
+            'RSI 30-50': 30 <= rsi14 <= 50,
+        }
         buy_score = sum(buy_checks.values())
         sell_score = sum(sell_checks.values())
-        # Filtro de calidad: solo A/A+ pueden convertirse en señales operables.
-        # La puntuación mide confluencia técnica, no probabilidad de acierto.
-        buy_adx_ok = adx14 >= 20
-        sell_adx_ok = adx14 >= 20
-        buy_quality = buy_score * 20 + (20 if adx14 >= 25 else 10 if adx14 >= 20 else 0)
-        sell_quality = sell_score * 20 + (20 if adx14 >= 25 else 10 if adx14 >= 20 else 0)
+        buy_quality = buy_score * 30 + (10 if adx14 >= 20 else 0)
+        sell_quality = sell_score * 30 + (10 if adx14 >= 20 else 0)
         signal = 'ESPERAR'
-        reason = 'Filtro A/A+: falta confluencia o fuerza suficiente; se espera.'
-        if buy_adx_ok and buy_score >= 3 and buy_score > sell_score:
+        reason = 'Filtro de 3 indicadores: falta fuerza o confirmación de momentum.'
+        if buy_score == 3 and buy_score > sell_score:
             signal = 'COMPRA'
-            reason = 'Confluencia alcista A/A+: ' + ', '.join(k for k,v in buy_checks.items() if v) + '. ADX ' + str(round(adx14,1))
-        elif sell_adx_ok and sell_score >= 3 and sell_score > buy_score:
+            reason = 'Confirmación alcista ADX + MACD + RSI. ADX ' + str(round(adx14, 1))
+        elif sell_score == 3 and sell_score > buy_score:
             signal = 'VENTA'
-            reason = 'Confluencia bajista A/A+: ' + ', '.join(k for k,v in sell_checks.items() if v) + '. ADX ' + str(round(adx14,1))
+            reason = 'Confirmación bajista ADX + MACD + RSI. ADX ' + str(round(adx14, 1))
         selected_score = buy_score if signal == 'COMPRA' else sell_score if signal == 'VENTA' else max(buy_score, sell_score)
         selected_quality = buy_quality if signal == 'COMPRA' else sell_quality if signal == 'VENTA' else max(buy_quality, sell_quality)
-        quality_grade = 'A+' if selected_score == 4 and adx14 >= 25 else 'A' if selected_score >= 3 and adx14 >= 20 else 'B' if selected_score >= 2 else 'C'
+        quality_grade = 'A+' if selected_score == 3 and adx14 >= 25 else 'A' if selected_score == 3 else 'B' if selected_score == 2 else 'C'
         if signal == 'ESPERAR':
-            reason += ' Calidad actual: ' + quality_grade + ' (' + str(selected_quality) + '/100).'
+            reason += ' Confluencia: ' + str(selected_score) + '/3.'
         stop_loss = None
         take_profit = None
 
@@ -778,12 +785,12 @@ def analysis():
             "bollinger_lower": bb_lower,
             "buy_score": buy_score,
             "sell_score": sell_score,
-            "score_max": 4,
+            "score_max": 3,
             "quality_grade": quality_grade,
             "quality_score": selected_quality,
             "quality_max": 100,
             "quality_label": {"A+": "Excelente", "A": "Buena", "B": "Débil", "C": "Insuficiente"}[quality_grade],
-            "quality_rule": "Solo COMPRA/VENTA con al menos 3/4 criterios y ADX>=20; A+ exige 4/4 y ADX>=25.",
+            "quality_rule": "Solo COMPRA/VENTA con ADX>=20, MACD alineado y RSI en zona direccional (3/3). PREPARAR con 2/3 y ADX>=15. EMA/Bollinger no filtran.",
             # Vigilancia anticipada separada: nunca equivale a entrada ni crea niveles operables.
             "pre_signal": bool(
                 signal == "ESPERAR"
@@ -809,8 +816,8 @@ def analysis():
                 for candle in candles
             ],
             "method": (
-                "EMA20/EMA50 + RSI14 + MACD + ADX14 + Bollinger(20,2); "
-                "score mínimo 3/4 y ADX>=20; SL=1.5x ATR; TP=3x ATR"
+                "Filtro de señal: ADX14 + MACD + RSI14 (3/3); "
+                "PREPARAR: 2/3 con ADX>=15; ATR solo para SL/TP"
             ),
             "warning": (
                 "Feed MT5 externo a Vantage. Verifica precio, spread y riesgo antes de operar. "

@@ -82,9 +82,9 @@ def main():
     # El cron corre en los minutos 17 y 47; los slots horarios son divisibles
     # por 2 o 3 para que los intervalos no dependan de la hora local del usuario.
     due_scans = [("XAU/USD", "5min")]
-    if started_at.hour % 2 == 0:
+    if started_at.minute < 30 and started_at.hour % 2 == 0:
         due_scans.append(("XAU/USD", "15min"))
-    if started_at.hour % 3 == 0:
+    if started_at.minute < 30 and started_at.hour % 3 == 0:
         due_scans.extend([
             ("EUR/USD", "5min"),
             ("EUR/USD", "15min"),

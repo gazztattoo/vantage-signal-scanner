@@ -1481,8 +1481,11 @@ def push_scan():
                     symbol, interval, data.get("recent_candles", [])
                 )
                 direction = data.get("signal") or "ESPERAR"
+                # Aviso anticipado: solo estado/outbox; nunca entra en signal_history.
+                if direction == "ESPERAR" and data.get("pre_signal") and data.get("pre_signal_side") in ("COMPRA", "VENTA"):
+                    direction = "PREPARAR_" + data["pre_signal_side"]
 
-                # M5 alerts require a fresh, pending M15 signal in the same direction.
+                # La confluencia M15 se exige solo a entradas validadas.
                 # Reuse signal_history; do not request additional Twelve Data candles.
                 if interval == "5min" and direction in ("COMPRA", "VENTA"):
                     confirmation_response = requests.get(
@@ -1667,12 +1670,19 @@ def push_scan():
                         short_interval = {
                             "5min": "M5", "15min": "M15", "30min": "M30"
                         }.get(interval, interval)
-                        alert_body = (
-                            f"{symbol} · {short_interval} | "
-                            f"Entrada {display_price(data.get('entry'))} · "
-                            f"SL {display_price(data.get('stop_loss'))} · "
-                            f"TP {display_price(data.get('take_profit'))}"
-                        )
+                        if direction.startswith("PREPARAR_"):
+                            alert_body = (
+                                f"{symbol} · {short_interval} | "
+                                f"Preparar MT5: posible {direction.replace('PREPARAR_', '')}. "
+                                "Esperar confirmación; todavía NO es una entrada."
+                            )
+                        else:
+                            alert_body = (
+                                f"{symbol} · {short_interval} | "
+                                f"Entrada {display_price(data.get('entry'))} · "
+                                f"SL {display_price(data.get('stop_loss'))} · "
+                                f"TP {display_price(data.get('take_profit'))}"
+                            )
 
                         # Crear una entrega independiente por dispositivo. La clave única
                         # (event_fingerprint, endpoint) hace idempotente la cola.
@@ -1695,12 +1705,19 @@ def push_scan():
                             short_interval = {
                                 "5min": "M5", "15min": "M15", "30min": "M30"
                             }.get(interval, interval)
-                            alert_body = (
-                                f"{symbol} · {short_interval} | "
-                                f"Entrada {display_price(data.get('entry'))} · "
-                                f"SL {display_price(data.get('stop_loss'))} · "
-                                f"TP {display_price(data.get('take_profit'))}"
-                            )
+                            if direction.startswith("PREPARAR_"):
+                                alert_body = (
+                                    f"{symbol} · {short_interval} | "
+                                    f"Preparar MT5: posible {direction.replace('PREPARAR_', '')}. "
+                                    "Esperar confirmación; todavía NO es una entrada."
+                                )
+                            else:
+                                alert_body = (
+                                    f"{symbol} · {short_interval} | "
+                                    f"Entrada {display_price(data.get('entry'))} · "
+                                    f"SL {display_price(data.get('stop_loss'))} · "
+                                    f"TP {display_price(data.get('take_profit'))}"
+                                )
                             queued = 0
                             queue_errors = 0
                             for row in subscriptions:
@@ -1709,16 +1726,21 @@ def push_scan():
                                 if not endpoint or not isinstance(subscription, dict):
                                     continue
                                 payload = {
-                                    "title": f"GLOBAL SIGNAL · {direction}",
+                                    "title": (
+                                        f"GLOBAL SIGNAL · PREPARAR {direction.replace('PREPARAR_', '')}"
+                                        if direction.startswith("PREPARAR_")
+                                        else f"GLOBAL SIGNAL · {direction}"
+                                    ),
                                     "body": alert_body,
                                     "tag": "gss-" + symbol.replace("/", "") + "-" + interval + "-" + requests.utils.quote(candle_time, safe=""),
                                     "url": ("https://vantage-signal-scanner.onrender.com/panel_escaner_vantage.html?view=scanner&symbol=" + requests.utils.quote(symbol, safe="") + "&timeframe=" + requests.utils.quote(interval, safe="")),
                                     "data": {
                                         "symbol": symbol, "interval": interval,
                                         "direction": direction,
-                                        "entry": data.get("entry"),
-                                        "stop_loss": data.get("stop_loss"),
-                                        "take_profit": data.get("take_profit"),
+                                        "stage": "preparation" if direction.startswith("PREPARAR_") else "validated_entry",
+                                        "entry": None if direction.startswith("PREPARAR_") else data.get("entry"),
+                                        "stop_loss": None if direction.startswith("PREPARAR_") else data.get("stop_loss"),
+                                        "take_profit": None if direction.startswith("PREPARAR_") else data.get("take_profit"),
                                     },
                                 }
                                 queue_response = requests.post(

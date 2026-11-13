@@ -428,6 +428,7 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 
 <section class="toolbar" aria-label="Notificaciones">
   <button id="pushToggle" type="button">🔔 Activar notificaciones</button>
+  <button id="pushTestButton" type="button" hidden>📨 Enviar prueba a este iPhone</button>
   <span class="hint" id="pushStatus">Notificaciones desactivadas</span>
 </section>
 
@@ -1188,6 +1189,7 @@ if(accessToken){hideAccessGate();update();}else{showAccessGate();statusEl.textCo
 
 const pushStatus=document.getElementById("pushStatus");
 const pushToggleButton=document.getElementById("pushToggle");
+const pushTestButton=document.getElementById("pushTestButton");
 const PUSH_API=API_BASE+"/api/push";
 async function restorePushState(){
   try{
@@ -1205,9 +1207,11 @@ async function restorePushState(){
     if(subscription){
       pushStatus.textContent="Notificaciones activadas en este dispositivo";
       pushToggleButton.textContent="🔕 Desactivar notificaciones";
+      pushTestButton.hidden=false;
     }else{
       pushStatus.textContent=Notification.permission==="granted"?"Permiso concedido, falta activar la suscripción":"Notificaciones desactivadas";
       pushToggleButton.textContent="🔔 Activar notificaciones";
+      pushTestButton.hidden=true;
     }
     pushToggleButton.disabled=false;
   }catch(error){
@@ -1223,6 +1227,24 @@ function urlBase64ToUint8Array(value){
   const raw=atob(base64);
   return Uint8Array.from([...raw].map(char=>char.charCodeAt(0)));
 }
+pushTestButton.addEventListener("click",async()=>{
+  pushTestButton.disabled=true;
+  pushStatus.textContent="Enviando una prueba solo a este iPhone…";
+  try{
+    if(!accessToken)throw new Error("Primero debes entrar al scanner.");
+    const registration=await navigator.serviceWorker.ready;
+    const subscription=await registration.pushManager.getSubscription();
+    if(!subscription)throw new Error("Este iPhone ya no tiene una suscripción push activa.");
+    const response=await fetch(PUSH_API+"/test",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+accessToken},body:JSON.stringify({endpoint:subscription.endpoint})});
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(result.error||"No se pudo enviar la notificación de prueba.");
+    pushStatus.textContent="Prueba enviada solo a este iPhone. Comprueba si aparece la notificación.";
+  }catch(error){
+    pushStatus.textContent=error.message||"Falló la prueba de notificaciones.";
+  }finally{
+    pushTestButton.disabled=false;
+  }
+});
 pushToggleButton.addEventListener("click",async()=>{
   pushToggleButton.disabled=true;
   try{

@@ -76,7 +76,8 @@ def main():
         print("Missing SCANNER_API_URL or SIGNAL_CRON_SECRET.", file=sys.stderr)
         return 2
 
-    symbols = ["EUR/USD", "XAU/USD", "BTC/USD"]
+    # Oro primero: prioridad de atención sin aumentar frecuencia ni consumo de API.
+    symbols = ["XAU/USD", "EUR/USD", "BTC/USD"]
     started_at = datetime.now(timezone.utc)
     # Ejecutar M5 y M15 en cada ciclo de GitHub Actions.
     # No dependemos del minuto exacto de inicio (GitHub puede retrasar

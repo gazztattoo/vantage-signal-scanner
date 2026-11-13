@@ -76,14 +76,26 @@ def main():
         print("Missing SCANNER_API_URL or SIGNAL_CRON_SECRET.", file=sys.stderr)
         return 2
 
-    symbols = ["EUR/USD", "XAU/USD", "BTC/USD"]
     started_at = datetime.now(timezone.utc)
-    # Ejecutar M5 y M15 en cada ciclo de GitHub Actions.
-    # No dependemos del minuto exacto de inicio (GitHub puede retrasar
-    # los cron): el backend usa Biquote y rechaza cotizaciones/velas antiguas.
-    # No hay fallback a Twelve Data; TEST no utiliza proveedores live.
-    # M30 queda reservado exclusivamente al análisis manual del panel.
-    due_intervals = ["5min", "15min"]
+    # Calendario escalonado: oro M5 cada 30 min; oro M15 cada 2 h;
+    # EUR/USD y BTC/USD en M5+M15 cada 3 h. Todo en UTC.
+    # El cron corre en los minutos 17 y 47; los slots horarios son divisibles
+    # por 2 o 3 para que los intervalos no dependan de la hora local del usuario.
+    due_scans = [("XAU/USD", "5min")]
+    if started_at.hour % 2 == 0:
+        due_scans.append(("XAU/USD", "15min"))
+    if started_at.hour % 3 == 0:
+        due_scans.extend([
+            ("EUR/USD", "5min"),
+            ("EUR/USD", "15min"),
+            ("BTC/USD", "5min"),
+            ("BTC/USD", "15min"),
+        ])
+
+    print(
+        "Programación UTC: " + ", ".join(f"{symbol} {interval}" for symbol, interval in due_scans),
+        flush=True,
+    )
 
     failures = []
     request_count = 0

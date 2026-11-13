@@ -719,37 +719,17 @@ def analysis():
                 "para calcular los indicadores"
             )
 
-        # Filtro simplificado: solo ADX, MACD y RSI deciden la señal.
-        # ADX mide fuerza; MACD y RSI confirman dirección/momentum.
-        # EMA y Bollinger se conservan en la respuesta por compatibilidad visual,
-        # pero ya no intervienen en la puntuación ni bloquean entradas.
-        buy_checks = {
-            'ADX >= 20': adx14 >= 20,
-            'MACD positivo': macd_hist > 0,
-            'RSI 50-70': 50 <= rsi14 <= 70,
-        }
-        sell_checks = {
-            'ADX >= 20': adx14 >= 20,
-            'MACD negativo': macd_hist < 0,
-            'RSI 30-50': 30 <= rsi14 <= 50,
-        }
-        buy_score = sum(buy_checks.values())
-        sell_score = sum(sell_checks.values())
-        buy_quality = buy_score * 30 + (10 if adx14 >= 20 else 0)
-        sell_quality = sell_score * 30 + (10 if adx14 >= 20 else 0)
-        signal = 'ESPERAR'
-        reason = 'Filtro de 3 indicadores: falta fuerza o confirmación de momentum.'
-        if buy_score == 3 and buy_score > sell_score:
-            signal = 'COMPRA'
-            reason = 'Confirmación alcista ADX + MACD + RSI. ADX ' + str(round(adx14, 1))
-        elif sell_score == 3 and sell_score > buy_score:
-            signal = 'VENTA'
-            reason = 'Confirmación bajista ADX + MACD + RSI. ADX ' + str(round(adx14, 1))
-        selected_score = buy_score if signal == 'COMPRA' else sell_score if signal == 'VENTA' else max(buy_score, sell_score)
-        selected_quality = buy_quality if signal == 'COMPRA' else sell_quality if signal == 'VENTA' else max(buy_quality, sell_quality)
-        quality_grade = 'A+' if selected_score == 3 and adx14 >= 25 else 'A' if selected_score == 3 else 'B' if selected_score == 2 else 'C'
-        if signal == 'ESPERAR':
-            reason += ' Confluencia: ' + str(selected_score) + '/3.'
+        from three_indicator_filter import evaluate_three_indicator_filter
+        filter_result = evaluate_three_indicator_filter(adx14=adx14, macd_hist=macd_hist, rsi14=rsi14)
+        buy_checks = filter_result["buy_checks"]
+        sell_checks = filter_result["sell_checks"]
+        buy_score = filter_result["buy_score"]
+        sell_score = filter_result["sell_score"]
+        signal = filter_result["signal"]
+        reason = filter_result["reason"]
+        selected_score = filter_result["selected_score"]
+        selected_quality = filter_result["quality_score"]
+        quality_grade = filter_result["quality_grade"]
         stop_loss = None
         take_profit = None
 

@@ -72,7 +72,9 @@ class ScheduledScannerJobTests(unittest.TestCase):
         session = Mock()
         session.post.side_effect = scanner_job.requests.RequestException("network down")
         with patch.object(scanner_job.requests, "Session", return_value=session), \
-             patch.object(scanner_job.time, "sleep"):
+             patch.object(scanner_job.time, "sleep"), \
+             patch.object(scanner_job, "datetime", wraps=datetime) as mock_datetime:
+            mock_datetime.now.return_value = datetime(2026, 11, 13, 12, 17, tzinfo=timezone.utc)
             self.assertEqual(scanner_job.main(), 1)
         self.assertEqual(session.post.call_count, 6)
 

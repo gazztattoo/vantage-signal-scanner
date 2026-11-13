@@ -1,4 +1,4 @@
-name: GLOBAL SIGNAL SCANNER — prueba controlada de 7 días
+name: GLOBAL SIGNAL SCANNER — ventana controlada de 7 días
 
 on:
   # Prueba autorizada: un ciclo cada 2 horas, fuera del minuto 00 para
@@ -34,8 +34,8 @@ jobs:
         env:
           SCANNER_API_URL: https://vantage-signal-api-carlos.onrender.com
           SIGNAL_CRON_SECRET: ${{ secrets.SIGNAL_CRON_SECRET }}
-          SCANNER_TRIAL_START_UTC: "2026-11-04T12:42:00Z"
-          SCANNER_TRIAL_END_UTC: "2026-11-11T12:42:00Z"
+          SCANNER_TRIAL_START_UTC: "2026-11-13T17:00:00Z"
+          SCANNER_TRIAL_END_UTC: "2026-11-20T17:00:00Z"
         run: |
           if [ -z "$SIGNAL_CRON_SECRET" ]; then
             echo "::error::Falta configurar el secreto SIGNAL_CRON_SECRET en GitHub."

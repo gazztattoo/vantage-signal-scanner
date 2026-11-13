@@ -2,6 +2,7 @@ import importlib.util
 import os
 import pathlib
 import unittest
+from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 
 SCRIPT_PATH = pathlib.Path(__file__).resolve().parents[1] / "scripts" / "run_signal_scan.py"
@@ -35,7 +36,9 @@ class ScheduledScannerJobTests(unittest.TestCase):
         session = Mock()
         session.post.return_value = self._response()
         with patch.object(scanner_job.requests, "Session", return_value=session), \
-             patch.object(scanner_job.time, "sleep"):
+             patch.object(scanner_job.time, "sleep"), \
+             patch.object(scanner_job, "datetime", wraps=datetime) as mock_datetime:
+            mock_datetime.now.return_value = datetime(2026, 11, 13, 12, 17, tzinfo=timezone.utc)
             self.assertEqual(scanner_job.main(), 0)
         self.assertEqual(session.post.call_count, 6)
         args, kwargs = session.post.call_args
@@ -53,7 +56,9 @@ class ScheduledScannerJobTests(unittest.TestCase):
         session = Mock()
         session.post.return_value = self._response(401, {"error": "No autorizado."})
         with patch.object(scanner_job.requests, "Session", return_value=session), \
-             patch.object(scanner_job.time, "sleep"):
+             patch.object(scanner_job.time, "sleep"), \
+             patch.object(scanner_job, "datetime", wraps=datetime) as mock_datetime:
+            mock_datetime.now.return_value = datetime(2026, 11, 13, 12, 17, tzinfo=timezone.utc)
             self.assertEqual(scanner_job.main(), 1)
         self.assertEqual(session.post.call_count, 6)
 

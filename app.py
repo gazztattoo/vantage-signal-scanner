@@ -784,6 +784,23 @@ def analysis():
             "quality_max": 100,
             "quality_label": {"A+": "Excelente", "A": "Buena", "B": "Débil", "C": "Insuficiente"}[quality_grade],
             "quality_rule": "Solo COMPRA/VENTA con al menos 3/4 criterios y ADX>=20; A+ exige 4/4 y ADX>=25.",
+            # Vigilancia anticipada separada: nunca equivale a entrada ni crea niveles operables.
+            "pre_signal": bool(
+                signal == "ESPERAR"
+                and adx14 >= 15
+                and max(buy_score, sell_score) >= 2
+                and buy_score != sell_score
+            ),
+            "pre_signal_side": (
+                "COMPRA" if signal == "ESPERAR" and adx14 >= 15 and buy_score >= 2 and buy_score > sell_score
+                else "VENTA" if signal == "ESPERAR" and adx14 >= 15 and sell_score >= 2 and sell_score > buy_score
+                else None
+            ),
+            "pre_signal_reason": (
+                "Vigilancia temprana: hay confluencia parcial, pero todavía no cumple el filtro de entrada validada."
+                if signal == "ESPERAR" and adx14 >= 15 and max(buy_score, sell_score) >= 2 and buy_score != sell_score
+                else None
+            ),
             "candle_time": candle_time,
             "candle_age_minutes": candle_age_minutes,
             "candles": len(candles),

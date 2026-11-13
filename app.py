@@ -775,7 +775,7 @@ def analysis():
             "quality_score": selected_quality,
             "quality_max": 100,
             "quality_label": {"A+": "Excelente", "A": "Buena", "B": "Débil", "C": "Insuficiente"}[quality_grade],
-            "quality_rule": "Solo COMPRA/VENTA con ADX>=20, MACD alineado y RSI en zona direccional (3/3). PREPARAR con 2/3 y ADX>=15. EMA/Bollinger no filtran.",
+            "quality_rule": "COMPRA/VENTA con 2/3 y ADX>=18; no se valida si MACD y RSI contradicen ambos la dirección. PREPARAR con 2/3 y ADX>=15.",
             # Vigilancia anticipada separada: nunca equivale a entrada ni crea niveles operables.
             "pre_signal": bool(
                 signal == "ESPERAR"
@@ -801,7 +801,7 @@ def analysis():
                 for candle in candles
             ],
             "method": (
-                "Filtro de señal: ADX14 + MACD + RSI14 (3/3); "
+                "Filtro flexible: ADX14 + MACD + RSI14 (2/3, ADX>=18); "
                 "PREPARAR: 2/3 con ADX>=15; ATR solo para SL/TP"
             ),
             "warning": (

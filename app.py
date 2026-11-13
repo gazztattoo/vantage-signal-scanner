@@ -765,6 +765,11 @@ def analysis():
             "bollinger_lower": bb_lower,
             "buy_score": buy_score,
             "sell_score": sell_score,
+            "indicator_diagnostics": {
+                "adx": {"value": round(adx14, 2), "required": ">=20", "passed": adx14 >= 20},
+                "macd": {"value": round(macd_hist, 8), "required": "positivo para COMPRA / negativo para VENTA", "buy_passed": macd_hist > 0, "sell_passed": macd_hist < 0},
+                "rsi": {"value": round(rsi14, 2), "buy_required": "50-70", "sell_required": "30-50", "buy_passed": 50 <= rsi14 <= 70, "sell_passed": 30 <= rsi14 <= 50},
+            },
             "score_max": 3,
             "quality_grade": quality_grade,
             "quality_score": selected_quality,

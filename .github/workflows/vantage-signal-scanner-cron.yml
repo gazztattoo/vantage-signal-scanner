@@ -1,10 +1,10 @@
-name: GLOBAL SIGNAL SCANNER — ventana controlada de 7 días
+name: GLOBAL SIGNAL SCANNER — calendario escalonado y ventana de 7 días
 
 on:
-  # Prueba autorizada: un ciclo cada 2 horas, fuera del minuto 00 para
-  # reducir retrasos de alta demanda de GitHub Actions. Corte UTC en el runner.
+  # Dos disparos por hora. El runner decide qué mercados/timeframes vencen.
+  # Oro M5 cada 30 min; oro M15 cada 2 h; EUR/BTC M5+M15 cada 3 h.
   schedule:
-    - cron: "17 */2 * * *"
+    - cron: "17,47 * * * *"
   workflow_dispatch:
 
 permissions:

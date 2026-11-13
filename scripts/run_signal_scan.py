@@ -76,14 +76,26 @@ def main():
         print("Missing SCANNER_API_URL or SIGNAL_CRON_SECRET.", file=sys.stderr)
         return 2
 
-    symbols = ["EUR/USD", "XAU/USD", "BTC/USD"]
     started_at = datetime.now(timezone.utc)
-    # Ejecutar M5 y M15 en cada ciclo de GitHub Actions.
-    # No dependemos del minuto exacto de inicio (GitHub puede retrasar
-    # los cron): el backend usa Biquote y rechaza cotizaciones/velas antiguas.
-    # No hay fallback a Twelve Data; TEST no utiliza proveedores live.
-    # M30 queda reservado exclusivamente al análisis manual del panel.
-    due_intervals = ["5min", "15min"]
+    # Calendario escalonado: oro M5 cada 30 min; oro M15 cada 2 h;
+    # EUR/USD y BTC/USD en M5+M15 cada 3 h. Todo en UTC.
+    # El cron corre en los minutos 17 y 47; los slots horarios son divisibles
+    # por 2 o 3 para que los intervalos no dependan de la hora local del usuario.
+    due_scans = [("XAU/USD", "5min")]
+    if started_at.minute < 30 and started_at.hour % 2 == 0:
+        due_scans.append(("XAU/USD", "15min"))
+    if started_at.minute < 30 and started_at.hour % 3 == 0:
+        due_scans.extend([
+            ("EUR/USD", "5min"),
+            ("EUR/USD", "15min"),
+            ("BTC/USD", "5min"),
+            ("BTC/USD", "15min"),
+        ])
+
+    print(
+        "Programación UTC: " + ", ".join(f"{symbol} {interval}" for symbol, interval in due_scans),
+        flush=True,
+    )
 
     failures = []
     request_count = 0
@@ -91,71 +103,70 @@ def main():
     session = requests.Session()
     headers = {"X-Scanner-Cron-Secret": secret}
 
-    for interval in due_intervals:
-        for symbol in symbols:
-            # Separar las llamadas para no sobrecargar el proveedor ni la API.
-            if request_count:
-                time.sleep(9)
-            request_count += 1
+    for symbol, interval in due_scans:
+        # Separar las llamadas para no sobrecargar el proveedor ni la API.
+        if request_count:
+            time.sleep(9)
+        request_count += 1
+        try:
+            response = session.post(
+                base_url + "/api/push/scan",
+                params={"symbol": symbol, "interval": interval},
+                headers=headers,
+                timeout=(10, 45),
+            )
             try:
-                response = session.post(
-                    base_url + "/api/push/scan",
-                    params={"symbol": symbol, "interval": interval},
-                    headers=headers,
-                    timeout=(10, 45),
-                )
-                try:
-                    payload = response.json()
-                except ValueError:
-                    payload = {"error": response.text[:300]}
+                payload = response.json()
+            except ValueError:
+                payload = {"error": response.text[:300]}
 
-                if response.status_code != 200 or not isinstance(payload, dict) or payload.get("error"):
-                    failures.append(f"{symbol} {interval}: HTTP {response.status_code}")
-                    detail = ""
-                    if isinstance(payload, dict):
-                        checks_detail = payload.get("checks")
-                        if isinstance(checks_detail, list) and checks_detail:
-                            detail = str(checks_detail[0].get("detail") or checks_detail[0].get("status") or "")
-                        detail = detail or str(payload.get("error") or "")
-                    print(
-                        f"{symbol} {interval} | HTTP {response.status_code} | API error"
-                        + (f" | detail={detail[:300]}" if detail else ""),
-                        flush=True,
-                    )
-                    continue
-
-                checks = payload.get("checks")
-                if not isinstance(checks, list) or len(checks) != 1:
-                    failures.append(f"{symbol} {interval}: expected exactly one check, got invalid/empty response")
-                else:
-                    check = checks[0]
-                    status = check.get("status")
-                    if status in FAILURE_STATUSES:
-                        failures.append(
-                            f"{symbol} {interval}: {status} "
-                            f"({check.get('detail') or check.get('http_status') or 'sin detalle'})"
-                        )
-                    elif status not in SUCCESS_STATUSES:
-                        failures.append(f"{symbol} {interval}: unrecognized check status {status!r}")
-
-                queue = payload.get("delivery_queue") or {}
-                if not isinstance(queue, dict) or int(queue.get("errors") or 0) > 0:
-                    failures.append(f"{symbol} {interval}: push delivery queue errors")
-
-                check_detail = ""
-                if isinstance(checks, list) and checks:
-                    check_detail = str(checks[0].get("detail") or checks[0].get("http_status") or "")
+            if response.status_code != 200 or not isinstance(payload, dict) or payload.get("error"):
+                failures.append(f"{symbol} {interval}: HTTP {response.status_code}")
+                detail = ""
+                if isinstance(payload, dict):
+                    checks_detail = payload.get("checks")
+                    if isinstance(checks_detail, list) and checks_detail:
+                        detail = str(checks_detail[0].get("detail") or checks_detail[0].get("status") or "")
+                    detail = detail or str(payload.get("error") or "")
                 print(
-                    f"{symbol} {interval} | HTTP {response.status_code} | "
-                    f"status={checks[0].get('status') if isinstance(checks, list) and checks else 'MISSING'}"
-                    + (f" | detail={check_detail[:300]}" if check_detail else "")
-                    + f" | queue={queue}",
+                    f"{symbol} {interval} | HTTP {response.status_code} | API error"
+                    + (f" | detail={detail[:300]}" if detail else ""),
                     flush=True,
                 )
-            except requests.RequestException as exc:
-                message = f"{symbol} {interval}: request failed ({type(exc).__name__})"
-                failures.append(message)
-                print(message, file=sys.stderr, flush=True)
+                continue
+
+            checks = payload.get("checks")
+            if not isinstance(checks, list) or len(checks) != 1:
+                failures.append(f"{symbol} {interval}: expected exactly one check, got invalid/empty response")
+            else:
+                check = checks[0]
+                status = check.get("status")
+                if status in FAILURE_STATUSES:
+                    failures.append(
+                        f"{symbol} {interval}: {status} "
+                        f"({check.get('detail') or check.get('http_status') or 'sin detalle'})"
+                    )
+                elif status not in SUCCESS_STATUSES:
+                    failures.append(f"{symbol} {interval}: unrecognized check status {status!r}")
+
+            queue = payload.get("delivery_queue") or {}
+            if not isinstance(queue, dict) or int(queue.get("errors") or 0) > 0:
+                failures.append(f"{symbol} {interval}: push delivery queue errors")
+
+            check_detail = ""
+            if isinstance(checks, list) and checks:
+                check_detail = str(checks[0].get("detail") or checks[0].get("http_status") or "")
+            print(
+                f"{symbol} {interval} | HTTP {response.status_code} | "
+                f"status={checks[0].get('status') if isinstance(checks, list) and checks else 'MISSING'}"
+                + (f" | detail={check_detail[:300]}" if check_detail else "")
+                + f" | queue={queue}",
+                flush=True,
+            )
+        except requests.RequestException as exc:
+            message = f"{symbol} {interval}: request failed ({type(exc).__name__})"
+            failures.append(message)
+            print(message, file=sys.stderr, flush=True)
 
     finished_at = datetime.now(timezone.utc)
     status = "FAILED" if failures else "OK"
@@ -169,7 +180,7 @@ def main():
         "## Vantage Signal Scanner — producción",
         f"- Inicio UTC: {started_at.isoformat()}",
         f"- Fin UTC: {finished_at.isoformat()}",
-        f"- Intervalos: {', '.join(due_intervals)}",
+        f"- Análisis: {request_count} combinaciones según calendario escalonado",
         f"- Combinaciones solicitadas: {request_count}",
         f"- Estado: **{status}**",
     ]

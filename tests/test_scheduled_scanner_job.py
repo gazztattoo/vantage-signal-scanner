@@ -28,6 +28,8 @@ class ScheduledScannerJobTests(unittest.TestCase):
     @patch.dict(os.environ, {
         "SCANNER_API_URL": "https://scanner.example.com/",
         "SIGNAL_CRON_SECRET": "test-only-secret",
+        "SCANNER_TRIAL_START_UTC": "2020-01-01T00:00:00Z",
+        "SCANNER_TRIAL_END_UTC": "2099-01-01T00:00:00Z",
     }, clear=True)
     def test_successful_scan_sends_secret_header_and_returns_zero(self):
         session = Mock()
@@ -44,6 +46,8 @@ class ScheduledScannerJobTests(unittest.TestCase):
     @patch.dict(os.environ, {
         "SCANNER_API_URL": "https://scanner.example.com",
         "SIGNAL_CRON_SECRET": "test-only-secret",
+        "SCANNER_TRIAL_START_UTC": "2020-01-01T00:00:00Z",
+        "SCANNER_TRIAL_END_UTC": "2099-01-01T00:00:00Z",
     }, clear=True)
     def test_non_200_response_returns_failure(self):
         session = Mock()
@@ -56,6 +60,8 @@ class ScheduledScannerJobTests(unittest.TestCase):
     @patch.dict(os.environ, {
         "SCANNER_API_URL": "https://scanner.example.com",
         "SIGNAL_CRON_SECRET": "test-only-secret",
+        "SCANNER_TRIAL_START_UTC": "2020-01-01T00:00:00Z",
+        "SCANNER_TRIAL_END_UTC": "2099-01-01T00:00:00Z",
     }, clear=True)
     def test_network_error_returns_failure(self):
         session = Mock()

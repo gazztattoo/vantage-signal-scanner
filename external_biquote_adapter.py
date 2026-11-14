@@ -6,7 +6,7 @@ the broker basis and spread have been validated.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 SYMBOLS = {"XAU/USD": "XAUUSD", "EUR/USD": "EURUSD", "BTC/USD": "BTCUSD"}

@@ -587,17 +587,25 @@ def fetch_cached_provider_candles(symbol, interval):
         if not isinstance(rows, list) or len(rows) < 55:
             return None
         rows.reverse()
+        expected_step = INTERVAL_MINUTES[interval] * 60
+        # Keep only the newest continuous run; older cache gaps must not
+        # invalidate 55 recent, consecutive closed bars.
+        continuous_rows = [rows[-1]]
+        for row in reversed(rows[:-1]):
+            newer = continuous_rows[0]
+            older_time = datetime.fromisoformat(row["candle_time"].replace("Z", "+00:00"))
+            newer_time = datetime.fromisoformat(newer["candle_time"].replace("Z", "+00:00"))
+            if (newer_time - older_time).total_seconds() != expected_step:
+                break
+            continuous_rows.insert(0, row)
+        if len(continuous_rows) < 55:
+            return None
+        rows = continuous_rows
         candles = [{
             "time": row["candle_time"],
             "open": float(row["open"]), "high": float(row["high"]),
             "low": float(row["low"]), "close": float(row["close"]),
         } for row in rows]
-        expected_step = INTERVAL_MINUTES[interval] * 60
-        for previous, current in zip(candles, candles[1:]):
-            previous_time = datetime.fromisoformat(previous["time"].replace("Z", "+00:00"))
-            current_time = datetime.fromisoformat(current["time"].replace("Z", "+00:00"))
-            if (current_time - previous_time).total_seconds() != expected_step:
-                return None
         now = datetime.now(timezone.utc)
         latest = datetime.fromisoformat(candles[-1]["time"].replace("Z", "+00:00"))
         age = max((now - latest.astimezone(timezone.utc)).total_seconds(), 0)
@@ -648,7 +656,6 @@ def fetch_candles(symbol, interval):
     cached_provider = fetch_cached_provider_candles(symbol, interval)
     if cached_provider is not None:
         return cached_provider
-    """Obtiene velas OHLC desde biquote; nunca usa velas Twelve Data como fallback."""
     provider_symbol = {"EUR/USD": "EURUSD", "XAU/USD": "XAUUSD", "BTC/USD": "BTCUSD"}[symbol]
     provider_interval = {"5min": "5m", "15min": "15m", "30min": "30m"}[interval]
     # Count every outbound attempt globally; cached analysis never reaches here.

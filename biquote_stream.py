@@ -12,7 +12,6 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-from pysignalr.client import SignalRClient
 
 LOGGER = logging.getLogger(__name__)
 HUB_URL = "https://biquote.io/hubs/tick"
@@ -96,6 +95,10 @@ def _set_state(**values: Any) -> None:
 
 
 async def _run_client() -> None:
+    # Import only when streaming is explicitly enabled. Other API tests and
+    # routes must remain importable without the optional SignalR dependency.
+    from pysignalr.client import SignalRClient
+
     client = SignalRClient(
         HUB_URL, ping_interval=15, connection_timeout=20,
         retry_sleep=2, retry_multiplier=1.5, retry_count=0,

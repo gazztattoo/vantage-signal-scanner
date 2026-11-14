@@ -10,7 +10,7 @@ def make_payload(symbol="XAUUSD", interval="5m", bars=None):
     if bars is None:
         bars = [
             {
-                "openTime": (NOW - timedelta(minutes=5)).isoformat(),
+                "openTime": (NOW - timedelta(minutes=int(interval[:-1]))).isoformat(),
                 "open": 2650.0, "high": 2652.0, "low": 2649.0,
                 "close": 2651.0, "tickVolume": 50, "isOpen": False,
             },
@@ -31,6 +31,8 @@ class BiQuoteAdapterTests(unittest.TestCase):
         self.assertTrue(result["accepted"])
         self.assertEqual(result["closed_bars"], 1)
         self.assertEqual(result["role"], "RESEARCH_ONLY_UNTIL_BROKER_BASIS_VALIDATED")
+        self.assertEqual(result["last_closed_age_minutes"], 0.0)
+        self.assertEqual(result["last_closed_close_time"], NOW.isoformat())
 
     def test_accepts_all_supported_symbols_and_intervals(self):
         for symbol, provider_symbol in (

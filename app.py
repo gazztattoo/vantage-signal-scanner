@@ -13,7 +13,7 @@ import logging
 import threading
 
 from biquote_quota import BiquoteQuotaError, reserve_biquote_request, get_biquote_usage
-from biquote_stream import start_stream, snapshot as biquote_stream_snapshot
+from biquote_stream import SYMBOLS as BIQUOTE_STREAM_SYMBOLS, start_stream, snapshot as biquote_stream_snapshot
 
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
@@ -621,7 +621,7 @@ def biquote_stream_ticks():
             fresh_ticks[symbol] = tick
     data["ticks"] = fresh_ticks
     data["fresh_symbols"] = sorted(fresh_ticks)
-    data["expected_symbols"] = ["EUR/USD", "XAU/USD", "BTC/USD"]
+    data["expected_symbols"] = [ {"EURUSD": "EUR/USD", "XAUUSD": "XAU/USD", "BTCUSD": "BTC/USD"}[symbol] for symbol in BIQUOTE_STREAM_SYMBOLS ]
     data["stream"]["enabled"] = True
     return jsonify(data), 200
 

@@ -529,7 +529,7 @@ def fetch_persisted_candles(symbol, interval):
                 "order": "minute_open.desc",
                 "limit": str(required_minutes + interval_minutes * 5),
             },
-            headers=supabase_headers(),
+            headers={**supabase_headers(), "Authorization": "Bearer " + SUPABASE_SECRET_KEY},
             timeout=10,
         )
         response.raise_for_status()

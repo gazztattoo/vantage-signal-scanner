@@ -9,6 +9,14 @@ on:
       - "requirements.txt"
       - "tests/test_biquote_stream.py"
       - ".github/workflows/biquote-production-stream.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "app.py"
+      - "biquote_stream.py"
+      - "requirements.txt"
+      - "tests/test_biquote_stream.py"
+      - ".github/workflows/biquote-production-stream.yml"
 
 permissions:
   contents: read

@@ -9,6 +9,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 import hmac
+import hashlib
 import logging
 import threading
 
@@ -1443,8 +1444,18 @@ def process_pending_push_deliveries(limit=100):
 def cron_auth_check():
     """Validación aislada del secreto cron; no ejecuta análisis ni envía notificaciones."""
     supplied = request.headers.get("X-Scanner-Cron-Secret", "")
+    server_fp = hashlib.sha256(SIGNAL_CRON_SECRET.encode()).hexdigest()[:12] if SIGNAL_CRON_SECRET else "VACIO"
+    supplied_fp = hashlib.sha256(supplied.encode()).hexdigest()[:12] if supplied else "VACIO"
     if not SIGNAL_CRON_SECRET or not hmac.compare_digest(supplied, SIGNAL_CRON_SECRET):
-        return jsonify({"ok": False, "error": "No autorizado."}), 401
+        return jsonify({
+            "ok": False,
+            "error": "No autorizado.",
+            "server_configured": bool(SIGNAL_CRON_SECRET),
+            "server_fingerprint": server_fp,
+            "received_fingerprint": supplied_fp,
+            "server_length": len(SIGNAL_CRON_SECRET),
+            "received_length": len(supplied)
+        }), 401
     return jsonify({"ok": True, "message": "Autenticación válida."}), 200
 
 

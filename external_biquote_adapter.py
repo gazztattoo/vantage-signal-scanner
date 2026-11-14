@@ -82,10 +82,13 @@ def normalize_biquote_ohlc(
         return {"accepted": False, "reason": "No hay velas cerradas; se bloquea el análisis."}
 
     closed.sort(key=lambda item: item["time"])
-    newest = _parse_utc(closed[-1]["time"])
-    age_minutes = (now - newest).total_seconds() / 60
+    newest_open = _parse_utc(closed[-1]["time"])
+    interval_minutes = int(interval[:-1])
+    newest_close = newest_open + timedelta(minutes=interval_minutes)
+    age_minutes = (now - newest_close).total_seconds() / 60
     if age_minutes < -1:
-        return {"accepted": False, "reason": "La última vela tiene una fecha futura."}
+        return {"accepted": False, "reason": "La última vela cerrada tiene una hora de cierre futura."}
+    age_minutes = max(age_minutes, 0)
     if (
         max_last_closed_age_minutes is not None
         and age_minutes > max_last_closed_age_minutes
@@ -106,6 +109,7 @@ def normalize_biquote_ohlc(
         "bars": closed,
         "closed_bars": len(closed),
         "last_closed_open_time": closed[-1]["time"],
+        "last_closed_close_time": newest_close.isoformat(),
         "last_closed_age_minutes": round(age_minutes, 1),
         "price_basis": "provider_feed_not_verified_as_VANTAGE",
         "volume_warning": "FX/CFD volume is not traded volume; tickVolume is only a tick count.",

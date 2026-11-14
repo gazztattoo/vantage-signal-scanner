@@ -4,8 +4,10 @@ on:
   push:
     branches: [push-test]
     paths:
+      - "app.py"
       - "external_biquote_adapter.py"
       - "tests/test_external_biquote_adapter.py"
+      - "tests/test_biquote_research_endpoint.py"
       - ".github/workflows/biquote-adapter-tests.yml"
   workflow_dispatch:
 
@@ -21,4 +23,4 @@ jobs:
         with:
           python-version: "3.12"
       - name: Run offline adapter tests
-        run: python -m unittest discover -s tests -p "test_external_biquote_adapter.py" -v
+        run: python -m unittest discover -s tests -p "test_*biquote*.py" -v

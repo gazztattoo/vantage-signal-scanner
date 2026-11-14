@@ -377,7 +377,7 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 </style>
 </head>
 
-<body>
+<body class="trade-mode">
 
 <section class="access-gate" id="accessGate" aria-label="Acceso privado"><form class="access-box" id="accessForm"><h1>GLOBAL SIGNAL SCANNER</h1><p>Plataforma de acceso privado. Introduce el código que te compartió el administrador.</p><input id="accessCode" type="password" autocomplete="current-password" placeholder="Código de acceso" required><button id="accessSubmit" type="submit">ENTRAR AL SCANNER</button><p class="access-error" id="accessError" role="alert"></p></form></section>
 <main class="wrap">
@@ -453,7 +453,6 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
     <option value="30min">M30 · manual</option>
   </select>
   <button id="refresh">↻ Actualizar análisis</button>
-  <button id="tradeMode" type="button" aria-pressed="false">◎ Vista operar</button>
   <span class="hint" id="updated">M5 y M15 se escanean automáticamente. M30 solo al solicitarlo.</span>
 </section>
 
@@ -585,14 +584,6 @@ const statusEl=document.getElementById("status");
 const dot=document.getElementById("dot");
 const button=document.getElementById("refresh");
 const updated=document.getElementById("updated");
-
-const tradeModeButton=document.getElementById("tradeMode");
-tradeModeButton.addEventListener("click",()=>{
-  const enabled=document.body.classList.toggle("trade-mode");
-  tradeModeButton.setAttribute("aria-pressed",String(enabled));
-  tradeModeButton.textContent=enabled?"✓ Vista operar activa":"◎ Vista operar";
-});
-
 
 function esc(v){
   return String(v??"").replace(/[&<>"]/g,c=>({

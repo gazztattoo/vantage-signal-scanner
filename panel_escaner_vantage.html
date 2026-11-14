@@ -1305,7 +1305,7 @@ if ("serviceWorker" in navigator) {
         return "<tr><td>"+escapeText(time)+"</td><td>"+fmt(bar.open)+"</td><td>"+fmt(bar.high)+"</td><td>"+fmt(bar.low)+"</td><td>"+fmt(bar.close)+"</td></tr>";
       }).join("");
       const age=Number(data.last_closed_age_minutes);
-      status.textContent=symbol+" · "+interval.toUpperCase()+" · "+data.closed_bars+" velas cerradas · última vela hace "+(Number.isFinite(age)?age.toFixed(1):"—")+" min · "+(data.cache?.hit?"caché":"consulta nueva");
+      status.textContent=symbol+" · "+interval.toUpperCase()+" · "+data.closed_bars+" velas cerradas · último cierre hace "+(Number.isFinite(age)?age.toFixed(1):"—")+" min · "+(data.cache?.hit?"caché":"consulta nueva");
     }catch(error){
       rows.innerHTML='<tr><td colspan="5" style="text-align:left">No hay datos disponibles para mostrar.</td></tr>';
       status.textContent=error.message||"Error al consultar BiQuote.";

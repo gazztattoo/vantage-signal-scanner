@@ -13,6 +13,7 @@ import logging
 import threading
 
 from biquote_quota import BiquoteQuotaError, reserve_biquote_request, get_biquote_usage
+from biquote_stream import start_stream, snapshot as biquote_stream_snapshot
 
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
@@ -94,7 +95,7 @@ def check_access_token():
 def protect_signal_endpoints():
     if request.method == "OPTIONS":
         return None
-    if request.path not in ("/api/access/check", "/api/analysis", "/api/price", "/api/history", "/api/performance", "/api/lab-status", "/api/push/subscribe", "/api/push/test", "/api/push/unsubscribe"):
+    if request.path not in ("/api/access/check", "/api/analysis", "/api/price", "/api/history", "/api/performance", "/api/lab-status", "/api/push/subscribe", "/api/push/test", "/api/push/unsubscribe", "/api/stream/ticks"):
         return None
     if not ACCESS_TOKEN_SECRET:
         return jsonify({"error": "El acceso privado no está configurado."}), 503
@@ -602,6 +603,27 @@ def credits_status():
         "reset_at_utc": usage["reset_at_utc"],
         "quota_status": "ok",
     })
+
+
+@app.route("/api/stream/ticks")
+def biquote_stream_ticks():
+    # Streaming is opt-in at the production service level. No scanner or push
+    # activation is performed by opening this endpoint.
+    if os.environ.get("BIQUOTE_STREAM_ENABLED", "false").strip().lower() not in ("1", "true", "yes", "on"):
+        return jsonify({"enabled": False, "status": "disabled", "ticks": {}, "provider": "biquote"}), 503
+    start_stream()
+    data = biquote_stream_snapshot()
+    max_age = 90
+    fresh_ticks = {}
+    for symbol, tick in data["ticks"].items():
+        age = tick.get("quote_age_seconds")
+        if isinstance(age, (int, float)) and age <= max_age and not tick.get("stale"):
+            fresh_ticks[symbol] = tick
+    data["ticks"] = fresh_ticks
+    data["fresh_symbols"] = sorted(fresh_ticks)
+    data["expected_symbols"] = ["EUR/USD", "XAU/USD", "BTC/USD"]
+    data["stream"]["enabled"] = True
+    return jsonify(data), 200
 
 
 @app.route("/api/price")

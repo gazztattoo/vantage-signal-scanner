@@ -13,6 +13,15 @@ class PersistentCandleTests(unittest.TestCase):
         self.assertEqual(closed[0]["high"], 2000)
         self.assertEqual(closed[0]["close"], 2000)
 
+    def test_ignores_out_of_order_tick(self):
+        builder = MinuteCandleBuilder()
+        builder.add_tick({"symbol":"BTC/USD","mid":100,"timestamp":"2026-11-14T10:02:10Z"})
+        self.assertEqual(builder.add_tick({"symbol":"BTC/USD","mid":90,"timestamp":"2026-11-14T10:01:50Z"}), [])
+        closed = builder.add_tick({"symbol":"BTC/USD","mid":101,"timestamp":"2026-11-14T10:03:00Z"})
+        self.assertEqual(len(closed), 1)
+        self.assertEqual(closed[0]["minute_open"], "2026-11-14T10:02:00Z")
+        self.assertEqual(closed[0]["close"], 100)
+
     def test_rejects_stale_and_unknown(self):
         builder = MinuteCandleBuilder()
         self.assertEqual(builder.add_tick({"symbol":"UNKNOWN","mid":10,"timestamp":"2026-11-14T10:00:01Z"}), [])

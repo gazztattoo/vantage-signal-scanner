@@ -352,6 +352,21 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 .live-feed-note{font-size:10px;color:var(--muted);margin-top:9px;line-height:1.45}
 @media(max-width:560px){.live-feed-grid{gap:6px}.live-feed-card{padding:8px}.live-feed-price{font-size:clamp(15px,4.4vw,21px)}}
 
+/* Manual BiQuote OHLC research panel — never connected to the signal engine */
+.bq-ohlc{margin:0 0 16px;padding:13px;border:1px solid var(--line);border-radius:15px;background:var(--panel)}
+.bq-ohlc-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px}
+.bq-ohlc-title{font-size:12px;font-weight:900;letter-spacing:.25px}
+.bq-ohlc-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.bq-ohlc-controls select,.bq-ohlc-controls button{min-height:36px;border-radius:9px;padding:7px 10px}
+.bq-ohlc-status{font-size:11px;color:var(--muted);margin:8px 0}
+.bq-ohlc-table-wrap{overflow-x:auto}
+.bq-ohlc-table{width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap}
+.bq-ohlc-table th,.bq-ohlc-table td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:right}
+.bq-ohlc-table th:first-child,.bq-ohlc-table td:first-child{text-align:left}
+.bq-ohlc-table th{color:var(--muted);font-weight:800}
+.bq-ohlc-note{font-size:10px;color:var(--muted);line-height:1.45;margin-top:9px}
+
+
 </style>
 </head>
 
@@ -384,6 +399,34 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
     <article class="live-feed-card"><div class="live-feed-symbol">BITCOIN · BTC/USD</div><div class="live-feed-price" id="bqPriceBTC">—</div><div class="live-feed-meta" id="bqMetaBTC">Esperando primer tick</div></article>
   </div>
   <div class="live-feed-note">Feed externo BiQuote (no cotización Vantage). Los ticks se reciben mientras esta pantalla permanece abierta. Este monitor no ejecuta órdenes ni activa alertas.</div>
+</section>
+
+<section class="bq-ohlc" id="biquoteOhlcResearch" aria-label="Velas BiQuote para investigación">
+  <div class="bq-ohlc-head">
+    <div class="bq-ohlc-title">BIQUOTE · VELAS OHLC · INVESTIGACIÓN TEST</div>
+    <span class="hint">Consulta manual</span>
+  </div>
+  <div class="bq-ohlc-controls">
+    <select id="bqOhlcSymbol" aria-label="Activo BiQuote">
+      <option value="XAU/USD">XAU/USD</option>
+      <option value="EUR/USD">EUR/USD</option>
+      <option value="BTC/USD">BTC/USD</option>
+    </select>
+    <select id="bqOhlcInterval" aria-label="Temporalidad BiQuote">
+      <option value="5m">M5</option>
+      <option value="15m">M15</option>
+      <option value="30m">M30</option>
+    </select>
+    <button id="bqOhlcLoad" type="button">Consultar velas</button>
+  </div>
+  <div class="bq-ohlc-status" id="bqOhlcStatus">No se ha realizado ninguna consulta. Pulsa «Consultar velas» para cargar datos.</div>
+  <div class="bq-ohlc-table-wrap">
+    <table class="bq-ohlc-table">
+      <thead><tr><th>Hora</th><th>Open</th><th>High</th><th>Low</th><th>Close</th></tr></thead>
+      <tbody id="bqOhlcRows"><tr><td colspan="5" style="text-align:left">Esperando consulta…</td></tr></tbody>
+    </table>
+  </div>
+  <div class="bq-ohlc-note">Fuente externa BiQuote (feed MT5 agregado, no Vantage). Solo se muestran velas cerradas. Estos datos no alimentan el motor de señales, no activan alertas y no ejecutan operaciones.</div>
 </section>
 
 <nav class="app-nav" aria-label="Navegación principal">
@@ -1230,6 +1273,44 @@ if ("serviceWorker" in navigator) {
     }catch(error){console.warn("BiQuote SignalR TEST:",error);setStatus("No se pudo conectar · "+(error.message||"error de red"),"error");}
   };
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start,{once:true});else start();
+})();
+</script>
+
+<script>
+/* On-demand BiQuote OHLC research viewer. No polling and no signal-engine calls. */
+(()=>{
+  const button=document.getElementById("bqOhlcLoad");
+  const symbolSelect=document.getElementById("bqOhlcSymbol");
+  const intervalSelect=document.getElementById("bqOhlcInterval");
+  const status=document.getElementById("bqOhlcStatus");
+  const rows=document.getElementById("bqOhlcRows");
+  if(!button||!symbolSelect||!intervalSelect||!status||!rows)return;
+  const fmt=value=>Number(value).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:5});
+  const escapeText=value=>String(value).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+  button.addEventListener("click",async()=>{
+    const symbol=symbolSelect.value,interval=intervalSelect.value;
+    button.disabled=true;
+    status.textContent="Consultando BiQuote…";
+    rows.innerHTML='<tr><td colspan="5" style="text-align:left">Cargando velas cerradas…</td></tr>';
+    try{
+      const url=API_BASE+"/api/research/biquote/ohlc?symbol="+encodeURIComponent(symbol)+"&interval="+encodeURIComponent(interval);
+      const response=await fetch(url,{method:"GET",cache:"no-store",headers:{"Accept":"application/json"}});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(data.error||"No se pudieron consultar las velas.");
+      if(!data.research_only||data.signals_activated!==false||!Array.isArray(data.bars))throw new Error("Respuesta no válida para el modo de investigación.");
+      const bars=data.bars.slice(-8).reverse();
+      rows.innerHTML=bars.map(bar=>{
+        const stamp=new Date(bar.time);
+        const time=Number.isNaN(stamp.getTime())?"—":stamp.toLocaleString("es-ES",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
+        return "<tr><td>"+escapeText(time)+"</td><td>"+fmt(bar.open)+"</td><td>"+fmt(bar.high)+"</td><td>"+fmt(bar.low)+"</td><td>"+fmt(bar.close)+"</td></tr>";
+      }).join("");
+      const age=Number(data.last_closed_age_minutes);
+      status.textContent=symbol+" · "+interval.toUpperCase()+" · "+data.closed_bars+" velas cerradas · última vela hace "+(Number.isFinite(age)?age.toFixed(1):"—")+" min · "+(data.cache?.hit?"caché":"consulta nueva");
+    }catch(error){
+      rows.innerHTML='<tr><td colspan="5" style="text-align:left">No hay datos disponibles para mostrar.</td></tr>';
+      status.textContent=error.message||"Error al consultar BiQuote.";
+    }finally{button.disabled=false;}
+  });
 })();
 </script>
 

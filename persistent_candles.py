@@ -5,7 +5,7 @@ Only completed UTC minutes are persisted. Missing minutes are not fabricated.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 
@@ -86,7 +86,7 @@ def aggregate_minutes(rows: list[dict[str, Any]], interval_minutes: int, limit: 
         items.sort(key=lambda pair: pair[0])
         if len(items) != interval_minutes:
             continue
-        expected = [start.replace() + __import__("datetime").timedelta(minutes=i) for i in range(interval_minutes)]
+        expected = [start + timedelta(minutes=i) for i in range(interval_minutes)]
         if [stamp for stamp, _ in items] != expected:
             continue
         values = [row for _, row in items]

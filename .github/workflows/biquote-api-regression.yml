@@ -5,6 +5,8 @@ on:
     branches: [biquote-production-ready]
     paths:
       - "app.py"
+      - "persistent_candles.py"
+      - "tests/test_persistent_candles.py"
       - "biquote_quota.py"
       - "tests/test_biquote_quota.py"
       - "tests/test_biquote_provider.py"
@@ -15,6 +17,8 @@ on:
     branches: [main]
     paths:
       - "app.py"
+      - "persistent_candles.py"
+      - "tests/test_persistent_candles.py"
       - "tests/test_biquote_provider.py"
       - "tests/test_market_session.py"
       - "tests/test_api_safety.py"
@@ -40,6 +44,7 @@ jobs:
           ACCESS_TOKEN_SECRET: regression-test-secret
           PANEL_ACCESS_CODE: regression-test-code
         run: |
+          python -m unittest discover -s tests -p "test_persistent_candles.py" -v
           python -m unittest discover -s tests -p "test_biquote_provider.py" -v
           python -m unittest discover -s tests -p "test_market_session.py" -v
           python -m unittest discover -s tests -p "test_api_safety.py" -v

@@ -1,0 +1,24 @@
+name: TEST BiQuote adapter safety tests
+
+on:
+  push:
+    branches: [push-test]
+    paths:
+      - "external_biquote_adapter.py"
+      - "tests/test_external_biquote_adapter.py"
+      - ".github/workflows/biquote-adapter-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  adapter-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run offline adapter tests
+        run: python -m unittest discover -s tests -p "test_external_biquote_adapter.py" -v

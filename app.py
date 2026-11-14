@@ -1439,6 +1439,15 @@ def process_pending_push_deliveries(limit=100):
         return summary
 
 
+@app.route("/api/cron-auth-check", methods=["POST"])
+def cron_auth_check():
+    """Validación aislada del secreto cron; no ejecuta análisis ni envía notificaciones."""
+    supplied = request.headers.get("X-Scanner-Cron-Secret", "")
+    if not SIGNAL_CRON_SECRET or not hmac.compare_digest(supplied, SIGNAL_CRON_SECRET):
+        return jsonify({"ok": False, "error": "No autorizado."}), 401
+    return jsonify({"ok": True, "message": "Autenticación válida."}), 200
+
+
 @app.route("/api/push/scan", methods=["POST"])
 def push_scan():
     supplied = request.headers.get("X-Scanner-Cron-Secret", "")

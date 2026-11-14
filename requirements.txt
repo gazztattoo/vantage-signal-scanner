@@ -1,1 +1,8 @@
-\nflask\nrequests\ngunicorn\nflask-cors\nitsdangerous\npywebpush==2.0.3\npysignalr==1.3.3\n
+
+flask
+requests
+gunicorn
+flask-cors
+itsdangerous
+pywebpush==2.0.3
+pysignalr==1.3.3

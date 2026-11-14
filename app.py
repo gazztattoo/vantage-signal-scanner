@@ -14,6 +14,7 @@ import threading
 
 from biquote_quota import BiquoteQuotaError, reserve_biquote_request, get_biquote_usage
 from biquote_stream import SYMBOLS as BIQUOTE_STREAM_SYMBOLS, start_stream, snapshot as biquote_stream_snapshot
+from persistent_candles import aggregate_minutes
 
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
@@ -513,7 +514,63 @@ def twelve_data_get(endpoint, params=None, timeout=20):
         return response
 
 
+def fetch_persisted_candles(symbol, interval):
+    """Read complete M1 bars from Supabase and aggregate locally without provider credits."""
+    if interval not in ("5min", "15min") or not SUPABASE_URL or not SUPABASE_SECRET_KEY:
+        return None
+    interval_minutes = INTERVAL_MINUTES[interval]
+    required_minutes = interval_minutes * 55
+    try:
+        response = requests.get(
+            SUPABASE_URL + "/rest/v1/market_minute_candles",
+            params={
+                "select": "symbol,minute_open,open,high,low,close,tick_count",
+                "symbol": "eq." + symbol,
+                "order": "minute_open.desc",
+                "limit": str(required_minutes + interval_minutes * 5),
+            },
+            headers=supabase_headers(),
+            timeout=10,
+        )
+        response.raise_for_status()
+        rows = response.json()
+        if not isinstance(rows, list) or len(rows) < required_minutes:
+            return None
+        rows.reverse()
+        candles = aggregate_minutes(rows, interval_minutes, limit=120)
+        if len(candles) < 55:
+            return None
+        now = datetime.now(timezone.utc)
+        latest_time = datetime.fromisoformat(candles[-1]["time"].replace("Z", "+00:00"))
+        age_seconds = max((now - latest_time).total_seconds(), 0)
+        max_age_seconds = interval_minutes * 60 * 2 + 90
+        if age_seconds > max_age_seconds:
+            app.logger.warning(
+                "persistent_candles stale symbol=%s interval=%s age_seconds=%s",
+                symbol, interval, int(age_seconds),
+            )
+            return None
+        for candle in candles:
+            candle["time"] = datetime.fromisoformat(
+                candle["time"].replace("Z", "+00:00")
+            ).astimezone(CANARY_TZ).isoformat()
+        app.logger.info(
+            "persistent_candles hit symbol=%s interval=%s bars=%s age_seconds=%s",
+            symbol, interval, len(candles), int(age_seconds),
+        )
+        return candles, candles[-1]["time"], round(age_seconds / 60, 2)
+    except (requests.RequestException, ValueError, TypeError) as exc:
+        # The caller may use the existing quota-protected OHLC bootstrap path.
+        app.logger.warning("persistent_candles read unavailable: %s", str(exc)[:180])
+        return None
+
+
 def fetch_candles(symbol, interval):
+    """Prefer persisted stream candles; use quota-protected BiQuote OHLC only to bootstrap."""
+    if interval in ("5min", "15min"):
+        persisted = fetch_persisted_candles(symbol, interval)
+        if persisted is not None:
+            return persisted
     """Obtiene velas OHLC desde biquote; nunca usa velas Twelve Data como fallback."""
     provider_symbol = {"EUR/USD": "EURUSD", "XAU/USD": "XAUUSD", "BTC/USD": "BTCUSD"}[symbol]
     provider_interval = {"5min": "5m", "15min": "15m", "30min": "30m"}[interval]

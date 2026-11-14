@@ -357,6 +357,23 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
   .trade-mode .reason{min-height:0;margin:8px 0;font-size:11px}
 }
 
+
+/* BiQuote live quotes — production read-only monitor */
+.live-feed{margin:0 0 16px;padding:12px;border:1px solid var(--line);border-radius:15px;background:linear-gradient(145deg,rgba(15,39,27,.96),rgba(7,16,11,.98))}
+.live-feed-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.live-feed-title{font-size:12px;font-weight:900;letter-spacing:.3px}
+.live-feed-status{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:7px}
+.live-feed-dot{width:8px;height:8px;border-radius:50%;background:var(--amber);display:inline-block}
+.live-feed-dot.connected{background:var(--green);box-shadow:0 0 8px rgba(88,242,154,.5)}
+.live-feed-dot.error{background:var(--red)}
+.live-feed-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.live-feed-card{min-width:0;padding:10px;border:1px solid var(--line);border-radius:11px;background:rgba(2,10,6,.48)}
+.live-feed-symbol{font-size:10px;color:var(--muted);font-weight:800}
+.live-feed-price{font-size:clamp(18px,4vw,25px);font-weight:900;letter-spacing:-.6px;margin:6px 0;white-space:nowrap}
+.live-feed-meta{font-size:10px;color:var(--muted);line-height:1.5;white-space:pre-line}
+.live-feed-note{font-size:10px;color:var(--muted);margin-top:9px;line-height:1.45}
+@media(max-width:560px){.live-feed-grid{gap:6px}.live-feed-card{padding:8px}.live-feed-price{font-size:clamp(15px,4.4vw,21px)}}
+
 </style>
 </head>
 
@@ -376,6 +393,21 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
     <span id="status">Esperando conexión</span>
   </div>
 </header>
+
+
+<section class="live-feed" id="biquoteLiveFeed" aria-label="Cotizaciones BiQuote en tiempo real">
+  <div class="live-feed-head">
+    <div class="live-feed-title">BIQUOTE · COTIZACIONES EN TIEMPO REAL</div>
+    <div class="live-feed-status"><span class="live-feed-dot" id="bqLiveDot"></span><span id="bqLiveStatus">Preparando conexión…</span></div>
+  </div>
+  <div class="live-feed-grid">
+    <article class="live-feed-card"><div class="live-feed-symbol">ORO · XAU/USD</div><div class="live-feed-price" id="bqPriceXAU">—</div><div class="live-feed-meta" id="bqMetaXAU">Esperando primer tick</div></article>
+    <article class="live-feed-card"><div class="live-feed-symbol">EURO · EUR/USD</div><div class="live-feed-price" id="bqPriceEUR">—</div><div class="live-feed-meta" id="bqMetaEUR">Esperando primer tick</div></article>
+    <article class="live-feed-card"><div class="live-feed-symbol">BITCOIN · BTC/USD</div><div class="live-feed-price" id="bqPriceBTC">—</div><div class="live-feed-meta" id="bqMetaBTC">Esperando primer tick</div></article>
+  </div>
+  <div class="live-feed-note">Fuente externa BiQuote (feed MT5, no Vantage). Solo visualización: estas cotizaciones todavía no alimentan el motor de señales ni ejecutan órdenes. Si el mercado está cerrado o no llegan ticks recientes, el panel no presenta el último precio como actual.</div>
+</section>
+
 
 <nav class="app-nav" aria-label="Navegación principal">
   <button type="button" class="active" data-view="scanner" aria-label="Scanner"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></span><span>Scanner</span></button>
@@ -1290,5 +1322,82 @@ if ("serviceWorker" in navigator) {
   });
 }
 </script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+/* BiQuote SignalR: producción, solo lectura. No toca el motor ni las órdenes. */
+(()=>{
+  const instruments={
+    XAUUSD:{price:"bqPriceXAU",meta:"bqMetaXAU",digits:2},
+    EURUSD:{price:"bqPriceEUR",meta:"bqMetaEUR",digits:5},
+    BTCUSD:{price:"bqPriceBTC",meta:"bqMetaBTC",digits:2}
+  };
+  const status=document.getElementById("bqLiveStatus");
+  const dot=document.getElementById("bqLiveDot");
+  if(!status||!dot)return;
+  const setStatus=(message,state="")=>{
+    status.textContent=message;
+    dot.className="live-feed-dot"+(state?" "+state:"");
+  };
+  const fmt=(value,digits)=>Number(value).toLocaleString("en-US",{
+    minimumFractionDigits:digits,maximumFractionDigits:digits
+  });
+  const renderTick=tick=>{
+    if(!tick||!instruments[tick.symbol])return;
+    const cfg=instruments[tick.symbol];
+    const bid=Number(tick.bid),ask=Number(tick.ask);
+    if(!Number.isFinite(bid)||!Number.isFinite(ask)||bid<=0||ask<bid)return;
+    const mid=Number.isFinite(Number(tick.mid))&&Number(tick.mid)>0
+      ?Number(tick.mid):(bid+ask)/2;
+    const rawTime=tick.timestamp||tick.lastQuoteAt||null;
+    const stamp=rawTime?new Date(rawTime):new Date();
+    if(Number.isNaN(stamp.getTime()))return;
+    const age=(Date.now()-stamp.getTime())/1000;
+    if(age < -10 || age > 90)return;
+    document.getElementById(cfg.price).textContent=fmt(mid,cfg.digits);
+    document.getElementById(cfg.meta).textContent=
+      "Bid "+fmt(bid,cfg.digits)+" · Ask "+fmt(ask,cfg.digits)+
+      " · Spread "+fmt(ask-bid,cfg.digits)+"\nTick "+stamp.toLocaleTimeString("es-ES");
+  };
+  const start=async()=>{
+    if(!window.signalR){setStatus("No se pudo cargar SignalR","error");return;}
+    const connection=new signalR.HubConnectionBuilder()
+      .withUrl("https://biquote.io/hubs/tick")
+      .withAutomaticReconnect([0,2000,5000,10000,20000])
+      .configureLogging(signalR.LogLevel.Warning)
+      .build();
+    connection.on("ReceiveTick",renderTick);
+    connection.on("ReceiveSubscriptionState",state=>{
+      if(state&&state.symbol&&instruments[state.symbol]&&state.state==="closed"){
+        const cfg=instruments[state.symbol];
+        document.getElementById(cfg.meta).textContent="Mercado cerrado · sin cotización en vivo";
+      }
+    });
+    connection.onreconnecting(()=>setStatus("Reconectando al flujo…"));
+    const subscribe=async()=>{
+      await connection.invoke("Subscribe",["XAUUSD","EURUSD","BTCUSD"]);
+      setStatus("Conectado · esperando ticks recientes","connected");
+    };
+    connection.onreconnected(async()=>{
+      try{await subscribe();}
+      catch(error){setStatus("Conectado, pero falló la suscripción","error");}
+    });
+    connection.onclose(()=>setStatus("Conexión interrumpida · recarga para reintentar","error"));
+    try{
+      setStatus("Abriendo conexión segura…");
+      await connection.start();
+      await subscribe();
+      window.__gssBiquoteProduction=connection;
+    }catch(error){
+      console.warn("BiQuote SignalR producción:",error);
+      setStatus("No se pudo conectar · "+(error.message||"error de red"),"error");
+    }
+  };
+  if(document.readyState==="loading")
+    document.addEventListener("DOMContentLoaded",start,{once:true});
+  else start();
+})();
+</script>
+
 </body>
 </html>

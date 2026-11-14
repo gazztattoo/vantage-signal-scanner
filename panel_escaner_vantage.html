@@ -564,6 +564,7 @@ accessForm.addEventListener("submit",async event=>{
     accessCodeInput.value="";
     accessError.textContent="";
     hideAccessGate();
+    document.dispatchEvent(new Event("gss-access-ready"));
     statusEl.textContent="Sesión verificada · Cargando scanner…";
     await update();
   }catch(error){

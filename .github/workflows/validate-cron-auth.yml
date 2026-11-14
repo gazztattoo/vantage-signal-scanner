@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Comprobar secreto sin ejecutar escáner
+      - name: Comparar huellas del secreto sin ejecutar escáner
         env:
           SCANNER_API_URL: https://vantage-signal-api-carlos.onrender.com
           SIGNAL_CRON_SECRET: ${{ secrets.SIGNAL_CRON_SECRET }}
@@ -20,13 +20,27 @@ jobs:
             echo "::error::Falta SIGNAL_CRON_SECRET en GitHub Actions."
             exit 1
           fi
+          CLIENT_FP=$(printf '%s' "$SIGNAL_CRON_SECRET" | sha256sum | cut -c1-12)
           STATUS=$(curl --silent --show-error --output /tmp/auth-check.json --write-out "%{http_code}" \
             --request POST \
             --header "X-Scanner-Cron-Secret: $SIGNAL_CRON_SECRET" \
             "$SCANNER_API_URL/api/cron-auth-check")
+          echo "Huella GitHub: $CLIENT_FP"
           if [ "$STATUS" = "200" ]; then
             echo "Autenticación válida. No se ejecutó ningún análisis."
             exit 0
           fi
+          python3 - <<'PY'
+          import json
+          with open("/tmp/auth-check.json", encoding="utf-8") as f:
+              data = json.load(f)
+          print("Diagnóstico API:", json.dumps({
+              "server_configured": data.get("server_configured"),
+              "server_fingerprint": data.get("server_fingerprint"),
+              "received_fingerprint": data.get("received_fingerprint"),
+              "server_length": data.get("server_length"),
+              "received_length": data.get("received_length")
+          }))
+          PY
           echo "::error::La API rechazó la autenticación (HTTP $STATUS). No se ejecutó ningún análisis."
           exit 1

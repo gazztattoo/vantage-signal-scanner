@@ -4,12 +4,12 @@ from three_indicator_filter import evaluate_three_indicator_filter
 
 class ThreeIndicatorFilterTests(unittest.TestCase):
     def test_buy_with_two_of_three_and_adx_18(self):
-        result = evaluate_three_indicator_filter(adx14=19, macd_hist=0.3, rsi14=48)
+        result = evaluate_three_indicator_filter(adx14=19, macd_hist=0.3, rsi14=72)
         self.assertEqual(result["signal"], "COMPRA")
         self.assertEqual(result["buy_score"], 2)
 
     def test_sell_with_two_of_three_and_adx_18(self):
-        result = evaluate_three_indicator_filter(adx14=21, macd_hist=-0.2, rsi14=53)
+        result = evaluate_three_indicator_filter(adx14=21, macd_hist=-0.2, rsi14=28)
         self.assertEqual(result["signal"], "VENTA")
         self.assertEqual(result["sell_score"], 2)
 
@@ -23,7 +23,7 @@ class ThreeIndicatorFilterTests(unittest.TestCase):
         self.assertEqual(result["signal"], "ESPERAR")
 
     def test_both_momentum_indicators_opposing_blocks_entry(self):
-        result = evaluate_three_indicator_filter(adx14=25, macd_hist=-0.2, rsi14=45)
+        result = evaluate_three_indicator_filter(adx14=25, macd_hist=-0.2, rsi14=60)
         self.assertEqual(result["signal"], "ESPERAR")
 
     def test_invalid_values_fail_closed(self):

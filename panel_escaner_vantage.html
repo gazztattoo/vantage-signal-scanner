@@ -1323,79 +1323,49 @@ if ("serviceWorker" in navigator) {
 }
 </script>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
-/* BiQuote SignalR: producción, solo lectura. No toca el motor ni las órdenes. */
+/* BiQuote ticks are streamed into the production backend; this panel reads only our API. */
 (()=>{
   const instruments={
-    XAUUSD:{price:"bqPriceXAU",meta:"bqMetaXAU",digits:2},
-    EURUSD:{price:"bqPriceEUR",meta:"bqMetaEUR",digits:5},
-    BTCUSD:{price:"bqPriceBTC",meta:"bqMetaBTC",digits:2}
+    XAUUSD:{symbol:"XAU/USD",price:"bqPriceXAU",meta:"bqMetaXAU",digits:2},
+    EURUSD:{symbol:"EUR/USD",price:"bqPriceEUR",meta:"bqMetaEUR",digits:5},
+    BTCUSD:{symbol:"BTC/USD",price:"bqPriceBTC",meta:"bqMetaBTC",digits:2}
   };
   const status=document.getElementById("bqLiveStatus");
   const dot=document.getElementById("bqLiveDot");
   if(!status||!dot)return;
-  const setStatus=(message,state="")=>{
-    status.textContent=message;
-    dot.className="live-feed-dot"+(state?" "+state:"");
-  };
-  const fmt=(value,digits)=>Number(value).toLocaleString("en-US",{
-    minimumFractionDigits:digits,maximumFractionDigits:digits
-  });
-  const renderTick=tick=>{
-    if(!tick||!instruments[tick.symbol])return;
-    const cfg=instruments[tick.symbol];
-    const bid=Number(tick.bid),ask=Number(tick.ask);
-    if(!Number.isFinite(bid)||!Number.isFinite(ask)||bid<=0||ask<bid)return;
-    const mid=Number.isFinite(Number(tick.mid))&&Number(tick.mid)>0
-      ?Number(tick.mid):(bid+ask)/2;
-    const rawTime=tick.timestamp||tick.lastQuoteAt||null;
-    const stamp=rawTime?new Date(rawTime):new Date();
-    if(Number.isNaN(stamp.getTime()))return;
-    const age=(Date.now()-stamp.getTime())/1000;
-    if(age < -10 || age > 90)return;
-    document.getElementById(cfg.price).textContent=fmt(mid,cfg.digits);
-    document.getElementById(cfg.meta).textContent=
-      "Bid "+fmt(bid,cfg.digits)+" · Ask "+fmt(ask,cfg.digits)+
-      " · Spread "+fmt(ask-bid,cfg.digits)+"\nTick "+stamp.toLocaleTimeString("es-ES");
-  };
-  const start=async()=>{
-    if(!window.signalR){setStatus("No se pudo cargar SignalR","error");return;}
-    const connection=new signalR.HubConnectionBuilder()
-      .withUrl("https://biquote.io/hubs/tick")
-      .withAutomaticReconnect([0,2000,5000,10000,20000])
-      .configureLogging(signalR.LogLevel.Warning)
-      .build();
-    connection.on("ReceiveTick",renderTick);
-    connection.on("ReceiveSubscriptionState",state=>{
-      if(state&&state.symbol&&instruments[state.symbol]&&state.state==="closed"){
-        const cfg=instruments[state.symbol];
-        document.getElementById(cfg.meta).textContent="Mercado cerrado · sin cotización en vivo";
-      }
-    });
-    connection.onreconnecting(()=>setStatus("Reconectando al flujo…"));
-    const subscribe=async()=>{
-      await connection.invoke("Subscribe",["XAUUSD","EURUSD","BTCUSD"]);
-      setStatus("Conectado · esperando ticks recientes","connected");
-    };
-    connection.onreconnected(async()=>{
-      try{await subscribe();}
-      catch(error){setStatus("Conectado, pero falló la suscripción","error");}
-    });
-    connection.onclose(()=>setStatus("Conexión interrumpida · recarga para reintentar","error"));
+  let timer=null, busy=false;
+  const setStatus=(message,state="")=>{status.textContent=message;dot.className="live-feed-dot"+(state?" "+state:"");};
+  const fmt=(v,d)=>Number(v).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+  const update=async()=>{
+    if(busy||!accessToken)return;
+    busy=true;
     try{
-      setStatus("Abriendo conexión segura…");
-      await connection.start();
-      await subscribe();
-      window.__gssBiquoteProduction=connection;
-    }catch(error){
-      console.warn("BiQuote SignalR producción:",error);
-      setStatus("No se pudo conectar · "+(error.message||"error de red"),"error");
-    }
+      const response=await fetch(API_BASE+"/api/stream/ticks",{headers:authHeaders(),cache:"no-store"});
+      const data=await response.json().catch(()=>({}));
+      if(response.status===401){setStatus("Sesión caducada · vuelve a entrar","error");return;}
+      if(!response.ok)throw new Error(data.error||"Streaming de servidor desactivado o no disponible");
+      const ticks=data.ticks||{};
+      let count=0;
+      for(const cfg of Object.values(instruments)){
+        const tick=ticks[cfg.symbol];
+        if(!tick)continue;
+        const bid=Number(tick.bid),ask=Number(tick.ask),mid=Number(tick.mid);
+        if(!Number.isFinite(bid)||!Number.isFinite(ask)||!Number.isFinite(mid)||bid<=0||ask<bid)continue;
+        const stamp=new Date(tick.timestamp);
+        if(Number.isNaN(stamp.getTime()))continue;
+        document.getElementById(cfg.price).textContent=fmt(mid,cfg.digits);
+        document.getElementById(cfg.meta).textContent="Bid "+fmt(bid,cfg.digits)+" · Ask "+fmt(ask,cfg.digits)+" · Spread "+fmt(ask-bid,cfg.digits)+"\nTick "+stamp.toLocaleTimeString("es-ES");
+        count++;
+      }
+      if(count)setStatus("Servidor conectado · "+count+" activos con cotización reciente","connected");
+      else setStatus(data.stream?.connected?"Conectado · esperando ticks del mercado":"Conectando con BiQuote desde servidor…");
+    }catch(error){setStatus(error.message||"Error de streaming","error");}
+    finally{busy=false;}
   };
-  if(document.readyState==="loading")
-    document.addEventListener("DOMContentLoaded",start,{once:true});
-  else start();
+  const begin=()=>{if(timer)clearInterval(timer);update();timer=setInterval(update,1000);};
+  if(accessToken)begin();
+  document.addEventListener("gss-access-ready",begin);
 })();
 </script>
 

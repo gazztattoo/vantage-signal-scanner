@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import threading
 import time
 from datetime import datetime, timezone
@@ -15,8 +16,13 @@ from typing import Any
 
 LOGGER = logging.getLogger(__name__)
 HUB_URL = "https://biquote.io/hubs/tick"
-SYMBOLS = ("EURUSD", "XAUUSD", "BTCUSD")
 SYMBOL_MAP = {"EURUSD": "EUR/USD", "XAUUSD": "XAU/USD", "BTCUSD": "BTC/USD"}
+_requested_symbols = [
+    item.strip().upper().replace("/", "")
+    for item in os.getenv("BIQUOTE_STREAM_SYMBOLS", "EURUSD,XAUUSD,BTCUSD").split(",")
+    if item.strip()
+]
+SYMBOLS = tuple(dict.fromkeys(item for item in _requested_symbols if item in SYMBOL_MAP)) or ("BTCUSD",)
 
 _lock = threading.RLock()
 _latest: dict[str, dict[str, Any]] = {}

@@ -438,6 +438,89 @@ def generate_mock_candles(symbol, interval, count=1200):
     return candles, latest_time.isoformat(), round(age_seconds / 60, 2)
 
 
+# BiQuote research feed is isolated from the strategy engine and disabled unless
+# explicitly enabled in the TEST service environment. It never changes DATA_MODE.
+BIQUOTE_RESEARCH_ENABLED = os.environ.get("BIQUOTE_RESEARCH_ENABLED", "true").strip().lower() in ("1", "true", "yes", "on")
+BIQUOTE_RESEARCH_CACHE = {}
+BIQUOTE_RESEARCH_CACHE_TTL = {"5m": 20, "15m": 45, "30m": 90}
+
+
+def fetch_biquote_research_ohlc(symbol, interval):
+    """Fetch and normalize external BiQuote bars for research display only."""
+    from external_biquote_adapter import normalize_biquote_ohlc
+
+    provider_symbol = {"EUR/USD": "EURUSD", "XAU/USD": "XAUUSD", "BTC/USD": "BTCUSD"}[symbol]
+    response = requests.get(
+        f"https://biquote.io/api/{provider_symbol}/ohlc",
+        params={"interval": interval, "limit": 120},
+        timeout=12,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if not isinstance(payload, dict):
+        raise RuntimeError("BiQuote devolvió una respuesta OHLC no válida.")
+    # The endpoint path and requested interval are authoritative when the
+    # provider omits those metadata fields; conflicting values are rejected.
+    payload = dict(payload)
+    if payload.get("symbol") not in (None, provider_symbol):
+        raise RuntimeError("BiQuote devolvió otro símbolo; respuesta rechazada.")
+    if payload.get("interval") not in (None, interval):
+        raise RuntimeError("BiQuote devolvió otra temporalidad; respuesta rechazada.")
+    payload["symbol"] = provider_symbol
+    payload["interval"] = interval
+    normalized = normalize_biquote_ohlc(
+        payload,
+        symbol=symbol,
+        interval=interval,
+        max_last_closed_age_minutes=(int(interval[:-1]) * 2 + 2),
+    )
+    if not normalized.get("accepted"):
+        raise RuntimeError(normalized.get("reason", "Datos BiQuote rechazados."))
+    if normalized["closed_bars"] < 55:
+        raise RuntimeError("BiQuote devolvió menos de 55 velas cerradas; no se publican datos.")
+    return normalized
+
+
+@app.route("/api/research/biquote/ohlc", methods=["GET"])
+def biquote_research_ohlc():
+    """On-demand BiQuote OHLC endpoint; never feeds signal generation."""
+    if not BIQUOTE_RESEARCH_ENABLED:
+        return jsonify({"enabled": False, "research_only": True, "signals_activated": False}), 503
+    symbol = get_symbol(request.args.get("symbol"))
+    interval = (request.args.get("interval") or "5m").strip()
+    if not symbol:
+        return jsonify({"error": "Símbolo no permitido.", "allowed_symbols": sorted(ALLOWED_SYMBOLS)}), 400
+    if interval not in ("5m", "15m", "30m"):
+        return jsonify({"error": "Temporalidad no permitida.", "allowed_intervals": ["5m", "15m", "30m"]}), 400
+
+    key = (symbol, interval)
+    now_mono = time.monotonic()
+    cached = BIQUOTE_RESEARCH_CACHE.get(key)
+    if cached and now_mono - cached["stored_at"] < BIQUOTE_RESEARCH_CACHE_TTL[interval]:
+        result = dict(cached["payload"])
+        result["cache"] = {"hit": True, "age_seconds": round(now_mono - cached["stored_at"], 1)}
+        return jsonify(result)
+
+    try:
+        result = fetch_biquote_research_ohlc(symbol, interval)
+    except (requests.RequestException, ValueError, TypeError, KeyError, RuntimeError) as exc:
+        app.logger.warning("BiQuote research OHLC rejected symbol=%s interval=%s reason=%s", symbol, interval, str(exc)[:160])
+        return jsonify({
+            "error": "No hay velas BiQuote válidas y recientes para investigación.",
+            "research_only": True,
+            "signals_activated": False,
+        }), 503
+
+    result.update({
+        "research_only": True,
+        "signals_activated": False,
+        "data_mode": DATA_MODE,
+        "cache": {"hit": False, "ttl_seconds": BIQUOTE_RESEARCH_CACHE_TTL[interval]},
+    })
+    BIQUOTE_RESEARCH_CACHE[key] = {"stored_at": now_mono, "payload": result}
+    return jsonify(result)
+
+
 def fetch_candles(symbol, interval):
     if DATA_MODE == "mock":
         return generate_mock_candles(symbol, interval)

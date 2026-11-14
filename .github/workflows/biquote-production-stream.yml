@@ -1,0 +1,37 @@
+name: BiQuote production stream tests
+
+on:
+  push:
+    branches: [biquote-production-rollout]
+    paths:
+      - "app.py"
+      - "biquote_stream.py"
+      - "requirements.txt"
+      - "tests/test_biquote_stream.py"
+      - ".github/workflows/biquote-production-stream.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "app.py"
+      - "biquote_stream.py"
+      - "requirements.txt"
+      - "tests/test_biquote_stream.py"
+      - ".github/workflows/biquote-production-stream.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  stream-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run BiQuote stream tests
+        run: python -m unittest discover -s tests -p "test_biquote_stream.py" -v
+      - name: Compile production API and stream module
+        run: python -m py_compile app.py biquote_stream.py

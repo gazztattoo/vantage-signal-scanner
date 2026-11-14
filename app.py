@@ -565,8 +565,79 @@ def fetch_persisted_candles(symbol, interval):
         return None
 
 
+def fetch_cached_provider_candles(symbol, interval):
+    """Read previously downloaded closed OHLC bars; cache hits consume no provider quota."""
+    if not SUPABASE_URL or not SUPABASE_SECRET_KEY:
+        return None
+    try:
+        response = requests.get(
+            SUPABASE_URL + "/rest/v1/market_ohlc_candles",
+            params={
+                "select": "candle_time,open,high,low,close",
+                "symbol": "eq." + symbol,
+                "timeframe": "eq." + interval,
+                "order": "candle_time.desc",
+                "limit": "120",
+            },
+            headers=supabase_headers(),
+            timeout=10,
+        )
+        response.raise_for_status()
+        rows = response.json()
+        if not isinstance(rows, list) or len(rows) < 55:
+            return None
+        rows.reverse()
+        candles = [{
+            "time": row["candle_time"],
+            "open": float(row["open"]), "high": float(row["high"]),
+            "low": float(row["low"]), "close": float(row["close"]),
+        } for row in rows]
+        now = datetime.now(timezone.utc)
+        latest = datetime.fromisoformat(candles[-1]["time"].replace("Z", "+00:00"))
+        age = max((now - latest.astimezone(timezone.utc)).total_seconds(), 0)
+        max_age = INTERVAL_MINUTES[interval] * 60 * 2 + 90
+        if age > max_age:
+            return None
+        candles[-1]["time"] = latest.astimezone(CANARY_TZ).isoformat()
+        app.logger.info("ohlc_cache hit symbol=%s interval=%s bars=%s age_seconds=%s", symbol, interval, len(candles), int(age))
+        return candles, candles[-1]["time"], round(age / 60, 2)
+    except (requests.RequestException, ValueError, TypeError, KeyError) as exc:
+        app.logger.warning("ohlc_cache read unavailable: %s", str(exc)[:180])
+        return None
+
+
+def store_provider_candles(symbol, interval, candles):
+    """Cache a provider response for reuse; failures never invalidate fresh source data."""
+    if not SUPABASE_URL or not SUPABASE_SECRET_KEY or not candles:
+        return
+    rows = [{
+        "symbol": symbol, "timeframe": interval, "candle_time": candle["time"],
+        "open": candle["open"], "high": candle["high"],
+        "low": candle["low"], "close": candle["close"],
+        "source": "biquote_ohlc",
+    } for candle in candles]
+    try:
+        response = requests.post(
+            SUPABASE_URL + "/rest/v1/market_ohlc_candles",
+            params={"on_conflict": "symbol,timeframe,candle_time"},
+            headers={
+                **supabase_headers(),
+                "Authorization": "Bearer " + SUPABASE_SECRET_KEY,
+                "Prefer": "resolution=merge-duplicates,return=minimal",
+            },
+            json=rows,
+            timeout=12,
+        )
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        app.logger.warning("ohlc_cache write failed: %s", str(exc)[:180])
+
+
 def fetch_candles(symbol, interval):
     """Prefer persisted stream candles; use quota-protected BiQuote OHLC only to bootstrap."""
+    cached_provider = fetch_cached_provider_candles(symbol, interval)
+    if cached_provider is not None:
+        return cached_provider
     if interval in ("5min", "15min"):
         persisted = fetch_persisted_candles(symbol, interval)
         if persisted is not None:
@@ -618,6 +689,7 @@ def fetch_candles(symbol, interval):
     max_age_seconds = interval_seconds * 2 + 90
     if age_seconds > max_age_seconds:
         raise RuntimeError(f"Velas biquote desactualizadas ({int(age_seconds // 60)} min). No se genera señal.")
+    store_provider_candles(symbol, interval, candles)
     return candles, latest_time.astimezone(CANARY_TZ).isoformat(), round(age_seconds / 60, 2)
 
 

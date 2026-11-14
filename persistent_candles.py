@@ -34,6 +34,11 @@ class MinuteCandleBuilder:
         if stamp.tzinfo is None:
             return []
         minute = _utc_minute(stamp)
+        # Ignore late/out-of-order ticks; never recreate a candle after a newer
+        # minute has already become active or been finalized.
+        active_minutes = [key[1] for key in self._active if key[0] == symbol]
+        if active_minutes and minute < max(active_minutes):
+            return []
         completed = []
         # A tick advances this symbol's stream. Finalize only earlier active minutes.
         for key, candle in list(self._active.items()):

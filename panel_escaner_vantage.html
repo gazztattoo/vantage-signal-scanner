@@ -690,7 +690,7 @@ function render(m,d,err,marketClosed=false){
         ?{t:"VENTA",c:"sell"}
         :{t:raw.includes("WAIT")?"ESPERAR":raw,c:""};
 
-  const entry=first(d,["entry","price"]);
+  const entry=first(d,["entry"]);
   const sl=first(d,["stop_loss","stopLoss","sl"]);
   const tp=first(d,["take_profit","takeProfit","tp"]);
   const reason=first(

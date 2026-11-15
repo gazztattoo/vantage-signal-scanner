@@ -665,6 +665,12 @@ def price():
 
 
 
+def cached_analysis_requires_reanalysis(payload):
+    """A cached setup invalidated by price drift must be recalculated from fresh candles."""
+    validation = payload.get("live_quote_validation") or {}
+    return validation.get("status") == "PRICE_MOVED"
+
+
 def apply_live_entry_validation(payload, symbol):
     """Bloquea entradas sin tick fresco y recalcula niveles desde Bid/Ask."""
     result = dict(payload)
@@ -789,12 +795,19 @@ def analysis():
         and cache_age < ANALYSIS_CACHE_TTL_SECONDS[interval]
         and cached_candle_age + (cache_age / 60) <= max_data_age_minutes
     )
+    reanalysis_triggered = False
     if cache_is_fresh:
         payload = dict(cached["payload"])
         payload["candle_age_minutes"] = round(cached_candle_age + cache_age / 60, 2)
         payload["cache"] = {"hit": True, "age_seconds": int(cache_age)}
         payload = apply_live_entry_validation(payload, symbol)
-        return jsonify(payload)
+        if not cached_analysis_requires_reanalysis(payload):
+            return jsonify(payload)
+        # A fresh BiQuote tick has moved beyond the cached candle's safe entry
+        # band. Do not just leave the old setup in ESPERAR: bypass the analysis
+        # cache once and rebuild indicators from fresh OHLC candles. The normal
+        # price-drift guard remains active on the rebuilt analysis.
+        reanalysis_triggered = True
 
     try:
         candles, candle_time, candle_age_minutes = fetch_candles(
@@ -914,6 +927,12 @@ def analysis():
             ),
             "cache": {"hit": False, "age_seconds": 0},
         }
+        if reanalysis_triggered:
+            payload["reanalysis"] = {
+                "triggered": True,
+                "reason": "PRICE_MOVED",
+                "message": "Se detectó desplazamiento en el análisis guardado; se recalcularon indicadores con velas recién solicitadas.",
+            }
         ANALYSIS_CACHE[cache_key] = {
             "stored_at": time.monotonic(),
             "payload": payload,

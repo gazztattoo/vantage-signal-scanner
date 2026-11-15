@@ -24,6 +24,17 @@ class ProductionApiSafetyTests(unittest.TestCase):
     def auth(self):
         return {"Authorization": "Bearer " + self.token}
 
+    def test_cached_analysis_retries_after_price_moved_validation(self):
+        self.assertTrue(scanner.cached_analysis_requires_reanalysis({
+            "live_quote_validation": {"status": "PRICE_MOVED"}
+        }))
+
+    def test_cached_analysis_does_not_retry_for_other_validation_statuses(self):
+        self.assertFalse(scanner.cached_analysis_requires_reanalysis({
+            "live_quote_validation": {"status": "VALIDATED_EXTERNAL_FEED"}
+        }))
+        self.assertFalse(scanner.cached_analysis_requires_reanalysis({}))
+
     def test_health_endpoint_is_available(self):
         response = self.client.get("/api/health")
         self.assertEqual(response.status_code, 200)

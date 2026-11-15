@@ -2,7 +2,7 @@ name: GLOBAL SIGNAL SCANNER — análisis horario y ventana de 7 días
 
 on:
   # Una ejecución por hora; el runner escalona los símbolos y temporalidades.
-  # Oro M5 cada hora; oro M15 cada 2 h; EUR/BTC M5+M15 cada 3 h.
+  # XAU/USD M5 cada hora; XAU/USD M15 cada 2 h; EUR/USD M5+M15 cada 3 h.
   schedule:
     - cron: '23 * * * *'
   workflow_dispatch:

@@ -13,6 +13,12 @@ class PanelJavaScriptSyntaxTests(unittest.TestCase):
         self.assertNotIn("BTC/USD", html)
         self.assertNotIn('class="trend-name">CRIPTO', html)
 
+    def test_live_tick_polling_is_throttled_and_pauses_in_background(self):
+        html = pathlib.Path("panel_escaner_vantage.html").read_text(encoding="utf-8")
+        self.assertIn("const POLL_INTERVAL_MS=2000", html)
+        self.assertIn('if(document.hidden)stop()', html)
+        self.assertIn('else if(accessToken)begin()', html)
+
     def test_inline_scripts_parse_with_node(self):
         html = pathlib.Path("panel_escaner_vantage.html").read_text(encoding="utf-8")
         scripts = re.findall(r"<script[^>]*>(.*?)</script>", html, re.IGNORECASE | re.DOTALL)

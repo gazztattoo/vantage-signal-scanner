@@ -1349,9 +1349,17 @@ if ("serviceWorker" in navigator) {
     }catch(error){setStatus(error.message||"Error de streaming","error");}
     finally{busy=false;}
   };
-  const begin=()=>{if(timer)clearInterval(timer);update();timer=setInterval(update,1000);};
+  const POLL_INTERVAL_MS=2000;
+  const stop=()=>{if(timer){clearInterval(timer);timer=null;}};
+  const begin=()=>{
+    stop();
+    if(document.hidden)return;
+    update();
+    timer=setInterval(update,POLL_INTERVAL_MS);
+  };
   if(accessToken)begin();
   document.addEventListener("gss-access-ready",begin);
+  document.addEventListener("visibilitychange",()=>{if(document.hidden)stop();else if(accessToken)begin();});
 })();
 </script>
 

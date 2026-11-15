@@ -52,6 +52,24 @@ class ScheduledScannerJobTests(unittest.TestCase):
         "SCANNER_TRIAL_START_UTC": "2020-01-01T00:00:00Z",
         "SCANNER_TRIAL_END_UTC": "2099-01-01T00:00:00Z",
     }, clear=True)
+    def test_second_half_hour_slot_scans_only_gold_m5(self):
+        session = Mock()
+        session.post.return_value = self._response()
+        with patch.object(scanner_job.requests, "Session", return_value=session), \\
+             patch.object(scanner_job.time, "sleep"), \\
+             patch.object(scanner_job, "datetime", wraps=datetime) as mock_datetime:
+            mock_datetime.now.return_value = datetime(2026, 11, 13, 12, 47, tzinfo=timezone.utc)
+            self.assertEqual(scanner_job.main(), 0)
+        self.assertEqual(session.post.call_count, 1)
+        kwargs = session.post.call_args.kwargs
+        self.assertEqual(kwargs["params"], {"symbol": "XAU/USD", "interval": "5min"})
+
+    @patch.dict(os.environ, {
+        "SCANNER_API_URL": "https://scanner.example.com",
+        "SIGNAL_CRON_SECRET": "test-only-secret",
+        "SCANNER_TRIAL_START_UTC": "2020-01-01T00:00:00Z",
+        "SCANNER_TRIAL_END_UTC": "2099-01-01T00:00:00Z",
+    }, clear=True)
     def test_non_200_response_returns_failure(self):
         session = Mock()
         session.post.return_value = self._response(401, {"error": "No autorizado."})

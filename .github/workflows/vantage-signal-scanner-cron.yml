@@ -1,10 +1,10 @@
-name: GLOBAL SIGNAL SCANNER — calendario escalonado y ventana de 7 días
+name: GLOBAL SIGNAL SCANNER — análisis horario y ventana de 7 días
 
 on:
-  # Dos disparos por hora. El runner decide qué mercados/timeframes vencen.
-  # Oro M5 cada 30 min; oro M15 cada 2 h; EUR/BTC M5+M15 cada 3 h.
-  # Automatic schedule intentionally paused until production authentication
-  # is reconciled and the scanner is explicitly re-authorized.
+  # Una ejecución por hora; el runner escalona los símbolos y temporalidades.
+  # Oro M5 cada hora; oro M15 cada 2 h; EUR/BTC M5+M15 cada 3 h.
+  schedule:
+    - cron: '17 * * * *'
   workflow_dispatch:
 
 permissions:

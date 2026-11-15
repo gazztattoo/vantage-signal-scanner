@@ -664,6 +664,64 @@ def price():
         return jsonify({"error": "No se pudo obtener una cotización Bid/Ask reciente del proveedor externo."}), 502
 
 
+
+def apply_live_entry_validation(payload, symbol):
+    """Bloquea entradas sin tick fresco y recalcula niveles desde Bid/Ask."""
+    result = dict(payload)
+    tick = (biquote_stream_snapshot().get("ticks") or {}).get(symbol)
+    signal = str(result.get("signal") or "ESPERAR").upper()
+    result["live_quote"] = None
+    if not isinstance(tick, dict):
+        result["live_quote_validation"] = {"valid": False, "status": "NO_LIVE_TICK", "provider": "biquote", "is_vantage_quote": False}
+        if signal in ("COMPRA", "VENTA"):
+            result.update({"signal": "ESPERAR", "entry": None, "stop_loss": None, "take_profit": None,
+                           "reason": "Entrada bloqueada: no hay tick reciente para validar el precio.",
+                           "pre_signal": False, "pre_signal_side": None})
+        return result
+    try:
+        bid, ask = float(tick["bid"]), float(tick["ask"])
+        stamp = datetime.fromisoformat(str(tick["timestamp"]).replace("Z", "+00:00"))
+        age = (datetime.now(timezone.utc) - stamp.astimezone(timezone.utc)).total_seconds()
+        mid = (bid + ask) / 2
+        atr_value = float(result.get("atr14") or 0)
+        candle_close = float(result.get("price") or 0)
+    except (KeyError, TypeError, ValueError):
+        age, bid, ask, mid, atr_value, candle_close = 999999, 0, 0, 0, 0, 0
+    result["live_quote"] = {
+        "bid": bid, "ask": ask, "mid": mid, "spread": ask - bid,
+        "timestamp": tick.get("timestamp"), "age_seconds": round(max(age, 0), 1),
+        "source": "biquote_external_mt5_feed", "is_vantage_quote": False
+    }
+    if age < -5 or age > 15 or bid <= 0 or ask < bid:
+        result["live_quote_validation"] = {"valid": False, "status": "STALE_TICK", "provider": "biquote", "is_vantage_quote": False}
+        if signal in ("COMPRA", "VENTA"):
+            result.update({"signal": "ESPERAR", "entry": None, "stop_loss": None, "take_profit": None,
+                           "reason": "Entrada bloqueada: la cotización en directo está desactualizada.",
+                           "pre_signal": False, "pre_signal_side": None})
+        return result
+    side = signal if signal in ("COMPRA", "VENTA") else None
+    entry = ask if side == "COMPRA" else bid if side == "VENTA" else mid
+    max_deviation = max(atr_value * 0.35, abs(candle_close) * 0.00003)
+    deviation = abs(entry - candle_close) if candle_close > 0 else 0
+    if side and (atr_value <= 0 or deviation > max_deviation):
+        result.update({"signal": "ESPERAR", "entry": None, "stop_loss": None, "take_profit": None,
+                       "pre_signal": False, "pre_signal_side": None,
+                       "reason": "Entrada bloqueada: el precio se desplazó demasiado desde el cierre analizado. Se necesita un nuevo análisis."})
+        result["live_quote_validation"] = {"valid": False, "status": "PRICE_MOVED", "provider": "biquote",
+                                           "is_vantage_quote": False, "deviation": round(deviation, 8),
+                                           "max_deviation": round(max_deviation, 8)}
+        return result
+    result["live_quote_validation"] = {"valid": True, "status": "VALIDATED_EXTERNAL_FEED",
+                                       "provider": "biquote", "is_vantage_quote": False,
+                                       "deviation": round(deviation, 8), "max_deviation": round(max_deviation, 8)}
+    if side and atr_value > 0:
+        result["entry"] = entry
+        result["stop_loss"] = entry - 1.5 * atr_value if side == "COMPRA" else entry + 1.5 * atr_value
+        result["take_profit"] = entry + 3.0 * atr_value if side == "COMPRA" else entry - 3.0 * atr_value
+        result["entry_source"] = "biquote_live_ask" if side == "COMPRA" else "biquote_live_bid"
+    return result
+
+
 @app.route("/api/analysis")
 def analysis():
     symbol = get_symbol(request.args.get("symbol"))
@@ -713,6 +771,7 @@ def analysis():
         payload = dict(cached["payload"])
         payload["candle_age_minutes"] = round(cached_candle_age + cache_age / 60, 2)
         payload["cache"] = {"hit": True, "age_seconds": int(cache_age)}
+        payload = apply_live_entry_validation(payload, symbol)
         return jsonify(payload)
 
     try:
@@ -837,6 +896,7 @@ def analysis():
             "stored_at": time.monotonic(),
             "payload": payload,
         }
+        payload = apply_live_entry_validation(payload, symbol)
         return jsonify(payload)
 
     except BiquoteQuotaError as exc:

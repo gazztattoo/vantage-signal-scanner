@@ -77,9 +77,9 @@ def main():
         return 2
 
     started_at = datetime.now(timezone.utc)
-    # Calendario escalonado: XAU/USD M5 cada hora, XAU/USD M15 cada 2 h;
+    # Calendario escalonado: XAU/USD M5 cada 30 min, XAU/USD M15 cada 2 h;
     # EUR/USD M5+M15 cada 3 h. Solo se analizan estos dos instrumentos.
-    # El cron corre una vez por hora; los slots UTC son divisibles por 2 o 3.
+    # El cron corre en :23 y :53; los marcos lentos solo se consultan en :23.
     due_scans = [("XAU/USD", "5min")]
     if started_at.minute < 30 and started_at.hour % 2 == 0:
         due_scans.append(("XAU/USD", "15min"))

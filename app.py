@@ -1765,10 +1765,15 @@ def push_scan():
                             "5min": "M5", "15min": "M15", "30min": "M30"
                         }.get(interval, interval)
                         if direction.startswith("PREPARAR_"):
+                            live_quote = data.get("live_quote") or {}
+                            quote_stamp = live_quote.get("timestamp") or "hora no disponible"
                             alert_body = (
                                 f"{symbol} · {short_interval} | "
-                                f"Preparar MT5: posible {direction.replace('PREPARAR_', '')}. "
-                                "Esperar confirmación; todavía NO es una entrada."
+                                f"PREPARAR MT5: posible {direction.replace('PREPARAR_', '')}. "
+                                f"BiQuote en directo · Bid {display_price(live_quote.get('bid'))} · "
+                                f"Ask {display_price(live_quote.get('ask'))} · "
+                                f"tick {quote_stamp}. "
+                                "Feed externo, no Vantage. Esperar confirmación; NO es entrada."
                             )
                         else:
                             alert_body = (
@@ -1800,10 +1805,15 @@ def push_scan():
                                 "5min": "M5", "15min": "M15", "30min": "M30"
                             }.get(interval, interval)
                             if direction.startswith("PREPARAR_"):
+                                live_quote = data.get("live_quote") or {}
+                                quote_stamp = live_quote.get("timestamp") or "hora no disponible"
                                 alert_body = (
                                     f"{symbol} · {short_interval} | "
-                                    f"Preparar MT5: posible {direction.replace('PREPARAR_', '')}. "
-                                    "Esperar confirmación; todavía NO es una entrada."
+                                    f"PREPARAR MT5: posible {direction.replace('PREPARAR_', '')}. "
+                                    f"BiQuote en directo · Bid {display_price(live_quote.get('bid'))} · "
+                                    f"Ask {display_price(live_quote.get('ask'))} · "
+                                    f"tick {quote_stamp}. "
+                                    "Feed externo, no Vantage. Esperar confirmación; NO es entrada."
                                 )
                             else:
                                 alert_body = (
@@ -1835,6 +1845,8 @@ def push_scan():
                                         "entry": None if direction.startswith("PREPARAR_") else data.get("entry"),
                                         "stop_loss": None if direction.startswith("PREPARAR_") else data.get("stop_loss"),
                                         "take_profit": None if direction.startswith("PREPARAR_") else data.get("take_profit"),
+                                        "live_quote": data.get("live_quote"),
+                                        "live_quote_validation": data.get("live_quote_validation"),
                                     },
                                 }
                                 queue_response = requests.post(

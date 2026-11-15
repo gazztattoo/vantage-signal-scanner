@@ -682,20 +682,24 @@ function render(m,d,err,marketClosed=false){
   const raw=String(
     first(d,["signal","action","recommendation","side"])||"ESPERAR"
   ).toUpperCase();
-
-  const s=
-    raw.includes("COMPRA")||raw.includes("BUY")
-      ?{t:"COMPRA",c:"buy"}
-      :raw.includes("VENTA")||raw.includes("SELL")
-        ?{t:"VENTA",c:"sell"}
-        :{t:raw.includes("WAIT")?"ESPERAR":raw,c:""};
-
-  const entry=first(d,["entry"]);
-  const sl=first(d,["stop_loss","stopLoss","sl"]);
-  const tp=first(d,["take_profit","takeProfit","tp"]);
+  const live=d.live_quote||{};
+  const validation=d.live_quote_validation||{};
+  const isBuy=raw.includes("COMPRA")||raw.includes("BUY");
+  const isSell=raw.includes("VENTA")||raw.includes("SELL");
+  const liveEntry=isBuy?Number(live.ask):isSell?Number(live.bid):NaN;
+  const liveValid=validation.valid===true && validation.is_vantage_quote===false &&
+    Number.isFinite(liveEntry) && liveEntry>0 && Number(live.age_seconds)<=15;
+  const actionable=(isBuy||isSell)&&liveValid;
+  const safeRaw=actionable?raw:"ESPERAR";
+  const s=safeRaw.includes("COMPRA")||safeRaw.includes("BUY")?{t:"COMPRA",c:"buy"}:
+    safeRaw.includes("VENTA")||safeRaw.includes("SELL")?{t:"VENTA",c:"sell"}:{t:"ESPERAR",c:""};
+  const entry=actionable?liveEntry:null;
+  const sl=actionable?first(d,["stop_loss","stopLoss","sl"]):null;
+  const tp=actionable?first(d,["take_profit","takeProfit","tp"]):null;
   const reason=first(
     d,["reason","explanation","message","warning","method"]
   )||"Análisis recibido desde la API.";
+  const safeReason=actionable?reason:((isBuy||isSell)?"ENTRADA BLOQUEADA: falta validación de cotización en directo reciente. No copiar ni operar.":reason);
 
   return `
     <article class="card">
@@ -719,9 +723,9 @@ function render(m,d,err,marketClosed=false){
         <strong data-live-mid style="display:block;font-size:22px;font-variant-numeric:tabular-nums">Esperando tick…</strong>
         <div data-live-detail style="font-size:10px;color:var(--muted);margin-top:3px">Bid — · Ask — · Spread —</div>
       </div>
-      <div class="price">${fmt(first(d,["price","entry"]),8)}</div>
+      <div class="price">${fmt(first(d,["price"]),8)}</div>
       <div class="priceLabel">CIERRE DE LA VELA ANALIZADA · REFERENCIA HISTÓRICA, NO PRECIO EN DIRECTO</div>
-      <p class="reason">${esc(reason)}</p>
+      <p class="reason">${esc(safeReason)}</p>
 
       ${(()=>{const x=d.indicator_diagnostics||{};const adx=x.adx||{};const macd=x.macd||{};const rsi=x.rsi||{};const rows=[["ADX",adx.value,adx.required||">=18",adx.passed?"OK":"FALTA"],["MACD",macd.value,"Compra: "+(macd.buy_passed?"OK":"—")+" · Venta: "+(macd.sell_passed?"OK":"—"),macd.buy_passed||macd.sell_passed?"HAY DIRECCIÓN":"SIN DIRECCIÓN"],["RSI",rsi.value,"Compra: "+(rsi.buy_passed?"OK":"—")+" · Venta: "+(rsi.sell_passed?"OK":"—"),rsi.buy_passed||rsi.sell_passed?"EN RANGO":"FUERA DE RANGO"]];return '<div style="margin:10px 0;padding:10px 12px;border:1px solid var(--line);border-radius:11px"><div style="font-size:10px;letter-spacing:.6px;color:var(--muted);margin-bottom:8px">QUÉ FALTA PARA CONFIRMAR</div>'+rows.map(([n,v,req,status])=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;font-size:12px"><span>'+n+' · '+esc(req)+'</span><strong style="color:'+(status==="OK"||status==="HAY DIRECCIÓN"||status==="EN RANGO"?'var(--green)':'var(--amber)')+'">'+(v===undefined?'—':esc(String(v)))+' · '+status+'</strong></div>').join('')+'</div>';})()}
 

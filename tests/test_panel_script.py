@@ -6,6 +6,13 @@ import unittest
 
 
 class PanelJavaScriptSyntaxTests(unittest.TestCase):
+    def test_production_panel_only_lists_eurusd_and_xauusd(self):
+        html = pathlib.Path("panel_escaner_vantage.html").read_text(encoding="utf-8")
+        self.assertIn('symbol:"EUR/USD"', html)
+        self.assertIn('symbol:"XAU/USD"', html)
+        self.assertNotIn("BTC/USD", html)
+        self.assertNotIn('class="trend-name">CRIPTO', html)
+
     def test_inline_scripts_parse_with_node(self):
         html = pathlib.Path("panel_escaner_vantage.html").read_text(encoding="utf-8")
         scripts = re.findall(r"<script[^>]*>(.*?)</script>", html, re.IGNORECASE | re.DOTALL)

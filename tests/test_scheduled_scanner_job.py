@@ -55,8 +55,8 @@ class ScheduledScannerJobTests(unittest.TestCase):
     def test_second_half_hour_slot_scans_only_gold_m5(self):
         session = Mock()
         session.post.return_value = self._response()
-        with patch.object(scanner_job.requests, "Session", return_value=session), \\
-             patch.object(scanner_job.time, "sleep"), \\
+        with patch.object(scanner_job.requests, "Session", return_value=session), \
+             patch.object(scanner_job.time, "sleep"), \
              patch.object(scanner_job, "datetime", wraps=datetime) as mock_datetime:
             mock_datetime.now.return_value = datetime(2026, 11, 13, 12, 47, tzinfo=timezone.utc)
             self.assertEqual(scanner_job.main(), 0)

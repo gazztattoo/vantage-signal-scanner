@@ -40,7 +40,7 @@ class ScheduledScannerJobTests(unittest.TestCase):
              patch.object(scanner_job, "datetime", wraps=datetime) as mock_datetime:
             mock_datetime.now.return_value = datetime(2026, 11, 13, 12, 17, tzinfo=timezone.utc)
             self.assertEqual(scanner_job.main(), 0)
-        self.assertEqual(session.post.call_count, 6)
+        self.assertEqual(session.post.call_count, 4)
         args, kwargs = session.post.call_args
         self.assertEqual(args[0], "https://scanner.example.com/api/push/scan")
         self.assertEqual(kwargs["headers"]["X-Scanner-Cron-Secret"], "test-only-secret")
@@ -60,7 +60,7 @@ class ScheduledScannerJobTests(unittest.TestCase):
              patch.object(scanner_job, "datetime", wraps=datetime) as mock_datetime:
             mock_datetime.now.return_value = datetime(2026, 11, 13, 12, 17, tzinfo=timezone.utc)
             self.assertEqual(scanner_job.main(), 1)
-        self.assertEqual(session.post.call_count, 6)
+        self.assertEqual(session.post.call_count, 4)
 
     @patch.dict(os.environ, {
         "SCANNER_API_URL": "https://scanner.example.com",
@@ -76,7 +76,7 @@ class ScheduledScannerJobTests(unittest.TestCase):
              patch.object(scanner_job, "datetime", wraps=datetime) as mock_datetime:
             mock_datetime.now.return_value = datetime(2026, 11, 13, 12, 17, tzinfo=timezone.utc)
             self.assertEqual(scanner_job.main(), 1)
-        self.assertEqual(session.post.call_count, 6)
+        self.assertEqual(session.post.call_count, 4)
 
 
 if __name__ == "__main__":

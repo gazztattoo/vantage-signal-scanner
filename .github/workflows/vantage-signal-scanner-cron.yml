@@ -4,7 +4,7 @@ on:
   # Una ejecución por hora; el runner escalona los símbolos y temporalidades.
   # Oro M5 cada hora; oro M15 cada 2 h; EUR/BTC M5+M15 cada 3 h.
   schedule:
-    - cron: '17 * * * *'
+    - cron: '23 * * * *'
   workflow_dispatch:
 
 permissions:

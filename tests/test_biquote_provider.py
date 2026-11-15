@@ -6,7 +6,7 @@ from unittest.mock import patch, Mock
 os.environ.setdefault("ACCESS_TOKEN_SECRET", "biquote-test-secret")
 os.environ.setdefault("PANEL_ACCESS_CODE", "biquote-test-code")
 
-from app import app, access_serializer, fetch_candles
+from app import app, access_serializer, fetch_candles, apply_live_entry_validation
 
 
 class BiQuoteProviderTests(unittest.TestCase):
@@ -91,6 +91,30 @@ class BiQuoteProviderTests(unittest.TestCase):
     def test_price_requires_authentication(self):
         result = self.client.get("/api/price?symbol=EUR/USD")
         self.assertEqual(result.status_code, 401)
+
+    def test_preparation_is_suppressed_without_live_tick(self):
+        payload = {
+            "signal": "ESPERAR", "pre_signal": True,
+            "pre_signal_side": "COMPRA", "pre_signal_reason": "confluencia parcial",
+        }
+        with patch("app.biquote_stream_snapshot", return_value={"ticks": {}}):
+            result = apply_live_entry_validation(payload, "EUR/USD")
+        self.assertFalse(result["pre_signal"])
+        self.assertIsNone(result["pre_signal_side"])
+        self.assertEqual(result["live_quote_validation"]["status"], "NO_LIVE_TICK")
+
+    def test_preparation_is_suppressed_when_live_tick_is_stale(self):
+        stale_stamp = (datetime.now(timezone.utc) - timedelta(seconds=30)).isoformat()
+        payload = {
+            "signal": "ESPERAR", "pre_signal": True,
+            "pre_signal_side": "VENTA", "pre_signal_reason": "confluencia parcial",
+        }
+        tick = {"bid": 1.08, "ask": 1.0802, "timestamp": stale_stamp}
+        with patch("app.biquote_stream_snapshot", return_value={"ticks": {"EUR/USD": tick}}):
+            result = apply_live_entry_validation(payload, "EUR/USD")
+        self.assertFalse(result["pre_signal"])
+        self.assertIsNone(result["pre_signal_side"])
+        self.assertEqual(result["live_quote_validation"]["status"], "STALE_TICK")
 
     def test_analysis_refuses_closed_market_before_fetching_or_using_cache(self):
         closed = {

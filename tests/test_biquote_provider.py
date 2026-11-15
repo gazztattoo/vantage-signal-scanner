@@ -135,6 +135,37 @@ class BiQuoteProviderTests(unittest.TestCase):
         self.assertEqual(payload["market_state"]["status"], "MERCADO CERRADO")
         fetch.assert_not_called()
 
+    def test_preparation_is_suppressed_when_price_has_moved_too_far(self):
+        payload = {
+            "signal": "ESPERAR", "pre_signal": True,
+            "pre_signal_side": "COMPRA", "price": 1.0800, "atr14": 0.001,
+        }
+        tick = {
+            "bid": 1.0810, "ask": 1.0812,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        with patch("app.biquote_stream_snapshot", return_value={"ticks": {"EUR/USD": tick}}):
+            result = apply_live_entry_validation(payload, "EUR/USD")
+        self.assertFalse(result["pre_signal"])
+        self.assertIsNone(result["pre_signal_side"])
+        self.assertEqual(result["live_quote_validation"]["status"], "PRICE_MOVED")
+        self.assertIn("demasiado", result["pre_signal_reason"])
+
+    def test_preparation_is_kept_when_live_price_is_within_drift_limit(self):
+        payload = {
+            "signal": "ESPERAR", "pre_signal": True,
+            "pre_signal_side": "COMPRA", "price": 1.0800, "atr14": 0.001,
+        }
+        tick = {
+            "bid": 1.08005, "ask": 1.08010,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        with patch("app.biquote_stream_snapshot", return_value={"ticks": {"EUR/USD": tick}}):
+            result = apply_live_entry_validation(payload, "EUR/USD")
+        self.assertTrue(result["pre_signal"])
+        self.assertEqual(result["pre_signal_side"], "COMPRA")
+        self.assertTrue(result["live_quote_validation"]["valid"])
+
 
 if __name__ == "__main__":
     unittest.main()

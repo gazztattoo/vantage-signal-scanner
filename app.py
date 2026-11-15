@@ -708,16 +708,30 @@ def apply_live_entry_validation(payload, symbol):
             result["pre_signal_reason"] = "Preparación bloqueada: la cotización en directo está desactualizada."
         return result
     side = signal if signal in ("COMPRA", "VENTA") else None
-    entry = ask if side == "COMPRA" else bid if side == "VENTA" else mid
+    # PREPARAR is also price-sensitive: do not alert on a setup whose quote
+    # has already drifted too far from the candle used for its analysis.
+    preparation_side = (
+        result.get("pre_signal_side")
+        if signal == "ESPERAR" and result.get("pre_signal") and result.get("pre_signal_side") in ("COMPRA", "VENTA")
+        else None
+    )
+    validation_side = side or preparation_side
+    entry = ask if validation_side == "COMPRA" else bid if validation_side == "VENTA" else mid
     max_deviation = max(atr_value * 0.35, abs(candle_close) * 0.00003)
     deviation = abs(entry - candle_close) if candle_close > 0 else 0
-    if side and (atr_value <= 0 or deviation > max_deviation):
-        result.update({"signal": "ESPERAR", "entry": None, "stop_loss": None, "take_profit": None,
-                       "pre_signal": False, "pre_signal_side": None,
-                       "reason": "Entrada bloqueada: el precio se desplazó demasiado desde el cierre analizado. Se necesita un nuevo análisis."})
+    price_moved = candle_close <= 0 or atr_value <= 0 or deviation > max_deviation
+    if validation_side and price_moved:
         result["live_quote_validation"] = {"valid": False, "status": "PRICE_MOVED", "provider": "biquote",
                                            "is_vantage_quote": False, "deviation": round(deviation, 8),
                                            "max_deviation": round(max_deviation, 8)}
+        if side:
+            result.update({"signal": "ESPERAR", "entry": None, "stop_loss": None, "take_profit": None,
+                           "pre_signal": False, "pre_signal_side": None,
+                           "reason": "Entrada bloqueada: el precio se desplazó demasiado desde el cierre analizado. Se necesita un nuevo análisis."})
+        else:
+            result["pre_signal"] = False
+            result["pre_signal_side"] = None
+            result["pre_signal_reason"] = "Preparación cancelada: el precio ya se desplazó demasiado desde la vela analizada. Se necesita un nuevo análisis."
         return result
     result["live_quote_validation"] = {"valid": True, "status": "VALIDATED_EXTERNAL_FEED",
                                        "provider": "biquote", "is_vantage_quote": False,

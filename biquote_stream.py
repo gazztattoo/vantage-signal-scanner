@@ -19,7 +19,7 @@ HUB_URL = "https://biquote.io/hubs/tick"
 SYMBOL_MAP = {"EURUSD": "EUR/USD", "XAUUSD": "XAU/USD", "BTCUSD": "BTC/USD"}
 _requested_symbols = [
     item.strip().upper().replace("/", "")
-    for item in os.getenv("BIQUOTE_STREAM_SYMBOLS", "EURUSD,XAUUSD,BTCUSD").split(",")
+    for item in os.getenv("BIQUOTE_STREAM_SYMBOLS", "EURUSD,XAUUSD").split(",")
     if item.strip()
 ]
 SYMBOLS = tuple(dict.fromkeys(item for item in _requested_symbols if item in SYMBOL_MAP)) or ("BTCUSD",)

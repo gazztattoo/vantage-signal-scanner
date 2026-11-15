@@ -673,12 +673,13 @@ def apply_live_entry_validation(payload, symbol):
     result["live_quote"] = None
     if not isinstance(tick, dict):
         result["live_quote_validation"] = {"valid": False, "status": "NO_LIVE_TICK", "provider": "biquote", "is_vantage_quote": False}
+        had_pre_signal = bool(result.get("pre_signal"))
         result["pre_signal"] = False
         result["pre_signal_side"] = None
         if signal in ("COMPRA", "VENTA"):
             result.update({"signal": "ESPERAR", "entry": None, "stop_loss": None, "take_profit": None,
                            "reason": "Entrada bloqueada: no hay tick reciente para validar el precio."})
-        elif result.get("pre_signal"):
+        elif had_pre_signal:
             result["pre_signal_reason"] = "Preparación bloqueada: no hay cotización en directo reciente."
         return result
     try:
@@ -697,12 +698,13 @@ def apply_live_entry_validation(payload, symbol):
     }
     if age < -5 or age > 15 or bid <= 0 or ask < bid:
         result["live_quote_validation"] = {"valid": False, "status": "STALE_TICK", "provider": "biquote", "is_vantage_quote": False}
+        had_pre_signal = bool(result.get("pre_signal"))
         result["pre_signal"] = False
         result["pre_signal_side"] = None
         if signal in ("COMPRA", "VENTA"):
             result.update({"signal": "ESPERAR", "entry": None, "stop_loss": None, "take_profit": None,
                            "reason": "Entrada bloqueada: la cotización en directo está desactualizada."})
-        elif result.get("pre_signal"):
+        elif had_pre_signal:
             result["pre_signal_reason"] = "Preparación bloqueada: la cotización en directo está desactualizada."
         return result
     side = signal if signal in ("COMPRA", "VENTA") else None

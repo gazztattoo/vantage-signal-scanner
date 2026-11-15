@@ -403,7 +403,6 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
   <div class="live-feed-grid">
     <article class="live-feed-card"><div class="live-feed-symbol">ORO · XAU/USD</div><div class="live-feed-price" id="bqPriceXAU">—</div><div class="live-feed-meta" id="bqMetaXAU">Esperando primer tick</div></article>
     <article class="live-feed-card"><div class="live-feed-symbol">EURO · EUR/USD</div><div class="live-feed-price" id="bqPriceEUR">—</div><div class="live-feed-meta" id="bqMetaEUR">Esperando primer tick</div></article>
-    <article class="live-feed-card"><div class="live-feed-symbol">BITCOIN · BTC/USD</div><div class="live-feed-price" id="bqPriceBTC">—</div><div class="live-feed-meta" id="bqMetaBTC">Esperando primer tick</div></article>
   </div>
   <div class="live-feed-note">Fuente externa BiQuote (feed MT5, no Vantage). Solo visualización: estas cotizaciones todavía no alimentan el motor de señales ni ejecutan órdenes. Si el mercado está cerrado o no llegan ticks recientes, el panel no presenta el último precio como actual.</div>
 </section>
@@ -425,8 +424,7 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
     <div class="trend-list" id="trendList">
       <div class="trend-card"><div class="trend-name">FOREX</div><div class="trend-note">Esperando análisis…</div></div>
       <div class="trend-card"><div class="trend-name">ORO</div><div class="trend-note">Esperando análisis…</div></div>
-      <div class="trend-card"><div class="trend-name">CRIPTO</div><div class="trend-note">Esperando análisis…</div></div>
-    </div>
+          </div>
   </section>
   <section class="overview-panel">
     <div class="overview-heading"><span class="overview-icon">◉</span> SENTIMIENTO TÉCNICO</div>
@@ -478,7 +476,7 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
     <h2>Historial de señales</h2>
     <p>Operaciones registradas automáticamente por el escáner. Solo se muestran registros reales guardados en el servidor.</p>
     <div class="data-toolbar">
-      <select id="historySymbol"><option value="">Todos los mercados</option><option>EUR/USD</option><option>XAU/USD</option><option>BTC/USD</option></select>
+      <select id="historySymbol"><option value="">Todos los mercados</option><option>EUR/USD</option><option>XAU/USD</option></select>
       <select id="historyTimeframe"><option value="">Todas las temporalidades</option><option value="5min">M5</option><option value="15min">M15</option><option value="30min">M30</option></select>
       <select id="historyStatus"><option value="">Todos los estados</option><option>PENDIENTE</option><option>TP</option><option>SL</option><option>CADUCADA</option><option>CANCELADA</option></select>
       <button id="historyRefresh" type="button">Actualizar</button>
@@ -504,7 +502,7 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
     <p>M5 y M15 se analizan automáticamente. M30 queda reservado para consulta manual con el botón Analizar. Los datos son análisis técnicos experimentales, no una garantía de resultado.</p>
     <p class="hint">M5 y M15 se actualizan mediante el escáner automático. M30 no se ejecuta en segundo plano: cada consulta manual consume datos solo cuando pulsas Analizar.</p>
     <div class="data-toolbar">
-      <select id="analysisSymbol"><option value="EUR/USD">EUR/USD</option><option value="XAU/USD">XAU/USD</option><option value="BTC/USD">BTC/USD</option></select>
+      <select id="analysisSymbol"><option value="EUR/USD">EUR/USD</option><option value="XAU/USD">XAU/USD</option></select>
       <select id="analysisTimeframe"><option value="5min">M5 · automático</option><option value="15min">M15 · automático</option><option value="30min">M30 · manual</option></select>
       <button id="analysisRefresh" type="button">Analizar temporalidad seleccionada</button>
     </div>
@@ -575,8 +573,7 @@ accessForm.addEventListener("submit",async event=>{
 
 const markets=[
   {symbol:"EUR/USD",category:"FOREX"},
-  {symbol:"XAU/USD",category:"ORO"},
-  {symbol:"BTC/USD",category:"CRIPTO"}
+  {symbol:"XAU/USD",category:"ORO"}
 ];
 
 const cards=document.getElementById("cards");
@@ -1311,8 +1308,7 @@ if ("serviceWorker" in navigator) {
 (()=>{
   const instruments={
     XAUUSD:{symbol:"XAU/USD",price:"bqPriceXAU",meta:"bqMetaXAU",digits:2},
-    EURUSD:{symbol:"EUR/USD",price:"bqPriceEUR",meta:"bqMetaEUR",digits:5},
-    BTCUSD:{symbol:"BTC/USD",price:"bqPriceBTC",meta:"bqMetaBTC",digits:2}
+    EURUSD:{symbol:"EUR/USD",price:"bqPriceEUR",meta:"bqMetaEUR",digits:5}
   };
   const status=document.getElementById("bqLiveStatus");
   const dot=document.getElementById("bqLiveDot");

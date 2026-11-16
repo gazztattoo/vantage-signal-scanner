@@ -172,9 +172,22 @@ def publish_tick(message: Any) -> bool:
 
 def snapshot() -> dict[str, Any]:
     with _lock:
+        candle_status = {}
+        for symbol in SYMBOL_MAP.values():
+            for interval in _CANDLE_SECONDS:
+                key = (symbol, interval)
+                history = _CLOSED_CANDLES.get(key, [])
+                forming = _FORMING_CANDLES.get(key)
+                candle_status[f"{symbol}|{interval}"] = {
+                    "closed_count": len(history),
+                    "last_closed_time": history[-1]["time"] if history else None,
+                    "forming_time": forming.get("time") if forming else None,
+                    "forming_tick_count": forming.get("tick_count", 0) if forming else 0,
+                }
         return {
             "stream": dict(_state),
             "ticks": {key: dict(value) for key, value in _latest.items()},
+            "candles": candle_status,
             "provider": "biquote",
             "is_vantage_quote": False,
         }

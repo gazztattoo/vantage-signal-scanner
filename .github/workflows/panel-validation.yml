@@ -12,6 +12,7 @@ on:
       - "tests/test_panel_script.py"
       - "tests/test_biquote_stream.py"
       - ".github/workflows/panel-validation.yml"
+      - ".github/workflows/vantage-signal-scanner-cron.yml"
   workflow_dispatch:
 
 permissions:

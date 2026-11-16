@@ -757,6 +757,33 @@ def apply_live_entry_validation(payload, symbol):
     return result
 
 
+def actionable_alert_direction(data):
+    """Return only alert stages backed by a fresh, explicitly validated live quote."""
+    if not isinstance(data, dict):
+        return "ESPERAR"
+    readiness = data.get("entry_readiness") or {}
+    quote_validation = data.get("live_quote_validation") or {}
+    if quote_validation.get("valid") is not True:
+        return "ESPERAR"
+
+    signal = str(data.get("signal") or "ESPERAR").upper()
+    if signal in ("COMPRA", "VENTA"):
+        if readiness.get("ready") is True and readiness.get("status") == "READY":
+            return signal
+        return "ESPERAR"
+
+    preparation_side = str(data.get("pre_signal_side") or "").upper()
+    if (
+        signal == "ESPERAR"
+        and data.get("pre_signal") is True
+        and preparation_side in ("COMPRA", "VENTA")
+        and readiness.get("ready") is False
+        and readiness.get("status") == "NO_CONFIRMED_SIGNAL"
+    ):
+        return "PREPARAR_" + preparation_side
+    return "ESPERAR"
+
+
 @app.route("/api/analysis")
 def analysis():
     symbol = get_symbol(request.args.get("symbol"))
@@ -1645,10 +1672,10 @@ def push_scan():
                 outcome_result = resolve_pending_signal_outcomes(
                     symbol, interval, data.get("recent_candles", [])
                 )
-                direction = data.get("signal") or "ESPERAR"
-                # Aviso anticipado: solo estado/outbox; nunca entra en signal_history.
-                if direction == "ESPERAR" and data.get("pre_signal") and data.get("pre_signal_side") in ("COMPRA", "VENTA"):
-                    direction = "PREPARAR_" + data["pre_signal_side"]
+                # Defense in depth: only emit a signal stage when the live quote
+                # validation and the explicit entry-readiness state both agree.
+                # This keeps invalid/stale quotes out of history and push delivery.
+                direction = actionable_alert_direction(data)
 
                 # La confluencia M15 se exige solo a entradas validadas.
                 # Reuse signal_history; do not request additional Twelve Data candles.

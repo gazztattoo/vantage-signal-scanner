@@ -100,6 +100,24 @@ def main():
     session = requests.Session()
     headers = {"X-Scanner-Cron-Secret": secret}
 
+    # Preflight seguro: valida el secreto sin analizar mercados ni consumir datos.
+    # Si Render y GitHub no coinciden, se detiene antes de enviar cualquier scan.
+    try:
+        auth_response = session.post(
+            base_url + "/api/cron-auth-check",
+            headers=headers,
+            timeout=(10, 20),
+        )
+    except requests.RequestException as exc:
+        print(f"Cron authentication preflight failed ({type(exc).__name__}); no scans sent.", file=sys.stderr)
+        return 1
+    if auth_response.status_code != 200:
+        print(
+            f"Cron authentication rejected (HTTP {auth_response.status_code}); no scans sent.",
+            file=sys.stderr,
+        )
+        return 1
+
     for symbol, interval in due_scans:
         # Separar las llamadas para no sobrecargar el proveedor ni la API.
         if request_count:

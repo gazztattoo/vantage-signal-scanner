@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import random
 import threading
 import time
 from datetime import datetime, timezone
@@ -32,7 +33,9 @@ _FORMING_CANDLES: dict[tuple[str, str], dict[str, Any]] = {}
 _MAX_CANDLES = 240
 _state: dict[str, Any] = {
     "enabled": False, "status": "stopped", "connected": False,
-    "started_at": None, "last_tick_at": None, "last_error": None,
+    "started_at": None, "connected_at": None, "last_tick_at": None,
+    "last_error": None, "retry_attempt": 0, "retry_in_seconds": 0,
+    "subscription_state": "not_started",
 }
 _thread: threading.Thread | None = None
 
@@ -58,8 +61,11 @@ def _extract_tick(message: Any) -> dict[str, Any] | None:
     if bid <= 0 or ask < bid or mid <= 0:
         return None
     raw_time = tick.get("timestamp") or tick.get("lastQuoteAt")
+    # Never manufacture a current timestamp: an undated payload cannot be proven fresh.
+    if not raw_time:
+        return None
     try:
-        stamp = datetime.fromisoformat(str(raw_time).replace("Z", "+00:00")) if raw_time else datetime.now(timezone.utc)
+        stamp = datetime.fromisoformat(str(raw_time).replace("Z", "+00:00"))
         if stamp.tzinfo is None:
             return None
         age = (datetime.now(timezone.utc) - stamp.astimezone(timezone.utc)).total_seconds()
@@ -194,9 +200,28 @@ def snapshot() -> dict[str, Any]:
                     "forming_time": forming.get("time") if forming else None,
                     "forming_tick_count": forming.get("tick_count", 0) if forming else 0,
                 }
+        now = datetime.now(timezone.utc)
+        ticks = {key: dict(value) for key, value in _latest.items()}
+        for tick in ticks.values():
+            try:
+                stamp = datetime.fromisoformat(tick["timestamp"].replace("Z", "+00:00"))
+                tick["age_seconds"] = round(max((now - stamp.astimezone(timezone.utc)).total_seconds(), 0), 1)
+                tick["fresh"] = tick["age_seconds"] <= 90 and not tick.get("stale")
+            except (KeyError, TypeError, ValueError):
+                tick["age_seconds"] = None
+                tick["fresh"] = False
+        stream_state = dict(_state)
+        stream_state["fresh_symbols"] = sorted(k for k, v in ticks.items() if v["fresh"])
+        stream_state["stale_symbols"] = sorted(k for k, v in ticks.items() if not v["fresh"])
+        if stream_state.get("connected") and not stream_state["fresh_symbols"]:
+            stream_state["quote_health"] = "waiting_for_fresh_ticks"
+        elif stream_state["fresh_symbols"]:
+            stream_state["quote_health"] = "fresh"
+        else:
+            stream_state["quote_health"] = "no_fresh_quotes"
         return {
-            "stream": dict(_state),
-            "ticks": {key: dict(value) for key, value in _latest.items()},
+            "stream": stream_state,
+            "ticks": ticks,
             "candles": candle_status,
             "provider": "biquote",
             "is_vantage_quote": False,
@@ -213,19 +238,27 @@ async def _run_client() -> None:
     # routes must remain importable without the optional SignalR dependency.
     from pysignalr.client import SignalRClient
 
+    # The outer worker owns retries to prevent a rapid 504 negotiation loop.
     client = SignalRClient(
-        HUB_URL, ping_interval=15, connection_timeout=20,
+        HUB_URL, ping_interval=15, connection_timeout=30,
         retry_sleep=2, retry_multiplier=1.5, retry_count=0,
     )
 
     async def on_open() -> None:
-        _set_state(status="connected", connected=True, last_error=None)
-        LOGGER.info("biquote_stream connected")
-        await client.send("Subscribe", [list(SYMBOLS)])
+        _set_state(status="subscribing", connected=True, last_error=None,
+                   connected_at=_utc_now(), subscription_state="pending")
+        LOGGER.info("biquote_stream connected; subscribing symbols=%s", ",".join(SYMBOLS))
+        try:
+            await client.send("Subscribe", [list(SYMBOLS)])
+        except Exception as exc:
+            _set_state(status="reconnecting", connected=False,
+                       last_error=("subscription_send: " + str(exc))[:240])
+            LOGGER.exception("biquote_stream subscription send failed")
+            raise
 
     async def on_close() -> None:
         _set_state(status="reconnecting", connected=False)
-        LOGGER.warning("biquote_stream disconnected")
+        LOGGER.warning("biquote_stream disconnected; cached quotes will age out")
 
     async def on_error(error: Any) -> None:
         _set_state(last_error=str(getattr(error, "error", error))[:240])
@@ -252,15 +285,34 @@ async def _run_client() -> None:
 
 
 def _thread_main() -> None:
-    _set_state(status="connecting", connected=False, started_at=_utc_now(), last_error=None)
+    base_delay = 3.0
+    max_delay = 60.0
+    failures = 0
+    _set_state(status="connecting", connected=False, started_at=_utc_now(),
+               last_error=None, retry_attempt=0, retry_in_seconds=0)
     while True:
+        attempt_started = time.monotonic()
         try:
             asyncio.run(_run_client())
-            _set_state(status="disconnected", connected=False)
+            session_seconds = time.monotonic() - attempt_started
+            if session_seconds >= 60:
+                failures = 0
+            _set_state(status="reconnecting", connected=False,
+                       last_error="SignalR terminó la conexión sin error explícito.")
+            LOGGER.warning("biquote_stream client ended session_seconds=%.1f", session_seconds)
         except Exception as exc:
+            session_seconds = time.monotonic() - attempt_started
+            if session_seconds >= 60:
+                failures = 0
+            failures += 1
             _set_state(status="reconnecting", connected=False, last_error=str(exc)[:240])
-            LOGGER.exception("biquote_stream connection failed")
-        time.sleep(3)
+            LOGGER.exception("biquote_stream connection failed attempt=%s session_seconds=%.1f",
+                             failures, session_seconds)
+        delay = min(base_delay * (2 ** min(max(failures - 1, 0), 5)), max_delay)
+        delay = min(max_delay, delay * random.uniform(0.8, 1.2))
+        _set_state(retry_attempt=failures, retry_in_seconds=round(delay, 1))
+        LOGGER.warning("biquote_stream reconnect scheduled in %.1fs attempt=%s", delay, failures)
+        time.sleep(delay)
 
 
 def start_stream() -> bool:

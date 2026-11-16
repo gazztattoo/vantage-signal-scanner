@@ -220,7 +220,7 @@ class PushScanDeliveryIntegrationTests(unittest.TestCase):
         def get(url, **kwargs):
             if url.endswith("/signal_alerts"):
                 return self.response(200, [])
-            if url.endswith("/push_subscriptions"):
+            if "/push_subscriptions" in url:
                 return self.response(subscription_status, subscriptions)
             if url.endswith("/push_delivery_outbox"):
                 return self.response(200, [])

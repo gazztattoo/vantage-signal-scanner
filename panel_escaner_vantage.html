@@ -686,7 +686,7 @@ function render(m,d,err,marketClosed=false){
   const reason=first(
     d,["reason","explanation","message","warning","method"]
   )||"Análisis recibido desde la API.";
-  const safeReason=actionable?reason:((isBuy||isSell)?"ENTRADA BLOQUEADA: falta validación de cotización en directo reciente. No copiar ni operar.":reason);
+  const safeReason=actionable?reason:((isBuy||isSell)?(d.entry_readiness?.reason||"ENTRADA BLOQUEADA: falta validación de cotización en directo reciente. No copiar ni operar."):reason);
 
   return `
     <article class="card">

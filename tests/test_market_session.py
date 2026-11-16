@@ -50,10 +50,11 @@ class VantageMarketSessionTests(unittest.TestCase):
     def test_xauusd_opens_after_summer_daily_pause(self):
         self.assertTrue(market_session("XAU/USD", utc("2026-07-05T22:02:00Z"))["open"])
 
-    def test_btcusd_remains_open_on_weekend_with_mt5_session_note(self):
+    def test_btc_is_not_an_authorized_production_market(self):
+        from app import ALLOWED_SYMBOLS
+        self.assertNotIn("BTC/USD", ALLOWED_SYMBOLS)
         result = market_session("BTC/USD", utc("2026-11-01T12:00:00Z"))
-        self.assertTrue(result["open"])
-        self.assertIn("no separa una sesión de trading", result["reason"])
+        self.assertFalse(result["open"])
 
 
 if __name__ == "__main__":

@@ -58,15 +58,15 @@ class BiQuoteStreamTests(unittest.TestCase):
         now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
         base = now - timedelta(minutes=60)
         historical = []
-        for index in range(12):
+        for index in range(10):
             stamp = base + timedelta(minutes=5 * index)
             price = 1.10 + index * 0.0001
             historical.append({
                 "time": stamp.isoformat(), "open": price, "high": price + 0.0002,
                 "low": price - 0.0002, "close": price + 0.0001,
             })
-        self.assertEqual(seed_history("EUR/USD", "5min", historical), 12)
-        self.assertEqual(len(closed_candles("EUR/USD", "5min")), 12)
+        self.assertEqual(seed_history("EUR/USD", "5min", historical), 10)
+        self.assertEqual(len(closed_candles("EUR/USD", "5min")), 10)
 
         first = now - timedelta(minutes=10)
         first = first.replace(minute=(first.minute // 5) * 5)

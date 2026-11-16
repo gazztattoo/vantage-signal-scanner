@@ -132,6 +132,11 @@ def _update_local_candles(tick: dict[str, Any]) -> None:
             bucket = int(stamp.timestamp()) // seconds * seconds
             bucket_time = datetime.fromtimestamp(bucket, timezone.utc).isoformat()
             forming = _FORMING_CANDLES.get(key)
+            history = _CLOSED_CANDLES.get(key, [])
+            # A late tick for an already closed/seeded interval is never
+            # allowed to create a candle older than the current history.
+            if history and bucket_time <= history[-1]["time"] and not (forming and forming["time"] == bucket_time):
+                continue
             if forming and forming["time"] == bucket_time:
                 forming["high"] = max(forming["high"], price)
                 forming["low"] = min(forming["low"], price)
@@ -161,9 +166,14 @@ def closed_candles(symbol: str, interval: str) -> list[dict[str, Any]]:
 
 def publish_tick(message: Any) -> bool:
     tick = _extract_tick(message)
-    if not tick:
+    if not tick or tick.get("stale"):
         return False
     with _lock:
+        previous = _latest.get(tick["symbol"])
+        # Reject out-of-order provider events so an old packet cannot roll
+        # the live quote backwards or contaminate a newer candle.
+        if previous and tick["timestamp"] < previous["timestamp"]:
+            return False
         _latest[tick["symbol"]] = tick
         _state["last_tick_at"] = tick["received_at"]
     _update_local_candles(tick)

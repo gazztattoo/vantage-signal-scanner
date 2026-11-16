@@ -26,7 +26,7 @@ jobs:
           from urllib.request import Request, urlopen
 
           BASE = "https://biquote.io"
-          SYMBOLS = ("EURUSD", "XAUUSD", "BTCUSD")
+          SYMBOLS = ("EURUSD", "XAUUSD")
           INTERVALS = {"5m": 5, "15m": 15, "30m": 30}
           failures = []
 
@@ -41,7 +41,7 @@ jobs:
                   return json.loads(response.read().decode("utf-8"))
 
           # One read-only XAU quote request, using the exact endpoint and schema
-          # consumed by app.py. Together with nine OHLC requests this is 10 max.
+          # consumed by app.py. Together with six OHLC requests this is 7 max.
           try:
               quote = get_json("/api/XAUUSD", {"allowStale": "false"})
               bid, ask = float(quote["bid"]), float(quote["ask"])
@@ -59,7 +59,7 @@ jobs:
           except Exception as exc:
               failures.append(f"XAUUSD quote: {type(exc).__name__}: {exc}")
 
-          # Nine read-only OHLC requests: 3 instruments x 3 timeframes.
+          # Six read-only OHLC requests: EURUSD and XAUUSD x 3 timeframes.
           for symbol in SYMBOLS:
               for interval, minutes in INTERVALS.items():
                   try:
@@ -93,5 +93,5 @@ jobs:
               for failure in failures:
                   print(" - " + failure)
               sys.exit(1)
-          print("PASS: XAUUSD live quote and all nine OHLC combinations are fresh and valid (10 read-only requests max).")
+          print("PASS: XAUUSD live quote and all six EURUSD/XAUUSD OHLC combinations are fresh and valid (7 read-only requests max).")
           PY

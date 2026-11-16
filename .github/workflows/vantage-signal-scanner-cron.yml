@@ -4,8 +4,6 @@ on:
   push:
     paths:
       - ".github/workflows/vantage-signal-scanner-cron.yml"
-  schedule:
-    - cron: "23,53 * * * *"
   workflow_dispatch:
 
 permissions:

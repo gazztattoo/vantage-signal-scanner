@@ -297,6 +297,7 @@ def _thread_main() -> None:
             session_seconds = time.monotonic() - attempt_started
             if session_seconds >= 60:
                 failures = 0
+            failures += 1
             _set_state(status="reconnecting", connected=False,
                        last_error="SignalR terminó la conexión sin error explícito.")
             LOGGER.warning("biquote_stream client ended session_seconds=%.1f", session_seconds)

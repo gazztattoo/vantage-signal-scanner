@@ -6,7 +6,7 @@ from unittest.mock import patch, Mock
 os.environ.setdefault("ACCESS_TOKEN_SECRET", "biquote-test-secret")
 os.environ.setdefault("PANEL_ACCESS_CODE", "biquote-test-code")
 
-from app import app, access_serializer, fetch_candles, apply_live_entry_validation
+from app import app, access_serializer, fetch_candles, apply_live_entry_validation, actionable_alert_direction
 
 
 class BiQuoteProviderTests(unittest.TestCase):
@@ -91,6 +91,37 @@ class BiQuoteProviderTests(unittest.TestCase):
     def test_price_requires_authentication(self):
         result = self.client.get("/api/price?symbol=EUR/USD")
         self.assertEqual(result.status_code, 401)
+
+
+    def test_alert_direction_requires_explicit_live_readiness(self):
+        valid_quote = {"valid": True}
+        self.assertEqual(actionable_alert_direction({
+            "signal": "COMPRA",
+            "entry_readiness": {"ready": True, "status": "READY"},
+            "live_quote_validation": valid_quote,
+        }), "COMPRA")
+        self.assertEqual(actionable_alert_direction({
+            "signal": "VENTA",
+            "entry_readiness": {"ready": False, "status": "NO_LIVE_TICK"},
+            "live_quote_validation": valid_quote,
+        }), "ESPERAR")
+        self.assertEqual(actionable_alert_direction({
+            "signal": "COMPRA",
+            "entry_readiness": {"ready": True, "status": "READY"},
+            "live_quote_validation": {"valid": False},
+        }), "ESPERAR")
+
+    def test_preparation_alert_requires_fresh_quote_but_not_confirmed_entry(self):
+        base = {
+            "signal": "ESPERAR", "pre_signal": True, "pre_signal_side": "COMPRA",
+            "entry_readiness": {"ready": False, "status": "NO_CONFIRMED_SIGNAL"},
+            "live_quote_validation": {"valid": True},
+        }
+        self.assertEqual(actionable_alert_direction(base), "PREPARAR_COMPRA")
+        stale = dict(base, live_quote_validation={"valid": False})
+        self.assertEqual(actionable_alert_direction(stale), "ESPERAR")
+        blocked = dict(base, entry_readiness={"ready": False, "status": "STALE_TICK"})
+        self.assertEqual(actionable_alert_direction(blocked), "ESPERAR")
 
     def test_preparation_is_suppressed_without_live_tick(self):
         payload = {

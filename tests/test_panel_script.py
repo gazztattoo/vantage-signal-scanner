@@ -12,6 +12,9 @@ class PanelJavaScriptSyntaxTests(unittest.TestCase):
         self.assertIn('symbol:"XAU/USD"', html)
         self.assertNotIn("BTC/USD", html)
         self.assertNotIn('class="trend-name">CRIPTO', html)
+        self.assertIn("El motor usa velas OHLC de BiQuote", html)
+        self.assertIn("ESTADO REAL DE LA ENTRADA", html)
+        self.assertIn("CALIDAD TÉCNICA DE LOS INDICADORES", html)
 
     def test_live_tick_polling_is_throttled_and_pauses_in_background(self):
         html = pathlib.Path("panel_escaner_vantage.html").read_text(encoding="utf-8")

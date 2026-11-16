@@ -131,5 +131,59 @@ class CachedPrecisionFrameTests(unittest.TestCase):
         self.assertIsNone(precision_frame_from_payload({}, "5min"))
 
 
+
+
+class InvalidNumericSnapshotTests(unittest.TestCase):
+    def setUp(self):
+        self.m30 = frame(1800)
+        self.m15 = frame(900, adx=22)
+        self.m5 = frame(300, adx=18, close=102, ema20=100,
+                        ema50=99, previous_high=101, swing_low=100.8)
+
+    def test_nan_optional_swing_level_blocks_multitimeframe_candidate(self):
+        from precision_engine_v2 import evaluate_multitimeframe_setup
+        m5 = {**self.m5, "swing_low": float("nan")}
+        result = evaluate_multitimeframe_setup(
+            symbol="XAU/USD", m30=self.m30, m15=self.m15, m5=m5)
+        self.assertEqual(result["signal"], "ESPERAR")
+        self.assertEqual(result["quality"], "INSUFICIENTE")
+
+    def test_infinite_breakout_level_blocks_m15_m5_candidate(self):
+        from precision_engine_v2 import evaluate_m15_m5_setup
+        m15 = frame(900, adx=22, close=102, ema20=101, ema50=100,
+                    rsi=60, macd=0.3)
+        m5 = frame(300, adx=18, close=103, ema20=102, ema50=101,
+                   rsi=62, macd=0.2, previous_high=float("inf"), swing_low=102)
+        result = evaluate_m15_m5_setup(symbol="XAU/USD", m15=m15, m5=m5)
+        self.assertEqual(result["signal"], "ESPERAR")
+        self.assertEqual(result["quality"], "INSUFICIENTE")
+
+    def test_numeric_strings_are_rejected_without_raising(self):
+        from precision_engine_v2 import evaluate_m15_m5_setup
+        m15 = {**frame(900, adx=22), "ema20": "101"}
+        result = evaluate_m15_m5_setup(symbol="EUR/USD", m15=m15, m5=self.m5)
+        self.assertEqual(result["signal"], "ESPERAR")
+        self.assertEqual(result["quality"], "INSUFICIENTE")
+
+    def test_out_of_range_rsi_is_rejected(self):
+        from precision_engine_v2 import evaluate_m15_m5_setup
+        m15 = {**frame(900, adx=22), "rsi": 101}
+        result = evaluate_m15_m5_setup(symbol="EUR/USD", m15=m15, m5=self.m5)
+        self.assertEqual(result["signal"], "ESPERAR")
+        self.assertEqual(result["quality"], "INSUFICIENTE")
+
+    def test_invalid_optional_m30_is_context_only(self):
+        from precision_engine_v2 import evaluate_m15_m5_setup
+        m15 = frame(900, adx=22, close=102, ema20=101, ema50=100,
+                    rsi=60, macd=0.3)
+        m5 = frame(300, adx=18, close=103, ema20=102, ema50=101,
+                   rsi=62, macd=0.2, previous_high=102.5, swing_low=102)
+        result = evaluate_m15_m5_setup(
+            symbol="XAU/USD", m15=m15, m5=m5,
+            m30={"ema20": float("nan"), "ema50": 99})
+        self.assertEqual(result["signal"], "BUY")
+        self.assertIsNone(result["m30_context"])
+
+
 if __name__ == "__main__":
     unittest.main()

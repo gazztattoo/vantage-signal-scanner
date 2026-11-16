@@ -88,14 +88,15 @@ def main():
     # Calendario escalonado: XAU/USD M5 cada 30 min, XAU/USD M15 cada 2 h;
     # EUR/USD M5+M15 cada 3 h. Solo se analizan estos dos instrumentos.
     # El cron corre en :23 y :53; los marcos lentos solo se consultan en :23.
-    due_scans = [("XAU/USD", "5min")]
+    # En los ciclos compartidos, guardar M15 antes de evaluar M5 para su confluencia.
+    due_scans = []
     if started_at.minute < 30 and started_at.hour % 2 == 0:
         due_scans.append(("XAU/USD", "15min"))
     if started_at.minute < 30 and started_at.hour % 3 == 0:
-        due_scans.extend([
-            ("EUR/USD", "5min"),
-            ("EUR/USD", "15min"),
-        ])
+        due_scans.append(("EUR/USD", "15min"))
+    due_scans.append(("XAU/USD", "5min"))
+    if started_at.minute < 30 and started_at.hour % 3 == 0:
+        due_scans.append(("EUR/USD", "5min"))
 
     print(
         "Programación UTC: " + ", ".join(f"{symbol} {interval}" for symbol, interval in due_scans),

@@ -284,9 +284,14 @@ async def _run_client() -> None:
     await client.run()
 
 
+def _retry_delay(attempt: int) -> float:
+    """Bounded exponential retry with jitter for transient upstream failures."""
+    attempt = max(int(attempt), 1)
+    base = min(3.0 * (2 ** min(attempt - 1, 5)), 60.0)
+    return min(60.0, base * random.uniform(0.8, 1.2))
+
+
 def _thread_main() -> None:
-    base_delay = 3.0
-    max_delay = 60.0
     failures = 0
     _set_state(status="connecting", connected=False, started_at=_utc_now(),
                last_error=None, retry_attempt=0, retry_in_seconds=0)
@@ -309,8 +314,7 @@ def _thread_main() -> None:
             _set_state(status="reconnecting", connected=False, last_error=str(exc)[:240])
             LOGGER.exception("biquote_stream connection failed attempt=%s session_seconds=%.1f",
                              failures, session_seconds)
-        delay = min(base_delay * (2 ** min(max(failures - 1, 0), 5)), max_delay)
-        delay = min(max_delay, delay * random.uniform(0.8, 1.2))
+        delay = _retry_delay(failures)
         _set_state(retry_attempt=failures, retry_in_seconds=round(delay, 1))
         LOGGER.warning("biquote_stream reconnect scheduled in %.1fs attempt=%s", delay, failures)
         time.sleep(delay)

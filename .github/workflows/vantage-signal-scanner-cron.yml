@@ -1,10 +1,7 @@
-name: GLOBAL SIGNAL SCANNER — análisis horario y ventana de 7 días
+name: GLOBAL SIGNAL SCANNER — ejecución manual protegida
 
 on:
-  # Dos ejecuciones por hora. XAU/USD M5 cada 30 min; M15 cada 2 h;
-  # EUR/USD M5+M15 cada 3 h, en el slot de :23 UTC.
-  schedule:
-    - cron: '23,53 * * * *'
+  # Sin schedule automático: solo ejecución manual, y el script exige SCANNER_ENABLED=true.
   workflow_dispatch:
 
 permissions:
@@ -33,6 +30,7 @@ jobs:
       - name: Ejecutar escáner
         env:
           SCANNER_API_URL: https://vantage-signal-api-carlos.onrender.com
+          SCANNER_ENABLED: "false"
           SIGNAL_CRON_SECRET: ${{ secrets.SIGNAL_CRON_SECRET }}
           SCANNER_TRIAL_START_UTC: "2026-11-13T17:00:00Z"
           SCANNER_TRIAL_END_UTC: "2026-11-20T17:00:00Z"

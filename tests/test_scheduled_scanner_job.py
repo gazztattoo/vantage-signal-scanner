@@ -40,11 +40,15 @@ class ScheduledScannerJobTests(unittest.TestCase):
              patch.object(scanner_job, "datetime", wraps=datetime) as mock_datetime:
             mock_datetime.now.return_value = datetime(2026, 11, 13, 12, 17, tzinfo=timezone.utc)
             self.assertEqual(scanner_job.main(), 0)
-        self.assertEqual(session.post.call_count, 4)
+        self.assertEqual(session.post.call_count, 5)
         args, kwargs = session.post.call_args
         self.assertEqual(args[0], "https://scanner.example.com/api/push/scan")
         self.assertEqual(kwargs["headers"]["X-Scanner-Cron-Secret"], "test-only-secret")
         self.assertEqual(kwargs["timeout"], (10, 45))
+        preflight_args, preflight_kwargs = session.post.call_args_list[0]
+        self.assertEqual(preflight_args[0], "https://scanner.example.com/api/cron-auth-check")
+        self.assertEqual(preflight_kwargs["headers"]["X-Scanner-Cron-Secret"], "test-only-secret")
+        self.assertEqual(preflight_kwargs["timeout"], (10, 20))
 
     @patch.dict(os.environ, {
         "SCANNER_API_URL": "https://scanner.example.com",
@@ -60,7 +64,7 @@ class ScheduledScannerJobTests(unittest.TestCase):
              patch.object(scanner_job, "datetime", wraps=datetime) as mock_datetime:
             mock_datetime.now.return_value = datetime(2026, 11, 13, 12, 47, tzinfo=timezone.utc)
             self.assertEqual(scanner_job.main(), 0)
-        self.assertEqual(session.post.call_count, 1)
+        self.assertEqual(session.post.call_count, 2)
         kwargs = session.post.call_args.kwargs
         self.assertEqual(kwargs["params"], {"symbol": "XAU/USD", "interval": "5min"})
 
@@ -70,7 +74,7 @@ class ScheduledScannerJobTests(unittest.TestCase):
         "SCANNER_TRIAL_START_UTC": "2020-01-01T00:00:00Z",
         "SCANNER_TRIAL_END_UTC": "2099-01-01T00:00:00Z",
     }, clear=True)
-    def test_non_200_response_returns_failure(self):
+    def test_cron_auth_rejection_stops_before_scanning(self):
         session = Mock()
         session.post.return_value = self._response(401, {"error": "No autorizado."})
         with patch.object(scanner_job.requests, "Session", return_value=session), \
@@ -78,7 +82,8 @@ class ScheduledScannerJobTests(unittest.TestCase):
              patch.object(scanner_job, "datetime", wraps=datetime) as mock_datetime:
             mock_datetime.now.return_value = datetime(2026, 11, 13, 12, 17, tzinfo=timezone.utc)
             self.assertEqual(scanner_job.main(), 1)
-        self.assertEqual(session.post.call_count, 4)
+        self.assertEqual(session.post.call_count, 1)
+        self.assertEqual(session.post.call_args.args[0], "https://scanner.example.com/api/cron-auth-check")
 
     @patch.dict(os.environ, {
         "SCANNER_API_URL": "https://scanner.example.com",
@@ -94,7 +99,7 @@ class ScheduledScannerJobTests(unittest.TestCase):
              patch.object(scanner_job, "datetime", wraps=datetime) as mock_datetime:
             mock_datetime.now.return_value = datetime(2026, 11, 13, 12, 17, tzinfo=timezone.utc)
             self.assertEqual(scanner_job.main(), 1)
-        self.assertEqual(session.post.call_count, 4)
+        self.assertEqual(session.post.call_count, 1)
 
 
 if __name__ == "__main__":

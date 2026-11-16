@@ -693,7 +693,7 @@ def apply_live_entry_validation(payload, symbol):
         "timestamp": tick.get("timestamp"), "age_seconds": round(max(age, 0), 1),
         "source": "biquote_external_mt5_feed", "is_vantage_quote": False
     }
-    if age < -5 or age > 15 or bid <= 0 or ask < bid:
+    if age < -5 or age > 15 or bid <= 0 or ask < bid or tick.get("stale") or str(tick.get("market_state") or "").lower() == "closed":
         result["live_quote_validation"] = {"valid": False, "status": "STALE_TICK", "provider": "biquote", "is_vantage_quote": False}
         result["entry_readiness"] = {"ready": False, "status": "STALE_TICK", "label": "BLOQUEADA · Cotización antigua", "reason": "El último tick supera el límite de frescura de 15 segundos."}
         had_pre_signal = bool(result.get("pre_signal"))
@@ -788,6 +788,11 @@ def analysis():
             "interval": interval,
             "data_provider": "biquote",
         }), 409
+
+    # Start the stream from the analysis path as well as the display endpoint.
+    # It remains strictly opt-in; no upstream connection is opened unless enabled.
+    if os.environ.get("BIQUOTE_STREAM_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on"):
+        start_stream()
 
     cache_key = (symbol, interval)
     cached = ANALYSIS_CACHE.get(cache_key)

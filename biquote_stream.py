@@ -16,6 +16,7 @@ from typing import Any
 
 
 LOGGER = logging.getLogger(__name__)
+LOGGER.setLevel(logging.INFO)
 HUB_URL = "https://biquote.io/hubs/tick"
 SYMBOL_MAP = {"EURUSD": "EUR/USD", "XAUUSD": "XAU/USD"}
 _requested_symbols = [
@@ -293,6 +294,7 @@ def _retry_delay(attempt: int) -> float:
 
 def _thread_main() -> None:
     failures = 0
+    LOGGER.info("biquote_stream worker started symbols=%s hub=%s", ",".join(SYMBOLS), HUB_URL)
     _set_state(status="connecting", connected=False, started_at=_utc_now(),
                last_error=None, retry_attempt=0, retry_in_seconds=0)
     while True:
@@ -334,4 +336,5 @@ def start_stream() -> bool:
         _state.update({"enabled": True, "status": "starting"})
         _thread = threading.Thread(target=_thread_main, name="biquote-signalr", daemon=True)
         _thread.start()
+        LOGGER.info("biquote_stream worker launch requested symbols=%s", ",".join(SYMBOLS))
         return True

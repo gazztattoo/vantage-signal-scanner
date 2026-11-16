@@ -245,7 +245,7 @@ async def _run_client() -> None:
     )
 
     async def on_open() -> None:
-        _set_state(status="subscribing", connected=True, last_error=None,
+        _set_state(status="connected", connected=True, last_error=None,
                    connected_at=_utc_now(), subscription_state="pending")
         LOGGER.info("biquote_stream connected; subscribing symbols=%s", ",".join(SYMBOLS))
         try:

@@ -21,12 +21,19 @@ class ScheduledScannerJobTests(unittest.TestCase):
         return response
 
     @patch.dict(os.environ, {}, clear=True)
-    def test_missing_configuration_exits_without_http_request(self):
+    def test_scanner_is_disabled_by_default_without_http_request(self):
+        with patch.object(scanner_job.requests, "Session") as session:
+            self.assertEqual(scanner_job.main(), 0)
+        session.assert_not_called()
+
+    @patch.dict(os.environ, {"SCANNER_ENABLED": "true"}, clear=True)
+    def test_enabled_scanner_without_configuration_exits_without_http_request(self):
         with patch.object(scanner_job.requests, "Session") as session:
             self.assertEqual(scanner_job.main(), 2)
         session.assert_not_called()
 
     @patch.dict(os.environ, {
+        "SCANNER_ENABLED": "true",
         "SCANNER_API_URL": "https://scanner.example.com/",
         "SIGNAL_CRON_SECRET": "test-only-secret",
         "SCANNER_TRIAL_START_UTC": "2020-01-01T00:00:00Z",
@@ -51,6 +58,7 @@ class ScheduledScannerJobTests(unittest.TestCase):
         self.assertEqual(preflight_kwargs["timeout"], (10, 20))
 
     @patch.dict(os.environ, {
+        "SCANNER_ENABLED": "true",
         "SCANNER_API_URL": "https://scanner.example.com",
         "SIGNAL_CRON_SECRET": "test-only-secret",
         "SCANNER_TRIAL_START_UTC": "2020-01-01T00:00:00Z",
@@ -69,6 +77,7 @@ class ScheduledScannerJobTests(unittest.TestCase):
         self.assertEqual(kwargs["params"], {"symbol": "XAU/USD", "interval": "5min"})
 
     @patch.dict(os.environ, {
+        "SCANNER_ENABLED": "true",
         "SCANNER_API_URL": "https://scanner.example.com",
         "SIGNAL_CRON_SECRET": "test-only-secret",
         "SCANNER_TRIAL_START_UTC": "2020-01-01T00:00:00Z",
@@ -86,6 +95,7 @@ class ScheduledScannerJobTests(unittest.TestCase):
         self.assertEqual(session.post.call_args.args[0], "https://scanner.example.com/api/cron-auth-check")
 
     @patch.dict(os.environ, {
+        "SCANNER_ENABLED": "true",
         "SCANNER_API_URL": "https://scanner.example.com",
         "SIGNAL_CRON_SECRET": "test-only-secret",
         "SCANNER_TRIAL_START_UTC": "2020-01-01T00:00:00Z",

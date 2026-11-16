@@ -2,7 +2,7 @@ name: Precision Engine V2 isolated tests
 
 on:
   push:
-    branches: [precision-engine-v2]
+    branches: [precision-engine-v2, research/precision-input-hardening]
     paths:
       - "precision_engine_v2.py"
       - "panel_escaner_vantage.html"

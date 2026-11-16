@@ -757,6 +757,32 @@ def apply_live_entry_validation(payload, symbol):
     return result
 
 
+def m15_confirmation_is_fresh(confirmation, m5_candle_time, now=None, max_age_minutes=20):
+    """Validate M15 confirmation against the M5 closed candle, not DB insertion time alone."""
+    if not isinstance(confirmation, dict) or not m5_candle_time:
+        return False
+    now = now or datetime.now(timezone.utc)
+
+    def parse_stamp(value):
+        stamp = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return stamp.replace(tzinfo=timezone.utc) if stamp.tzinfo is None else stamp.astimezone(timezone.utc)
+
+    try:
+        signal_at = parse_stamp(confirmation.get("signal_at"))
+        m15_candle = parse_stamp(confirmation.get("candle_time"))
+        m5_candle = parse_stamp(m5_candle_time)
+        now_utc = now.replace(tzinfo=timezone.utc) if now.tzinfo is None else now.astimezone(timezone.utc)
+    except (TypeError, ValueError):
+        return False
+
+    signal_age = (now_utc - signal_at).total_seconds() / 60
+    candle_gap = (m5_candle - m15_candle).total_seconds() / 60
+    return (
+        -2 <= signal_age <= max_age_minutes
+        and -2 <= candle_gap <= max_age_minutes
+    )
+
+
 def actionable_alert_direction(data):
     """Return only alert stages backed by a fresh, explicitly validated live quote."""
     if not isinstance(data, dict):
@@ -1702,20 +1728,12 @@ def push_scan():
                         continue
                     confirmation_rows = confirmation_response.json()
                     confirmation = confirmation_rows[0] if confirmation_rows else None
-                    confirmation_age = None
-                    if confirmation:
-                        try:
-                            confirmation_time = datetime.fromisoformat(
-                                str(confirmation.get("signal_at")).replace("Z", "+00:00")
-                            )
-                            confirmation_age = (datetime.now(timezone.utc) - confirmation_time).total_seconds() / 60
-                        except (TypeError, ValueError):
-                            confirmation_age = None
                     if (
                         not confirmation
                         or confirmation.get("direction") != direction
-                        or confirmation_age is None
-                        or confirmation_age > 40
+                        or not m15_confirmation_is_fresh(
+                            confirmation, data.get("candle_time")
+                        )
                     ):
                         results.append({
                             "symbol": symbol, "interval": interval,

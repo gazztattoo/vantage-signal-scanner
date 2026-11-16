@@ -1,7 +1,7 @@
-name: GLOBAL SIGNAL SCANNER — ejecución manual protegida
+name: GLOBAL SIGNAL SCANNER — análisis horario y ventana de 7 días
 
 on:
-  # Sin schedule automático: solo ejecución manual, y el script exige SCANNER_ENABLED=true.
+  # Escaneo automático desactivado: solo ejecución manual autorizada.
   workflow_dispatch:
 
 permissions:

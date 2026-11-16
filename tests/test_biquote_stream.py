@@ -92,6 +92,35 @@ class BiQuoteStreamTests(unittest.TestCase):
         self.assertEqual(closed[-1]["close"], 1.102)
         self.assertNotIn(second.isoformat(), [bar["time"] for bar in closed])
 
+
+    def test_aggregates_15m_and_30m_only_after_next_bucket(self):
+        base = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+        for interval, minutes in (("15min", 15), ("30min", 30)):
+            with self.subTest(interval=interval):
+                start = base.replace(minute=(base.minute // minutes) * minutes)
+                first = start + timedelta(seconds=5)
+                next_bucket = start + timedelta(minutes=minutes)
+                _update_local_candles({"symbol": "XAU/USD", "mid": 2000.0, "timestamp": first.isoformat()})
+                _update_local_candles({"symbol": "XAU/USD", "mid": 2001.0, "timestamp": (first + timedelta(minutes=2)).isoformat()})
+                self.assertFalse(any(x["source"] == "biquote_live_ticks" for x in closed_candles("XAU/USD", interval)))
+                _update_local_candles({"symbol": "XAU/USD", "mid": 2002.0, "timestamp": next_bucket.isoformat()})
+                bars = [x for x in closed_candles("XAU/USD", interval) if x["source"] == "biquote_live_ticks"]
+                self.assertEqual(len(bars), 1)
+                self.assertEqual((bars[0]["open"], bars[0]["high"], bars[0]["close"]), (2000.0, 2001.0, 2001.0))
+
+    def test_late_tick_cannot_reopen_a_closed_candle(self):
+        now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+        start = now - timedelta(minutes=10)
+        start = start.replace(minute=(start.minute // 5) * 5)
+        next_bucket = start + timedelta(minutes=5)
+        _update_local_candles({"symbol": "EUR/USD", "mid": 1.1, "timestamp": start.isoformat()})
+        _update_local_candles({"symbol": "EUR/USD", "mid": 1.2, "timestamp": next_bucket.isoformat()})
+        before = closed_candles("EUR/USD", "5min")
+        _update_local_candles({"symbol": "EUR/USD", "mid": 9.9, "timestamp": (start + timedelta(minutes=1)).isoformat()})
+        after = closed_candles("EUR/USD", "5min")
+        self.assertEqual(after, before)
+        self.assertEqual(after[-1]["close"], 1.1)
+
     def test_seed_rejects_unknown_interval_and_symbol(self):
         self.assertEqual(seed_history("BTC/USD", "5min", []), 0)
         self.assertEqual(seed_history("EUR/USD", "1min", []), 0)

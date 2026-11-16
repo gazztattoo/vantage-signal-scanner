@@ -30,6 +30,7 @@ jobs:
       - name: Ejecutar escáner
         env:
           SCANNER_API_URL: https://vantage-signal-api-carlos.onrender.com
+          SCANNER_ENABLED: "false"
           SIGNAL_CRON_SECRET: ${{ secrets.SIGNAL_CRON_SECRET }}
           SCANNER_TRIAL_START_UTC: "2026-11-13T17:00:00Z"
           SCANNER_TRIAL_END_UTC: "2026-11-20T17:00:00Z"

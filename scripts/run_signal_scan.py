@@ -45,6 +45,14 @@ def write_step_summary(lines):
 
 
 def main():
+    # Activación explícita obligatoria. El valor ausente o falso mantiene el escáner apagado.
+    enabled = os.environ.get("SCANNER_ENABLED", "false").strip().lower()
+    if enabled not in {"1", "true", "yes", "on"}:
+        message = "Scanner disabled by SCANNER_ENABLED; no API requests sent."
+        print(message, flush=True)
+        write_step_summary(["## GLOBAL SIGNAL SCANNER", f"- {message}"])
+        return 0
+
     # Fail closed: no hay consultas a la API si la ventana de prueba falta,
     # tiene formato inválido o ya terminó.
     start_raw = os.environ.get("SCANNER_TRIAL_START_UTC", "").strip()
@@ -100,6 +108,24 @@ def main():
     session = requests.Session()
     headers = {"X-Scanner-Cron-Secret": secret}
 
+    # Preflight seguro: valida el secreto sin analizar mercados ni consumir datos.
+    # Si Render y GitHub no coinciden, se detiene antes de enviar cualquier scan.
+    try:
+        auth_response = session.post(
+            base_url + "/api/cron-auth-check",
+            headers=headers,
+            timeout=(10, 20),
+        )
+    except requests.RequestException as exc:
+        print(f"Cron authentication preflight failed ({type(exc).__name__}); no scans sent.", file=sys.stderr)
+        return 1
+    if auth_response.status_code != 200:
+        print(
+            f"Cron authentication rejected (HTTP {auth_response.status_code}); no scans sent.",
+            file=sys.stderr,
+        )
+        return 1
+
     for symbol, interval in due_scans:
         # Separar las llamadas para no sobrecargar el proveedor ni la API.
         if request_count:
@@ -138,6 +164,12 @@ def main():
             else:
                 check = checks[0]
                 status = check.get("status")
+                # HTTP 200 no garantiza que todas las entregas se hayan encolado.
+                if int(check.get("queue_errors") or 0) > 0:
+                    failures.append(
+                        f"{symbol} {interval}: push queue errors "
+                        f"({check.get('queue_errors')})"
+                    )
                 if status in FAILURE_STATUSES:
                     failures.append(
                         f"{symbol} {interval}: {status} "

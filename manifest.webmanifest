@@ -2,7 +2,7 @@
   "id": "./",
   "name": "GLOBAL SIGNAL SCANNER",
   "short_name": "GLOBAL SCANNER",
-  "description": "Panel de análisis técnico Forex, oro y criptomonedas.",
+  "description": "Panel de análisis técnico de EUR/USD y oro XAU/USD.",
   "lang": "es",
   "start_url": "./panel_escaner_vantage.html",
   "scope": "./",

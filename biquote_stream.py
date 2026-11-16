@@ -16,13 +16,13 @@ from typing import Any
 
 LOGGER = logging.getLogger(__name__)
 HUB_URL = "https://biquote.io/hubs/tick"
-SYMBOL_MAP = {"EURUSD": "EUR/USD", "XAUUSD": "XAU/USD", "BTCUSD": "BTC/USD"}
+SYMBOL_MAP = {"EURUSD": "EUR/USD", "XAUUSD": "XAU/USD"}
 _requested_symbols = [
     item.strip().upper().replace("/", "")
     for item in os.getenv("BIQUOTE_STREAM_SYMBOLS", "EURUSD,XAUUSD").split(",")
     if item.strip()
 ]
-SYMBOLS = tuple(dict.fromkeys(item for item in _requested_symbols if item in SYMBOL_MAP)) or ("BTCUSD",)
+SYMBOLS = tuple(dict.fromkeys(item for item in _requested_symbols if item in SYMBOL_MAP))
 
 _lock = threading.RLock()
 _latest: dict[str, dict[str, Any]] = {}
@@ -148,6 +148,10 @@ def _thread_main() -> None:
 
 def start_stream() -> bool:
     global _thread
+    if not SYMBOLS:
+        _set_state(enabled=False, status="disabled", connected=False,
+                   last_error="No hay símbolos BiQuote autorizados configurados.")
+        return False
     with _lock:
         if _thread and _thread.is_alive():
             return False

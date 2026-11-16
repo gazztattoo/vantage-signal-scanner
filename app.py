@@ -119,7 +119,7 @@ def protect_signal_endpoints():
     return None
 TWELVE_DATA_URL = "https://api.twelvedata.com"
 
-ALLOWED_SYMBOLS = {"EUR/USD", "XAU/USD", "BTC/USD"}
+ALLOWED_SYMBOLS = {"EUR/USD", "XAU/USD"}
 ALLOWED_INTERVALS = {"5min", "15min", "30min"}
 
 CANARY_TZ = ZoneInfo("Atlantic/Canary")
@@ -142,18 +142,6 @@ def market_session(symbol, now=None):
     now = now or datetime.now(timezone.utc)
     server_now, server_offset = vantage_server_time(now)
     server_time_label = server_now.isoformat()
-
-    if symbol == "BTC/USD":
-        return {
-            "open": True,
-            "status": "ABIERTO",
-            "reason": (
-                "MT5 muestra sesiones de cotización 00:00-24:00 todos los días; "
-                "la captura no separa una sesión de trading."
-            ),
-            "server_time": server_time_label,
-            "server_utc_offset": f"UTC+{server_offset}",
-        }
 
     schedules = {
         # (hora de apertura, cierre lun-jue, cierre viernes), en minutos del servidor.
@@ -516,7 +504,7 @@ def twelve_data_get(endpoint, params=None, timeout=20):
 
 def fetch_candles(symbol, interval):
     """Obtiene velas OHLC desde biquote; nunca usa velas Twelve Data como fallback."""
-    provider_symbol = {"EUR/USD": "EURUSD", "XAU/USD": "XAUUSD", "BTC/USD": "BTCUSD"}[symbol]
+    provider_symbol = {"EUR/USD": "EURUSD", "XAU/USD": "XAUUSD"}[symbol]
     provider_interval = {"5min": "5m", "15min": "15m", "30min": "30m"}[interval]
     # Count every outbound attempt globally; cached analysis never reaches here.
     reserve_biquote_request()
@@ -622,7 +610,7 @@ def biquote_stream_ticks():
             fresh_ticks[symbol] = tick
     data["ticks"] = fresh_ticks
     data["fresh_symbols"] = sorted(fresh_ticks)
-    data["expected_symbols"] = [ {"EURUSD": "EUR/USD", "XAUUSD": "XAU/USD", "BTCUSD": "BTC/USD"}[symbol] for symbol in BIQUOTE_STREAM_SYMBOLS ]
+    data["expected_symbols"] = [ {"EURUSD": "EUR/USD", "XAUUSD": "XAU/USD"}[symbol] for symbol in BIQUOTE_STREAM_SYMBOLS ]
     data["stream"]["enabled"] = True
     return jsonify(data), 200
 
@@ -632,7 +620,7 @@ def price():
     symbol = get_symbol(request.args.get("symbol"))
     if not symbol:
         return jsonify({"error": "Símbolo no permitido", "allowed_symbols": sorted(ALLOWED_SYMBOLS)}), 400
-    provider_symbol = {"EUR/USD": "EURUSD", "XAU/USD": "XAUUSD", "BTC/USD": "BTCUSD"}[symbol]
+    provider_symbol = {"EUR/USD": "EURUSD", "XAU/USD": "XAUUSD"}[symbol]
     try:
         # Quote calls share the same global daily budget as OHLC calls.
         reserve_biquote_request()
@@ -1463,6 +1451,24 @@ def resolve_pending_signal_outcomes(symbol, interval, recent_candles):
 
 SIGNAL_CRON_SECRET = os.environ.get("SIGNAL_CRON_SECRET", "")
 
+def reset_signal_alert_state(symbol, interval, fingerprint):
+    """Remove a transition marker when its push event was not durably queued."""
+    try:
+        response = requests.delete(
+            SUPABASE_URL + "/rest/v1/signal_alerts",
+            params={
+                "market": "eq." + symbol,
+                "timeframe": "eq." + interval,
+                "fingerprint": "eq." + fingerprint,
+            },
+            headers=supabase_headers(),
+            timeout=10,
+        )
+        return response.status_code in (200, 204)
+    except (RuntimeError, requests.RequestException):
+        return False
+
+
 def process_pending_push_deliveries(limit=100):
     """Envía la cola pendiente por dispositivo sin repetir entregas confirmadas."""
     summary = {"sent": 0, "retrying": 0, "dead": 0, "errors": 0}
@@ -1570,11 +1576,11 @@ def push_scan():
     sent_total = 0
     token = access_serializer().dumps({"access": True})
     intervals = ["5min", "15min", "30min"]
-    symbols = ["EUR/USD", "XAU/USD", "BTC/USD"]
+    symbols = ["EUR/USD", "XAU/USD"]
 
     # El escáner programado procesa una combinación por petición para respetar
-    # el límite HTTP de la plataforma. El runner invoca las 9 combinaciones
-    # secuencialmente; cada petición queda aislada y puede reintentarse.
+    # el límite HTTP de la plataforma. El runner solo invoca las combinaciones
+    # EUR/USD y XAU/USD que vencen en cada ciclo; cada petición puede reintentarse.
     requested_symbol = request.args.get("symbol")
     requested_interval = request.args.get("interval")
     if requested_symbol and requested_symbol not in symbols:
@@ -1584,7 +1590,7 @@ def push_scan():
     if requested_interval == "30min":
         return jsonify({"error": "M30 es de análisis manual; no admite escaneo automático ni alertas."}), 403
     selected_symbols = [requested_symbol] if requested_symbol else symbols
-    selected_intervals = [requested_interval] if requested_interval else intervals
+    selected_intervals = [requested_interval] if requested_interval else ["5min", "15min"]
 
     with app.test_client() as client:
         for symbol, interval in (
@@ -1831,9 +1837,15 @@ def push_scan():
                             headers=supabase_headers(), timeout=15,
                         )
                         if subs_response.status_code != 200:
+                            # No marcar la transición como notificada: el siguiente ciclo
+                            # debe poder reconstruir el evento cuando Supabase responda.
+                            state_reset = reset_signal_alert_state(symbol, interval, fingerprint)
                             results.append({
                                 "symbol": symbol, "interval": interval,
-                                "status": "subscription_read_error"
+                                "status": "subscription_read_error" if state_reset else "delivery_queue_error",
+                                "state_reset": state_reset,
+                                "http_status": subs_response.status_code,
+                                "detail": "No se pudieron leer los dispositivos push; se reintentará."
                             })
                         else:
                             subscriptions = subs_response.json()
@@ -1909,20 +1921,21 @@ def push_scan():
                                     queued += 1
                                 else:
                                     queue_errors += 1
+                            state_reset = True
                             if queue_errors:
-                                # Permitir que el siguiente ciclo reconstruya las filas que faltaron.
-                                # La unicidad del outbox evita duplicar las que ya quedaron guardadas.
-                                requests.delete(
-                                    SUPABASE_URL + "/rest/v1/signal_alerts",
-                                    params={"market": "eq." + symbol, "timeframe": "eq." + interval,
-                                            "fingerprint": "eq." + fingerprint},
-                                    headers=supabase_headers(), timeout=10,
-                                )
+                                # Reintentar el evento completo en el siguiente ciclo. Las filas
+                                # ya guardadas quedan protegidas por la clave única del outbox.
+                                state_reset = reset_signal_alert_state(symbol, interval, fingerprint)
                             results.append({
                                 "symbol": symbol, "interval": interval,
-                                "status": "delivery_queued" if queued else "new_signal_no_subscribers",
+                                "status": (
+                                    "delivery_queue_error" if queue_errors
+                                    else "delivery_queued" if queued
+                                    else "new_signal_no_subscribers"
+                                ),
                                 "devices_queued": queued,
-                                "queue_errors": queue_errors
+                                "queue_errors": queue_errors,
+                                "state_reset": state_reset
                             })
 
     delivery_summary = process_pending_push_deliveries()

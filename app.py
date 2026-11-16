@@ -1451,6 +1451,24 @@ def resolve_pending_signal_outcomes(symbol, interval, recent_candles):
 
 SIGNAL_CRON_SECRET = os.environ.get("SIGNAL_CRON_SECRET", "")
 
+def reset_signal_alert_state(symbol, interval, fingerprint):
+    """Remove a transition marker when its push event was not durably queued."""
+    try:
+        response = requests.delete(
+            SUPABASE_URL + "/rest/v1/signal_alerts",
+            params={
+                "market": "eq." + symbol,
+                "timeframe": "eq." + interval,
+                "fingerprint": "eq." + fingerprint,
+            },
+            headers=supabase_headers(),
+            timeout=10,
+        )
+        return response.status_code in (200, 204)
+    except (RuntimeError, requests.RequestException):
+        return False
+
+
 def process_pending_push_deliveries(limit=100):
     """Envía la cola pendiente por dispositivo sin repetir entregas confirmadas."""
     summary = {"sent": 0, "retrying": 0, "dead": 0, "errors": 0}
@@ -1819,9 +1837,15 @@ def push_scan():
                             headers=supabase_headers(), timeout=15,
                         )
                         if subs_response.status_code != 200:
+                            # No marcar la transición como notificada: el siguiente ciclo
+                            # debe poder reconstruir el evento cuando Supabase responda.
+                            state_reset = reset_signal_alert_state(symbol, interval, fingerprint)
                             results.append({
                                 "symbol": symbol, "interval": interval,
-                                "status": "subscription_read_error"
+                                "status": "subscription_read_error" if state_reset else "delivery_queue_error",
+                                "state_reset": state_reset,
+                                "http_status": subs_response.status_code,
+                                "detail": "No se pudieron leer los dispositivos push; se reintentará."
                             })
                         else:
                             subscriptions = subs_response.json()
@@ -1897,20 +1921,21 @@ def push_scan():
                                     queued += 1
                                 else:
                                     queue_errors += 1
+                            state_reset = True
                             if queue_errors:
-                                # Permitir que el siguiente ciclo reconstruya las filas que faltaron.
-                                # La unicidad del outbox evita duplicar las que ya quedaron guardadas.
-                                requests.delete(
-                                    SUPABASE_URL + "/rest/v1/signal_alerts",
-                                    params={"market": "eq." + symbol, "timeframe": "eq." + interval,
-                                            "fingerprint": "eq." + fingerprint},
-                                    headers=supabase_headers(), timeout=10,
-                                )
+                                # Reintentar el evento completo en el siguiente ciclo. Las filas
+                                # ya guardadas quedan protegidas por la clave única del outbox.
+                                state_reset = reset_signal_alert_state(symbol, interval, fingerprint)
                             results.append({
                                 "symbol": symbol, "interval": interval,
-                                "status": "delivery_queued" if queued else "new_signal_no_subscribers",
+                                "status": (
+                                    "delivery_queue_error" if queue_errors
+                                    else "delivery_queued" if queued
+                                    else "new_signal_no_subscribers"
+                                ),
                                 "devices_queued": queued,
-                                "queue_errors": queue_errors
+                                "queue_errors": queue_errors,
+                                "state_reset": state_reset
                             })
 
     delivery_summary = process_pending_push_deliveries()

@@ -1044,8 +1044,8 @@ async function update(){
   statusEl.textContent=
     fails===0
       ?(closed>0
-        ?`API de análisis conectada · ${active} activos · ${closed} mercados cerrados`
-        :"API de análisis conectada · revisa el feed BiQuote arriba")
+        ?`Motor conectado · ${active} activos · ${closed} mercados cerrados`
+        :"Motor conectado")
       :fails===markets.length-closed
         ?"Error de conexión"
         :"Conexión parcial";

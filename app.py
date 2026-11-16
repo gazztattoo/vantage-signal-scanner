@@ -1579,8 +1579,8 @@ def push_scan():
     symbols = ["EUR/USD", "XAU/USD"]
 
     # El escáner programado procesa una combinación por petición para respetar
-    # el límite HTTP de la plataforma. El runner invoca las 9 combinaciones
-    # secuencialmente; cada petición queda aislada y puede reintentarse.
+    # el límite HTTP de la plataforma. El runner solo invoca las combinaciones
+    # EUR/USD y XAU/USD que vencen en cada ciclo; cada petición puede reintentarse.
     requested_symbol = request.args.get("symbol")
     requested_interval = request.args.get("interval")
     if requested_symbol and requested_symbol not in symbols:

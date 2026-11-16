@@ -9,9 +9,12 @@ import asyncio
 import logging
 import os
 import threading
+import requests
 import time
 from datetime import datetime, timezone
 from typing import Any
+
+from persistent_candles import MinuteCandleBuilder
 
 
 LOGGER = logging.getLogger(__name__)
@@ -31,6 +34,7 @@ _state: dict[str, Any] = {
     "started_at": None, "last_tick_at": None, "last_error": None,
 }
 _thread: threading.Thread | None = None
+_candle_builder = MinuteCandleBuilder()
 
 
 def _utc_now() -> str:
@@ -75,6 +79,33 @@ def _extract_tick(message: Any) -> dict[str, Any] | None:
     }
 
 
+def _persist_completed_candles(candles: list[dict[str, Any]]) -> None:
+    """Persist completed M1 candles using the server-only Supabase key."""
+    if not candles:
+        return
+    base = os.getenv("SUPABASE_URL", "").rstrip("/")
+    key = os.getenv("SUPABASE_SECRET_KEY", "")
+    if not base or not key:
+        LOGGER.warning("candle_store skipped: Supabase server credentials unavailable")
+        return
+    try:
+        response = requests.post(
+            f"{base}/rest/v1/market_minute_candles",
+            json=candles,
+            headers={
+                "apikey": key,
+                "Authorization": f"Bearer {key}",
+                "Content-Type": "application/json",
+                "Prefer": "resolution=merge-duplicates,return=minimal",
+            },
+            params={"on_conflict": "symbol,minute_open"},
+            timeout=8,
+        )
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        LOGGER.warning("candle_store write failed: %s", str(exc)[:200])
+
+
 def publish_tick(message: Any) -> bool:
     tick = _extract_tick(message)
     if not tick:
@@ -82,6 +113,8 @@ def publish_tick(message: Any) -> bool:
     with _lock:
         _latest[tick["symbol"]] = tick
         _state["last_tick_at"] = tick["received_at"]
+    completed = _candle_builder.add_tick(tick)
+    _persist_completed_candles(completed)
     return True
 
 

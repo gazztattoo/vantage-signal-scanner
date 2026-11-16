@@ -439,12 +439,12 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 <section class="toolbar">
   <label for="interval">Temporalidad</label>
   <select id="interval">
-    <option value="5min">M5 · automático</option>
-    <option value="15min">M15 · automático</option>
+    <option value="5min">M5 · consulta</option>
+    <option value="15min">M15 · consulta</option>
     <option value="30min">M30 · manual</option>
   </select>
   <button id="refresh">↻ Actualizar análisis</button>
-  <span class="hint" id="updated">M5 y M15 se escanean automáticamente. M30 solo al solicitarlo.</span>
+  <span class="hint" id="updated">Producción pausada: M5/M15 disponibles bajo consulta. M30 solo al solicitarlo.</span>
 </section>
 
 
@@ -492,11 +492,11 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 <section class="app-view" id="viewAnalysis" hidden>
   <div class="data-panel">
     <h2>Análisis técnico</h2>
-    <p>M5 y M15 se analizan automáticamente. M30 queda reservado para consulta manual con el botón Analizar. Los datos son análisis técnicos experimentales, no una garantía de resultado.</p>
-    <p class="hint">M5 y M15 se actualizan mediante el escáner automático. M30 no se ejecuta en segundo plano: cada consulta manual consume datos solo cuando pulsas Analizar.</p>
+    <p>El escaneo automático de producción está pausado. M5 y M15 se consultan manualmente; M30 también queda reservado para consulta manual. Los datos son análisis técnicos experimentales, no una garantía de resultado.</p>
+    <p class="hint">No hay análisis en segundo plano mientras producción permanezca pausada. Cada consulta manual solicita velas al proveedor y puede consumir cuota. M30 nunca se ejecuta en segundo plano.</p>
     <div class="data-toolbar">
       <select id="analysisSymbol"><option value="EUR/USD">EUR/USD</option><option value="XAU/USD">XAU/USD</option></select>
-      <select id="analysisTimeframe"><option value="5min">M5 · automático</option><option value="15min">M15 · automático</option><option value="30min">M30 · manual</option></select>
+      <select id="analysisTimeframe"><option value="5min">M5 · consulta</option><option value="15min">M15 · consulta</option><option value="30min">M30 · manual</option></select>
       <button id="analysisRefresh" type="button">Analizar temporalidad seleccionada</button>
     </div>
     <div id="analysisMessage" class="hint" style="margin-bottom:12px">Selecciona mercado y temporalidad. M30 se consulta únicamente al pulsar el botón.</div>

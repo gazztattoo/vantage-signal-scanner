@@ -93,6 +93,7 @@ class BiQuoteStreamTests(unittest.TestCase):
         self.assertEqual(data["provider"], "biquote")
         self.assertFalse(data["is_vantage_quote"])
         self.assertIsNotNone(data["stream"]["last_tick_at"])
+        self.assertIn("EUR/USD|5min", data["candles"])
 
 
 if __name__ == "__main__":

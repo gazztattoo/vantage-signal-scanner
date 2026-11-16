@@ -104,6 +104,40 @@ class BiQuoteProviderTests(unittest.TestCase):
         self.assertEqual(result["live_quote_validation"]["status"], "NO_LIVE_TICK")
         self.assertEqual(result["entry_readiness"]["status"], "NO_LIVE_TICK")
 
+    def test_preparation_is_suppressed_when_tick_is_marked_stale_even_with_recent_timestamp(self):
+        payload = {
+            "signal": "ESPERAR", "pre_signal": True,
+            "pre_signal_side": "COMPRA", "price": 1.0800, "atr14": 0.001,
+        }
+        tick = {
+            "bid": 1.08005, "ask": 1.08010,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "stale": True, "market_state": "open",
+        }
+        with patch("app.biquote_stream_snapshot", return_value={"ticks": {"EUR/USD": tick}}):
+            result = apply_live_entry_validation(payload, "EUR/USD")
+        self.assertFalse(result["pre_signal"])
+        self.assertEqual(result["live_quote_validation"]["status"], "STALE_TICK")
+        self.assertEqual(result["entry_readiness"]["status"], "STALE_TICK")
+
+    def test_entry_levels_use_executable_live_ask_for_buy(self):
+        payload = {
+            "signal": "COMPRA", "price": 1.0800, "atr14": 0.001,
+        }
+        tick = {
+            "bid": 1.08005, "ask": 1.08010,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "stale": False, "market_state": "open",
+        }
+        with patch("app.biquote_stream_snapshot", return_value={"ticks": {"EUR/USD": tick}}):
+            result = apply_live_entry_validation(payload, "EUR/USD")
+        self.assertEqual(result["signal"], "COMPRA")
+        self.assertAlmostEqual(result["entry"], 1.08010)
+        self.assertAlmostEqual(result["stop_loss"], 1.07860)
+        self.assertAlmostEqual(result["take_profit"], 1.08310)
+        self.assertTrue(result["entry_readiness"]["ready"])
+        self.assertEqual(result["entry_readiness"]["status"], "READY")
+
     def test_preparation_is_suppressed_when_live_tick_is_stale(self):
         stale_stamp = (datetime.now(timezone.utc) - timedelta(seconds=30)).isoformat()
         payload = {

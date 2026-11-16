@@ -1,10 +1,7 @@
 name: GLOBAL SIGNAL SCANNER — análisis horario y ventana de 7 días
 
 on:
-  # Dos ejecuciones por hora. XAU/USD M5 cada 30 min; M15 cada 2 h;
-  # EUR/USD M5+M15 cada 3 h, en el slot de :23 UTC.
-  schedule:
-    - cron: '23,53 * * * *'
+  # Escaneo automático desactivado: solo ejecución manual autorizada.
   workflow_dispatch:
 
 permissions:

@@ -28,4 +28,4 @@ jobs:
         with:
           python-version: "3.12"
       - name: Validate panel JavaScript and market scope
-        run: python -m unittest discover -s tests -v
+        run: python -m unittest discover -s tests -p "test_panel_script.py" -v && python -m unittest discover -s tests -p "test_biquote_stream.py" -v

@@ -50,6 +50,19 @@ class PanelJavaScriptSyntaxTests(unittest.TestCase):
         self.assertNotIn('PUSH_API+"/test"', html)
         self.assertIn('id="pushToggle"', html)
 
+
+    def test_scan_persists_m15_confirmation_before_m5_confluence_check(self):
+        app = pathlib.Path("app.py").read_text(encoding="utf-8")
+        self.assertIn('selected_intervals = [requested_interval] if requested_interval else ["15min", "5min"]', app)
+        self.assertLess(app.index('for symbol, interval in ('), app.index('if interval == "5min" and direction in ("COMPRA", "VENTA")'))
+        self.assertIn('"timeframe": "eq.15min"', app)
+
+    def test_production_scan_workflow_remains_paused(self):
+        workflow = pathlib.Path(".github/workflows/vantage-signal-scanner-cron.yml").read_text(encoding="utf-8")
+        self.assertIn("workflow_dispatch:", workflow)
+        self.assertNotIn("schedule:", workflow)
+        self.assertIn('SCANNER_ENABLED: "false"', workflow)
+
     def test_pwa_cache_and_entry_url_are_bumped(self):
         worker = pathlib.Path("service-worker.js").read_text(encoding="utf-8")
         index = pathlib.Path("index.html").read_text(encoding="utf-8")

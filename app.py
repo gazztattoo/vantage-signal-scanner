@@ -119,7 +119,7 @@ def protect_signal_endpoints():
     return None
 TWELVE_DATA_URL = "https://api.twelvedata.com"
 
-ALLOWED_SYMBOLS = {"EUR/USD", "XAU/USD", "BTC/USD"}
+ALLOWED_SYMBOLS = {"EUR/USD", "XAU/USD"}
 ALLOWED_INTERVALS = {"5min", "15min", "30min"}
 
 CANARY_TZ = ZoneInfo("Atlantic/Canary")
@@ -142,18 +142,6 @@ def market_session(symbol, now=None):
     now = now or datetime.now(timezone.utc)
     server_now, server_offset = vantage_server_time(now)
     server_time_label = server_now.isoformat()
-
-    if symbol == "BTC/USD":
-        return {
-            "open": True,
-            "status": "ABIERTO",
-            "reason": (
-                "MT5 muestra sesiones de cotización 00:00-24:00 todos los días; "
-                "la captura no separa una sesión de trading."
-            ),
-            "server_time": server_time_label,
-            "server_utc_offset": f"UTC+{server_offset}",
-        }
 
     schedules = {
         # (hora de apertura, cierre lun-jue, cierre viernes), en minutos del servidor.
@@ -516,7 +504,7 @@ def twelve_data_get(endpoint, params=None, timeout=20):
 
 def fetch_candles(symbol, interval):
     """Obtiene velas OHLC desde biquote; nunca usa velas Twelve Data como fallback."""
-    provider_symbol = {"EUR/USD": "EURUSD", "XAU/USD": "XAUUSD", "BTC/USD": "BTCUSD"}[symbol]
+    provider_symbol = {"EUR/USD": "EURUSD", "XAU/USD": "XAUUSD"}[symbol]
     provider_interval = {"5min": "5m", "15min": "15m", "30min": "30m"}[interval]
     # Count every outbound attempt globally; cached analysis never reaches here.
     reserve_biquote_request()
@@ -622,7 +610,7 @@ def biquote_stream_ticks():
             fresh_ticks[symbol] = tick
     data["ticks"] = fresh_ticks
     data["fresh_symbols"] = sorted(fresh_ticks)
-    data["expected_symbols"] = [ {"EURUSD": "EUR/USD", "XAUUSD": "XAU/USD", "BTCUSD": "BTC/USD"}[symbol] for symbol in BIQUOTE_STREAM_SYMBOLS ]
+    data["expected_symbols"] = [ {"EURUSD": "EUR/USD", "XAUUSD": "XAU/USD"}[symbol] for symbol in BIQUOTE_STREAM_SYMBOLS ]
     data["stream"]["enabled"] = True
     return jsonify(data), 200
 
@@ -632,7 +620,7 @@ def price():
     symbol = get_symbol(request.args.get("symbol"))
     if not symbol:
         return jsonify({"error": "Símbolo no permitido", "allowed_symbols": sorted(ALLOWED_SYMBOLS)}), 400
-    provider_symbol = {"EUR/USD": "EURUSD", "XAU/USD": "XAUUSD", "BTC/USD": "BTCUSD"}[symbol]
+    provider_symbol = {"EUR/USD": "EURUSD", "XAU/USD": "XAUUSD"}[symbol]
     try:
         # Quote calls share the same global daily budget as OHLC calls.
         reserve_biquote_request()
@@ -1570,7 +1558,7 @@ def push_scan():
     sent_total = 0
     token = access_serializer().dumps({"access": True})
     intervals = ["5min", "15min", "30min"]
-    symbols = ["EUR/USD", "XAU/USD", "BTC/USD"]
+    symbols = ["EUR/USD", "XAU/USD"]
 
     # El escáner programado procesa una combinación por petición para respetar
     # el límite HTTP de la plataforma. El runner invoca las 9 combinaciones
@@ -1584,7 +1572,7 @@ def push_scan():
     if requested_interval == "30min":
         return jsonify({"error": "M30 es de análisis manual; no admite escaneo automático ni alertas."}), 403
     selected_symbols = [requested_symbol] if requested_symbol else symbols
-    selected_intervals = [requested_interval] if requested_interval else intervals
+    selected_intervals = [requested_interval] if requested_interval else ["5min", "15min"]
 
     with app.test_client() as client:
         for symbol, interval in (

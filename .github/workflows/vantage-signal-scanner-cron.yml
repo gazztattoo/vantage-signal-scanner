@@ -33,7 +33,7 @@ jobs:
 
       - name: Ejecutar escáner de producción
         env:
-          SCANNER_ENABLED: "true"
+          SCANNER_ENABLED: "false"
           SCANNER_TRIAL_START_UTC: "2026-11-16T00:00:00Z"
           SCANNER_TRIAL_END_UTC: "2026-11-23T23:59:00Z"
           SCANNER_API_URL: "https://vantage-signal-api-carlos.onrender.com"

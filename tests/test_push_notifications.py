@@ -296,6 +296,7 @@ class PushScanDeliveryIntegrationTests(unittest.TestCase):
         check = response.get_json()["checks"][0]
         self.assertEqual(check["status"], "subscription_read_error")
         self.assertTrue(check["state_reset"])
+        sender.assert_not_called()
         delete.assert_called_once()
 
 

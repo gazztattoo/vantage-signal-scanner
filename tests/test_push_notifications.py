@@ -217,13 +217,15 @@ class PushScanDeliveryIntegrationTests(unittest.TestCase):
 
     def request(self, subscriptions, outbox_statuses=None, subscription_status=200):
         outbox_statuses = list(outbox_statuses or [])
+        queued_rows = []
+
         def get(url, **kwargs):
             if url.endswith("/signal_alerts"):
                 return self.response(200, [])
             if "/push_subscriptions" in url:
                 return self.response(subscription_status, subscriptions)
             if url.endswith("/push_delivery_outbox"):
-                return self.response(200, [])
+                return self.response(200, list(queued_rows))
             raise AssertionError("Unexpected GET " + url)
 
         def post(url, **kwargs):
@@ -233,31 +235,43 @@ class PushScanDeliveryIntegrationTests(unittest.TestCase):
                 return self.response(201, [{"id": 1}])
             if "/push_delivery_outbox?" in url:
                 status = outbox_statuses.pop(0) if outbox_statuses else 201
+                if status in (200, 201, 204):
+                    queued_rows.append({
+                        "id": len(queued_rows) + 1,
+                        "endpoint": kwargs["json"]["endpoint"],
+                        "subscription": kwargs["json"]["subscription"],
+                        "payload": kwargs["json"]["payload"],
+                        "attempts": 0,
+                    })
                 return self.response(status)
             raise AssertionError("Unexpected POST " + url)
 
         with (
             patch.object(scanner.requests, "get", side_effect=get),
             patch.object(scanner.requests, "post", side_effect=post),
+            patch.object(scanner.requests, "patch", return_value=self.response(204)),
             patch.object(scanner.requests, "delete", return_value=self.response(204)) as delete,
+            patch.object(scanner, "send_web_push") as sender,
         ):
             response = self.client.post(
                 "/api/push/scan?symbol=EUR%2FUSD&interval=15min",
                 headers={"X-Scanner-Cron-Secret": "cron-test-secret"},
             )
-        return response, delete
+        return response, delete, sender
 
     def test_signal_is_queued_per_device_and_reported(self):
         devices = [
             {"endpoint": "https://push.example.test/a", "subscription": {"endpoint": "https://push.example.test/a", "keys": {"p256dh": "a", "auth": "a"}}},
             {"endpoint": "https://push.example.test/b", "subscription": {"endpoint": "https://push.example.test/b", "keys": {"p256dh": "b", "auth": "b"}}},
         ]
-        response, delete = self.request(devices, [201, 201])
+        response, delete, sender = self.request(devices, [201, 201])
         self.assertEqual(response.status_code, 200)
         check = response.get_json()["checks"][0]
         self.assertEqual(check["status"], "delivery_queued")
         self.assertEqual(check["devices_queued"], 2)
         self.assertEqual(check["queue_errors"], 0)
+        self.assertEqual(response.get_json()["alerts_sent"], 2)
+        self.assertEqual(sender.call_count, 2)
         delete.assert_not_called()
 
     def test_partial_outbox_failure_resets_transition_for_retry(self):
@@ -265,17 +279,19 @@ class PushScanDeliveryIntegrationTests(unittest.TestCase):
             {"endpoint": "https://push.example.test/a", "subscription": {"endpoint": "https://push.example.test/a", "keys": {"p256dh": "a", "auth": "a"}}},
             {"endpoint": "https://push.example.test/b", "subscription": {"endpoint": "https://push.example.test/b", "keys": {"p256dh": "b", "auth": "b"}}},
         ]
-        response, delete = self.request(devices, [201, 503])
+        response, delete, sender = self.request(devices, [201, 503])
         self.assertEqual(response.status_code, 200)
         check = response.get_json()["checks"][0]
         self.assertEqual(check["status"], "delivery_queue_error")
         self.assertEqual(check["devices_queued"], 1)
         self.assertEqual(check["queue_errors"], 1)
         self.assertTrue(check["state_reset"])
+        self.assertEqual(response.get_json()["alerts_sent"], 1)
+        self.assertEqual(sender.call_count, 1)
         delete.assert_called_once()
 
     def test_subscription_read_failure_resets_transition_for_retry(self):
-        response, delete = self.request([], [], subscription_status=503)
+        response, delete, sender = self.request([], [], subscription_status=503)
         self.assertEqual(response.status_code, 200)
         check = response.get_json()["checks"][0]
         self.assertEqual(check["status"], "subscription_read_error")

@@ -92,7 +92,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 }
 .overview-icon{color:var(--green);font-size:15px}
 .trend-list{
-  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
   gap:7px;padding:8px;
 }
 .trend-card{
@@ -166,8 +166,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
   .instrument-mark{width:40px;height:40px;flex-basis:40px;font-size:22px}
   .instrument-mark.forex{font-size:18px;gap:0}
   .instrument-mark.gold .gold-bars{transform:scale(.88)}
-  .instrument-mark.crypto{font-size:25px}
-  .market-overview{grid-template-columns:minmax(0,1.15fr) minmax(132px,.85fr);gap:7px;margin-bottom:13px}
+    .market-overview{grid-template-columns:minmax(0,1.15fr) minmax(132px,.85fr);gap:7px;margin-bottom:13px}
   .overview-panel{border-radius:12px}
   .overview-heading{padding:8px 8px;font-size:9px;letter-spacing:0;gap:5px}
   .overview-icon{font-size:12px}
@@ -245,12 +244,6 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .gold-bars i:nth-child(2){right:1px;bottom:3px}
 .gold-bars i:nth-child(3){left:8px;top:1px}
 
-.instrument-mark.crypto{
-  background:radial-gradient(circle at 32% 25%,#ffd28a 0%,#f7931a 48%,#a84c00 100%);
-  border:2px solid #ffc06a;color:#fff4df;font-size:29px;font-weight:950;
-  text-shadow:0 2px 5px rgba(91,39,0,.65);
-  box-shadow:0 0 12px rgba(247,147,26,.48),inset 0 0 8px rgba(255,255,255,.25);
-}
 .instrument-copy{min-width:0}
 .instrument-copy .symbol{white-space:nowrap}
 
@@ -386,7 +379,7 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
   <img
     class="brand-banner"
     src="./global-signal-header.jpg"
-    alt="GLOBAL SIGNAL SCANNER — Trading Intelligence — Forex, Gold, Crypto"
+    alt="GLOBAL SIGNAL SCANNER — Trading Intelligence — Forex y Gold"
   >
   <div class="status">
     <span class="dot" id="dot"></span>
@@ -629,9 +622,6 @@ function instrumentIdentity(m){
   }
   if(m.category==="ORO"){
     return `<span class="instrument-mark gold" aria-label="Lingotes de oro"><span class="gold-bars"><i></i><i></i><i></i></span></span>`;
-  }
-  if(m.category==="CRIPTO"){
-    return `<span class="instrument-mark crypto" aria-label="Bitcoin">₿</span>`;
   }
   return `<span class="instrument-mark">${esc(m.symbol.slice(0,1))}</span>`;
 }
@@ -918,7 +908,7 @@ function updateOverview(results){
     market:item.m,
     bias:item.err?null:technicalBias(item.d)
   }));
-  const names={FOREX:"FOREX",ORO:"ORO",CRIPTO:"CRIPTO"};
+  const names={FOREX:"FOREX",ORO:"ORO"};
   trendList.innerHTML=analyzed.map(item=>{
     const name=names[item.market.category]||item.market.category;
     const b=item.bias;

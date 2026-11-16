@@ -138,6 +138,12 @@ def main():
             else:
                 check = checks[0]
                 status = check.get("status")
+                # HTTP 200 no garantiza que todas las entregas se hayan encolado.
+                if int(check.get("queue_errors") or 0) > 0:
+                    failures.append(
+                        f"{symbol} {interval}: push queue errors "
+                        f"({check.get('queue_errors')})"
+                    )
                 if status in FAILURE_STATUSES:
                     failures.append(
                         f"{symbol} {interval}: {status} "

@@ -45,6 +45,14 @@ def write_step_summary(lines):
 
 
 def main():
+    # Activación explícita obligatoria. El valor ausente o falso mantiene el escáner apagado.
+    enabled = os.environ.get("SCANNER_ENABLED", "false").strip().lower()
+    if enabled not in {"1", "true", "yes", "on"}:
+        message = "Scanner disabled by SCANNER_ENABLED; no API requests sent."
+        print(message, flush=True)
+        write_step_summary(["## GLOBAL SIGNAL SCANNER", f"- {message}"])
+        return 0
+
     # Fail closed: no hay consultas a la API si la ventana de prueba falta,
     # tiene formato inválido o ya terminó.
     start_raw = os.environ.get("SCANNER_TRIAL_START_UTC", "").strip()

@@ -62,6 +62,34 @@ class PushTestDeviceScopeTests(unittest.TestCase):
         send.assert_not_called()
 
 
+class SignalAlertStateRecoveryTests(unittest.TestCase):
+    def test_failed_state_reset_is_reported(self):
+        failed = Mock(status_code=503)
+        with (
+            patch.object(scanner, "supabase_headers", return_value={"apikey": "test"}),
+            patch.object(scanner.requests, "delete", return_value=failed) as delete_request,
+        ):
+            result = scanner.reset_signal_alert_state("EUR/USD", "5min", "event-1")
+        self.assertFalse(result)
+        self.assertEqual(delete_request.call_args.kwargs["params"], {
+            "market": "eq.EUR/USD",
+            "timeframe": "eq.5min",
+            "fingerprint": "eq.event-1",
+        })
+
+    def test_successful_state_reset_allows_event_retry(self):
+        saved = Mock(status_code=204)
+        with (
+            patch.object(scanner, "supabase_headers", return_value={"apikey": "test"}),
+            patch.object(scanner.requests, "delete", return_value=saved),
+        ):
+            self.assertTrue(scanner.reset_signal_alert_state("XAU/USD", "15min", "event-2"))
+
+    def test_state_reset_fails_closed_on_storage_exception(self):
+        with patch.object(scanner, "supabase_headers", side_effect=RuntimeError("storage unavailable")):
+            self.assertFalse(scanner.reset_signal_alert_state("EUR/USD", "5min", "event-3"))
+
+
 class PushDeliveryOutboxTests(unittest.TestCase):
     def pending_row(self, attempts=0, endpoint="https://push.example.test/device-a"):
         return {

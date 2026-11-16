@@ -137,6 +137,24 @@ class BiQuoteStreamTests(unittest.TestCase):
         self.assertFalse(data["ticks"]["EUR/USD"]["fresh"])
         self.assertEqual(data["stream"]["quote_health"], "no_fresh_quotes")
 
+    def test_start_stream_does_not_overwrite_worker_startup_state(self):
+        from unittest.mock import Mock, patch
+        fake_thread = Mock()
+        fake_thread.is_alive.return_value = False
+        with biquote_stream._lock:
+            biquote_stream._thread = None
+        try:
+            with patch("biquote_stream.threading.Thread", return_value=fake_thread):
+                self.assertTrue(biquote_stream.start_stream())
+            self.assertEqual(snapshot()["stream"]["status"], "starting")
+            fake_thread.start.assert_called_once()
+        finally:
+            with biquote_stream._lock:
+                biquote_stream._thread = None
+                biquote_stream._state.update({
+                    "enabled": False, "status": "stopped", "connected": False,
+                })
+
     def test_retry_delay_is_exponential_and_capped(self):
         from unittest.mock import patch
         from biquote_stream import _retry_delay

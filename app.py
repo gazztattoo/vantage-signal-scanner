@@ -662,11 +662,14 @@ def cached_analysis_requires_reanalysis(payload):
 def apply_live_entry_validation(payload, symbol):
     """Bloquea entradas sin tick fresco y recalcula niveles desde Bid/Ask."""
     result = dict(payload)
-    tick = (biquote_stream_snapshot().get("ticks") or {}).get(symbol)
     signal = str(result.get("signal") or "ESPERAR").upper()
+    result["technical_signal"] = signal
+    result["entry_readiness"] = {"ready": False, "status": "CHECKING", "label": "Validando cotización en directo"}
+    tick = (biquote_stream_snapshot().get("ticks") or {}).get(symbol)
     result["live_quote"] = None
     if not isinstance(tick, dict):
         result["live_quote_validation"] = {"valid": False, "status": "NO_LIVE_TICK", "provider": "biquote", "is_vantage_quote": False}
+        result["entry_readiness"] = {"ready": False, "status": "NO_LIVE_TICK", "label": "BLOQUEADA · Sin tick en directo", "reason": "No hay una cotización Bid/Ask reciente."}
         had_pre_signal = bool(result.get("pre_signal"))
         result["pre_signal"] = False
         result["pre_signal_side"] = None
@@ -692,6 +695,7 @@ def apply_live_entry_validation(payload, symbol):
     }
     if age < -5 or age > 15 or bid <= 0 or ask < bid:
         result["live_quote_validation"] = {"valid": False, "status": "STALE_TICK", "provider": "biquote", "is_vantage_quote": False}
+        result["entry_readiness"] = {"ready": False, "status": "STALE_TICK", "label": "BLOQUEADA · Cotización antigua", "reason": "El último tick supera el límite de frescura de 15 segundos."}
         had_pre_signal = bool(result.get("pre_signal"))
         result["pre_signal"] = False
         result["pre_signal_side"] = None
@@ -718,6 +722,12 @@ def apply_live_entry_validation(payload, symbol):
         result["live_quote_validation"] = {"valid": False, "status": "PRICE_MOVED", "provider": "biquote",
                                            "is_vantage_quote": False, "deviation": round(deviation, 8),
                                            "max_deviation": round(max_deviation, 8)}
+        result["entry_readiness"] = {"ready": False, "status": "PRICE_MOVED",
+                                     "label": "BLOQUEADA · Precio desplazado",
+                                     "reason": "El precio se alejó más de la banda segura del análisis; esperar una nueva vela o un retroceso.",
+                                     "deviation": round(deviation, 8),
+                                     "max_deviation": round(max_deviation, 8),
+                                     "deviation_atr": round(deviation / atr_value, 3) if atr_value > 0 else None}
         if side:
             result.update({"signal": "ESPERAR", "entry": None, "stop_loss": None, "take_profit": None,
                            "pre_signal": False, "pre_signal_side": None,
@@ -730,6 +740,15 @@ def apply_live_entry_validation(payload, symbol):
     result["live_quote_validation"] = {"valid": True, "status": "VALIDATED_EXTERNAL_FEED",
                                        "provider": "biquote", "is_vantage_quote": False,
                                        "deviation": round(deviation, 8), "max_deviation": round(max_deviation, 8)}
+    result["entry_readiness"] = {
+        "ready": bool(side),
+        "status": "READY" if side else "NO_CONFIRMED_SIGNAL",
+        "label": "ENTRADA VALIDADA · Precio en banda segura" if side else "SIN ENTRADA · Falta señal confirmada",
+        "reason": "Bid/Ask reciente validado; los niveles se calculan desde el precio ejecutable." if side else "La cotización está fresca, pero los indicadores no han confirmado una dirección de entrada.",
+        "deviation": round(deviation, 8),
+        "max_deviation": round(max_deviation, 8),
+        "deviation_atr": round(deviation / atr_value, 3) if atr_value > 0 else None,
+    }
     if side and atr_value > 0:
         result["entry"] = entry
         result["stop_loss"] = entry - 1.5 * atr_value if side == "COMPRA" else entry + 1.5 * atr_value

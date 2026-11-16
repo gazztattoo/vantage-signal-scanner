@@ -882,6 +882,19 @@ def analysis():
         and cache_age < ANALYSIS_CACHE_TTL_SECONDS[interval]
         and cached_candle_age + (cache_age / 60) <= max_data_age_minutes
     )
+    # Un cierre nuevo construido con ticks invalida el análisis cacheado,
+    # incluso si su TTL todavía no venció. Así se recalculan indicadores
+    # exactamente cuando hay una vela cerrada nueva, sin polling OHLC REST.
+    if cache_is_fresh:
+        local_closed = biquote_closed_candles(symbol, interval)
+        if local_closed and cached["payload"].get("candle_time"):
+            try:
+                latest_local = parse_candle_time(local_closed[-1]["time"])
+                cached_candle = parse_candle_time(cached["payload"]["candle_time"])
+                if latest_local > cached_candle:
+                    cache_is_fresh = False
+            except (TypeError, ValueError, RuntimeError):
+                cache_is_fresh = False
     reanalysis_triggered = False
     if cache_is_fresh:
         payload = dict(cached["payload"])

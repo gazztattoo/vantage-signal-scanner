@@ -197,6 +197,7 @@ class PushScanDeliveryIntegrationTests(unittest.TestCase):
         self.client = scanner.app.test_client()
         self.patches = [
             patch.object(scanner, "SIGNAL_CRON_SECRET", "cron-test-secret"),
+            patch.object(scanner, "ACCESS_TOKEN_SECRET", "test-only-secret"),
             patch.object(scanner, "market_session", return_value={"open": True}),
             patch.object(scanner, "resolve_pending_signal_outcomes", return_value={"resolved": 0, "errors": 0}),
             patch.object(scanner.app, "test_client", return_value=self.FakeInternalClient()),

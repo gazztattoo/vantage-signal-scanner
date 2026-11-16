@@ -22,8 +22,8 @@ class PanelJavaScriptSyntaxTests(unittest.TestCase):
         self.assertIn("El escaneo automático de producción está pausado.", html)
         self.assertNotIn("M5 · automático", html)
         self.assertNotIn("M15 · automático", html)
-        self.assertIn("API de análisis conectada", html)
-        self.assertIn("revisa el feed BiQuote arriba", html)
+        self.assertIn("Motor conectado", html)
+        self.assertNotIn("revisa el feed BiQuote arriba", html)
 
     def test_live_tick_polling_is_throttled_and_pauses_in_background(self):
         html = pathlib.Path("panel_escaner_vantage.html").read_text(encoding="utf-8")

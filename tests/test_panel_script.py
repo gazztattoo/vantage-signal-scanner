@@ -16,6 +16,15 @@ class PanelJavaScriptSyntaxTests(unittest.TestCase):
         self.assertIn("ESTADO REAL DE LA ENTRADA", html)
         self.assertIn("CALIDAD TÉCNICA DE LOS INDICADORES", html)
 
+    def test_panel_does_not_claim_automatic_scanning_while_production_is_paused(self):
+        html = pathlib.Path("panel_escaner_vantage.html").read_text(encoding="utf-8")
+        self.assertIn("Producción pausada: M5/M15 disponibles bajo consulta.", html)
+        self.assertIn("El escaneo automático de producción está pausado.", html)
+        self.assertNotIn("M5 · automático", html)
+        self.assertNotIn("M15 · automático", html)
+        self.assertIn("API de análisis conectada", html)
+        self.assertIn("revisa el feed BiQuote arriba", html)
+
     def test_live_tick_polling_is_throttled_and_pauses_in_background(self):
         html = pathlib.Path("panel_escaner_vantage.html").read_text(encoding="utf-8")
         self.assertIn("const POLL_INTERVAL_MS=2000", html)

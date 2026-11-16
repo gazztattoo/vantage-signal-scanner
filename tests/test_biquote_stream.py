@@ -48,10 +48,12 @@ class BiQuoteStreamTests(unittest.TestCase):
         self.assertIsNone(_extract_tick(self.make_tick(bid=0)))
         self.assertIsNone(_extract_tick(self.make_tick(bid=2, ask=1)))
 
-    def test_rejects_stale_and_timezone_naive_ticks(self):
+    def test_rejects_stale_timezone_naive_and_undated_ticks(self):
         old = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
         self.assertIsNone(_extract_tick(self.make_tick(timestamp=old)))
         self.assertIsNone(_extract_tick(self.make_tick(timestamp="2026-11-16T12:00:00")))
+        self.assertIsNone(_extract_tick(self.make_tick(timestamp=None)))
+        self.assertIsNone(_extract_tick(self.make_tick(timestamp="", lastQuoteAt=None)))
 
 
 
@@ -127,6 +129,22 @@ class BiQuoteStreamTests(unittest.TestCase):
     def test_seed_rejects_unknown_interval_and_symbol(self):
         self.assertEqual(seed_history("BTC/USD", "5min", []), 0)
         self.assertEqual(seed_history("EUR/USD", "1min", []), 0)
+
+    def test_snapshot_marks_old_cached_tick_as_not_fresh(self):
+        old = (datetime.now(timezone.utc) - timedelta(seconds=150)).isoformat()
+        self.assertTrue(publish_tick(self.make_tick(timestamp=old)))
+        data = snapshot()
+        self.assertFalse(data["ticks"]["EUR/USD"]["fresh"])
+        self.assertEqual(data["stream"]["quote_health"], "no_fresh_quotes")
+
+    def test_retry_delay_is_exponential_and_capped(self):
+        from unittest.mock import patch
+        from biquote_stream import _retry_delay
+        with patch("biquote_stream.random.uniform", return_value=1.0):
+            self.assertEqual(_retry_delay(1), 3.0)
+            self.assertEqual(_retry_delay(2), 6.0)
+            self.assertEqual(_retry_delay(3), 12.0)
+            self.assertEqual(_retry_delay(20), 60.0)
 
     def test_publish_updates_snapshot(self):
         self.assertTrue(publish_tick(self.make_tick()))

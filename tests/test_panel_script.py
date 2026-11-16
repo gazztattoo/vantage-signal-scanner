@@ -50,7 +50,6 @@ class PanelJavaScriptSyntaxTests(unittest.TestCase):
         self.assertNotIn('PUSH_API+"/test"', html)
         self.assertIn('id="pushToggle"', html)
 
-
     def test_scan_persists_m15_confirmation_before_m5_confluence_check(self):
         app = pathlib.Path("app.py").read_text(encoding="utf-8")
         self.assertIn('selected_intervals = [requested_interval] if requested_interval else ["15min", "5min"]', app)
@@ -72,7 +71,8 @@ class PanelJavaScriptSyntaxTests(unittest.TestCase):
         panel = pathlib.Path("panel_escaner_vantage.html").read_text(encoding="utf-8")
         self.assertIn('https://vantage-signal-scanner.onrender.com/panel_escaner_vantage.html?view=scanner&symbol=', app)
         self.assertIn('&timeframe=', app)
-        self.assertIn('new URL(event.notification.data?.url', worker)
+        self.assertIn('const targetUrl = new URL(', worker)
+        self.assertIn('event.notification.data?.url || "./panel_escaner_vantage.html"', worker)
         self.assertIn('if (targetOrigin !== self.location.origin) return;', worker)
         self.assertIn('notificationParams.get("symbol")', panel)
         self.assertIn('scrollIntoView({behavior:"smooth",block:"center"})', panel)

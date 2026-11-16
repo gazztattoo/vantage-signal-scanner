@@ -1,14 +1,7 @@
-name: GLOBAL SIGNAL SCANNER — análisis horario y ventana de 7 días
+name: GLOBAL SIGNAL SCANNER — producción pausada
 
 on:
-  # Activado por autorización explícita el 16-11-2026.
-  # Un único ciclo inicial al publicar este archivo y luego cada 30 minutos.
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/vantage-signal-scanner-cron.yml"
-  schedule:
-    - cron: "23,53 * * * 1-5"
+  # Sin cron ni activación por push. Solo ejecución manual y fail-closed.
   workflow_dispatch:
 
 permissions:
@@ -21,7 +14,7 @@ concurrency:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 3
     steps:
       - name: Descargar código
         uses: actions/checkout@v4
@@ -34,16 +27,7 @@ jobs:
       - name: Instalar dependencias
         run: pip install -r requirements.txt
 
-      - name: Ejecutar escáner
+      - name: Verificar pausa del escáner
         env:
-          SCANNER_API_URL: https://vantage-signal-api-carlos.onrender.com
-          SCANNER_ENABLED: "true"
-          SIGNAL_CRON_SECRET: ${{ secrets.SIGNAL_CRON_SECRET }}
-          SCANNER_TRIAL_START_UTC: "2026-11-16T16:00:00Z"
-          SCANNER_TRIAL_END_UTC: "2026-11-23T16:00:00Z"
-        run: |
-          if [ -z "$SIGNAL_CRON_SECRET" ]; then
-            echo "::error::Falta configurar el secreto SIGNAL_CRON_SECRET en GitHub."
-            exit 1
-          fi
-          python scripts/run_signal_scan.py
+          SCANNER_ENABLED: "false"
+        run: python scripts/run_signal_scan.py

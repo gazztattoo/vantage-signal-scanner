@@ -102,6 +102,7 @@ class BiQuoteProviderTests(unittest.TestCase):
         self.assertFalse(result["pre_signal"])
         self.assertIsNone(result["pre_signal_side"])
         self.assertEqual(result["live_quote_validation"]["status"], "NO_LIVE_TICK")
+        self.assertEqual(result["entry_readiness"]["status"], "NO_LIVE_TICK")
 
     def test_preparation_is_suppressed_when_live_tick_is_stale(self):
         stale_stamp = (datetime.now(timezone.utc) - timedelta(seconds=30)).isoformat()
@@ -149,6 +150,8 @@ class BiQuoteProviderTests(unittest.TestCase):
         self.assertFalse(result["pre_signal"])
         self.assertIsNone(result["pre_signal_side"])
         self.assertEqual(result["live_quote_validation"]["status"], "PRICE_MOVED")
+        self.assertFalse(result["entry_readiness"]["ready"])
+        self.assertEqual(result["entry_readiness"]["status"], "PRICE_MOVED")
         self.assertIn("demasiado", result["pre_signal_reason"])
 
     def test_preparation_is_kept_when_live_price_is_within_drift_limit(self):
@@ -165,6 +168,8 @@ class BiQuoteProviderTests(unittest.TestCase):
         self.assertTrue(result["pre_signal"])
         self.assertEqual(result["pre_signal_side"], "COMPRA")
         self.assertTrue(result["live_quote_validation"]["valid"])
+        self.assertFalse(result["entry_readiness"]["ready"])
+        self.assertEqual(result["entry_readiness"]["status"], "NO_CONFIRMED_SIGNAL")
 
 
 if __name__ == "__main__":

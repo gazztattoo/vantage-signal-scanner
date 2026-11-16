@@ -1702,7 +1702,9 @@ def push_scan():
     if requested_interval == "30min":
         return jsonify({"error": "M30 es de análisis manual; no admite escaneo automático ni alertas."}), 403
     selected_symbols = [requested_symbol] if requested_symbol else symbols
-    selected_intervals = [requested_interval] if requested_interval else ["5min", "15min"]
+    # Evaluate M15 first so its confirmed setup is persisted before M5
+    # checks the required same-direction confluence in signal_history.
+    selected_intervals = [requested_interval] if requested_interval else ["15min", "5min"]
 
     with app.test_client() as client:
         for symbol, interval in (

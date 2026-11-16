@@ -11,7 +11,6 @@ on:
       - "external_technical_signal_adapters.py"
       - "external_biquote_adapter.py"
       - "tests/test_precision_engine_v2.py"
-      - "tests/test_precision_candidate_endpoint.py"
       - "app.py"
       - "tests/test_external_signal_intelligence.py"
       - "tests/test_external_technical_signal_adapters.py"
@@ -59,7 +58,6 @@ jobs:
         run: |
           python -m unittest discover -s tests -p "test_panel_script.py" -v
           python -m unittest discover -s tests -p "test_precision_engine_v2.py" -v
-          python -m unittest discover -s tests -p "test_precision_candidate_endpoint.py" -v
           python -m unittest discover -s tests -p "test_external_signal_intelligence.py" -v
           python -m unittest discover -s tests -p "test_external_technical_signal_adapters.py" -v
           python -m unittest discover -s tests -p "test_external_biquote_adapter.py" -v

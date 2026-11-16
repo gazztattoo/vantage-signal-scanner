@@ -329,7 +329,9 @@ def start_stream() -> bool:
     with _lock:
         if _thread and _thread.is_alive():
             return False
+        # Publish the desired state before starting the worker; otherwise the
+        # caller can overwrite the worker's "connecting" state after it starts.
+        _state.update({"enabled": True, "status": "starting"})
         _thread = threading.Thread(target=_thread_main, name="biquote-signalr", daemon=True)
         _thread.start()
-        _state.update({"enabled": True, "status": "starting"})
         return True

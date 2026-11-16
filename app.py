@@ -662,11 +662,14 @@ def cached_analysis_requires_reanalysis(payload):
 def apply_live_entry_validation(payload, symbol):
     """Bloquea entradas sin tick fresco y recalcula niveles desde Bid/Ask."""
     result = dict(payload)
-    tick = (biquote_stream_snapshot().get("ticks") or {}).get(symbol)
     signal = str(result.get("signal") or "ESPERAR").upper()
+    result["technical_signal"] = signal
+    result["entry_readiness"] = {"ready": False, "status": "CHECKING", "label": "Validando cotización en directo"}
+    tick = (biquote_stream_snapshot().get("ticks") or {}).get(symbol)
     result["live_quote"] = None
     if not isinstance(tick, dict):
         result["live_quote_validation"] = {"valid": False, "status": "NO_LIVE_TICK", "provider": "biquote", "is_vantage_quote": False}
+        result["entry_readiness"] = {"ready": False, "status": "NO_LIVE_TICK", "label": "BLOQUEADA · Sin tick en directo", "reason": "No hay una cotización Bid/Ask reciente."}
         had_pre_signal = bool(result.get("pre_signal"))
         result["pre_signal"] = False
         result["pre_signal_side"] = None
@@ -690,8 +693,9 @@ def apply_live_entry_validation(payload, symbol):
         "timestamp": tick.get("timestamp"), "age_seconds": round(max(age, 0), 1),
         "source": "biquote_external_mt5_feed", "is_vantage_quote": False
     }
-    if age < -5 or age > 15 or bid <= 0 or ask < bid:
+    if age < -5 or age > 15 or bid <= 0 or ask < bid or tick.get("stale") or str(tick.get("market_state") or "").lower() == "closed":
         result["live_quote_validation"] = {"valid": False, "status": "STALE_TICK", "provider": "biquote", "is_vantage_quote": False}
+        result["entry_readiness"] = {"ready": False, "status": "STALE_TICK", "label": "BLOQUEADA · Cotización antigua", "reason": "El último tick supera el límite de frescura de 15 segundos."}
         had_pre_signal = bool(result.get("pre_signal"))
         result["pre_signal"] = False
         result["pre_signal_side"] = None
@@ -718,6 +722,12 @@ def apply_live_entry_validation(payload, symbol):
         result["live_quote_validation"] = {"valid": False, "status": "PRICE_MOVED", "provider": "biquote",
                                            "is_vantage_quote": False, "deviation": round(deviation, 8),
                                            "max_deviation": round(max_deviation, 8)}
+        result["entry_readiness"] = {"ready": False, "status": "PRICE_MOVED",
+                                     "label": "BLOQUEADA · Precio desplazado",
+                                     "reason": "El precio se alejó más de la banda segura del análisis; esperar una nueva vela o un retroceso.",
+                                     "deviation": round(deviation, 8),
+                                     "max_deviation": round(max_deviation, 8),
+                                     "deviation_atr": round(deviation / atr_value, 3) if atr_value > 0 else None}
         if side:
             result.update({"signal": "ESPERAR", "entry": None, "stop_loss": None, "take_profit": None,
                            "pre_signal": False, "pre_signal_side": None,
@@ -730,12 +740,76 @@ def apply_live_entry_validation(payload, symbol):
     result["live_quote_validation"] = {"valid": True, "status": "VALIDATED_EXTERNAL_FEED",
                                        "provider": "biquote", "is_vantage_quote": False,
                                        "deviation": round(deviation, 8), "max_deviation": round(max_deviation, 8)}
+    result["entry_readiness"] = {
+        "ready": bool(side),
+        "status": "READY" if side else "NO_CONFIRMED_SIGNAL",
+        "label": "ENTRADA VALIDADA · Precio en banda segura" if side else "SIN ENTRADA · Falta señal confirmada",
+        "reason": "Bid/Ask reciente validado; los niveles se calculan desde el precio ejecutable." if side else "La cotización está fresca, pero los indicadores no han confirmado una dirección de entrada.",
+        "deviation": round(deviation, 8),
+        "max_deviation": round(max_deviation, 8),
+        "deviation_atr": round(deviation / atr_value, 3) if atr_value > 0 else None,
+    }
     if side and atr_value > 0:
         result["entry"] = entry
         result["stop_loss"] = entry - 1.5 * atr_value if side == "COMPRA" else entry + 1.5 * atr_value
         result["take_profit"] = entry + 3.0 * atr_value if side == "COMPRA" else entry - 3.0 * atr_value
         result["entry_source"] = "biquote_live_ask" if side == "COMPRA" else "biquote_live_bid"
     return result
+
+
+def m15_confirmation_is_fresh(confirmation, m5_candle_time, now=None, max_age_minutes=20):
+    """Validate M15 confirmation against the M5 closed candle, not DB insertion time alone."""
+    if not isinstance(confirmation, dict) or not m5_candle_time:
+        return False
+    now = now or datetime.now(timezone.utc)
+
+    def parse_stamp(value):
+        stamp = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return stamp.replace(tzinfo=timezone.utc) if stamp.tzinfo is None else stamp.astimezone(timezone.utc)
+
+    try:
+        signal_at = parse_stamp(confirmation.get("signal_at"))
+        m15_candle = parse_stamp(confirmation.get("candle_time"))
+        m5_candle = parse_stamp(m5_candle_time)
+        now_utc = now.replace(tzinfo=timezone.utc) if now.tzinfo is None else now.astimezone(timezone.utc)
+    except (TypeError, ValueError):
+        return False
+
+    signal_age = (now_utc - signal_at).total_seconds() / 60
+    candle_gap = (m5_candle - m15_candle).total_seconds() / 60
+    return (
+        -2 <= signal_age <= max_age_minutes
+        and -2 <= candle_gap <= max_age_minutes
+    )
+
+
+def actionable_alert_direction(data):
+    """Return only alert stages backed by a fresh, explicitly validated live quote."""
+    if not isinstance(data, dict):
+        return "ESPERAR"
+    readiness = data.get("entry_readiness") or {}
+    quote_validation = data.get("live_quote_validation") or {}
+    if quote_validation.get("valid") is not True:
+        return "ESPERAR"
+
+    signal = str(data.get("signal") or "ESPERAR").upper()
+    if signal in ("COMPRA", "VENTA"):
+        if readiness.get("ready") is True and readiness.get("status") == "READY":
+            return signal
+        return "ESPERAR"
+
+    preparation_side = str(data.get("pre_signal_side") or "").upper()
+    if (
+        signal == "ESPERAR"
+        and data.get("pre_signal") is True
+        and preparation_side in ("COMPRA", "VENTA")
+        and readiness.get("ready") is False
+        and readiness.get("status") == "NO_CONFIRMED_SIGNAL"
+    ):
+        return "PREPARAR_" + preparation_side
+    return "ESPERAR"
+
+
 
 
 @app.route("/api/analysis")
@@ -769,6 +843,11 @@ def analysis():
             "interval": interval,
             "data_provider": "biquote",
         }), 409
+
+    # Abrir el streaming Bid/Ask desde análisis solo cuando esté habilitado explícitamente.
+    # Por defecto permanece apagado para no consumir datos reales sin autorización.
+    if os.environ.get("BIQUOTE_STREAM_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on"):
+        start_stream()
 
     cache_key = (symbol, interval)
     cached = ANALYSIS_CACHE.get(cache_key)
@@ -1621,10 +1700,8 @@ def push_scan():
                 outcome_result = resolve_pending_signal_outcomes(
                     symbol, interval, data.get("recent_candles", [])
                 )
-                direction = data.get("signal") or "ESPERAR"
-                # Aviso anticipado: solo estado/outbox; nunca entra en signal_history.
-                if direction == "ESPERAR" and data.get("pre_signal") and data.get("pre_signal_side") in ("COMPRA", "VENTA"):
-                    direction = "PREPARAR_" + data["pre_signal_side"]
+                # Emitir solo etapas respaldadas por Bid/Ask fresco y estado explícito de entrada.
+                direction = actionable_alert_direction(data)
 
                 # La confluencia M15 se exige solo a entradas validadas.
                 # Reuse signal_history; do not request additional Twelve Data candles.
@@ -1651,20 +1728,12 @@ def push_scan():
                         continue
                     confirmation_rows = confirmation_response.json()
                     confirmation = confirmation_rows[0] if confirmation_rows else None
-                    confirmation_age = None
-                    if confirmation:
-                        try:
-                            confirmation_time = datetime.fromisoformat(
-                                str(confirmation.get("signal_at")).replace("Z", "+00:00")
-                            )
-                            confirmation_age = (datetime.now(timezone.utc) - confirmation_time).total_seconds() / 60
-                        except (TypeError, ValueError):
-                            confirmation_age = None
                     if (
                         not confirmation
                         or confirmation.get("direction") != direction
-                        or confirmation_age is None
-                        or confirmation_age > 40
+                        or not m15_confirmation_is_fresh(
+                            confirmation, data.get("candle_time")
+                        )
                     ):
                         results.append({
                             "symbol": symbol, "interval": interval,

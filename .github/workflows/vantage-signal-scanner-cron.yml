@@ -1,7 +1,8 @@
-name: GLOBAL SIGNAL SCANNER — producción pausada
+name: GLOBAL SIGNAL SCANNER — producción (GitHub Actions)
 
 on:
-  # Sin cron ni activación por push. Solo ejecución manual y fail-closed.
+  schedule:
+    - cron: "23,53 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -27,7 +28,11 @@ jobs:
       - name: Instalar dependencias
         run: pip install -r requirements.txt
 
-      - name: Verificar pausa del escáner
+      - name: Ejecutar escáner de producción
         env:
-          SCANNER_ENABLED: "false"
+          SCANNER_ENABLED: "true"
+          SCANNER_TRIAL_START_UTC: "2026-11-16T00:00:00Z"
+          SCANNER_TRIAL_END_UTC: "2026-11-23T23:59:00Z"
+          SCANNER_API_URL: "https://vantage-signal-api-carlos.onrender.com"
+          SIGNAL_CRON_SECRET: ${{ secrets.SIGNAL_CRON_SECRET }}
         run: python scripts/run_signal_scan.py

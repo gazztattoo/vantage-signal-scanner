@@ -5,6 +5,7 @@ Inputs are completed-candle snapshots supplied by a separate adapter.
 This module is research-only until historical validation and explicit approval.
 """
 from dataclasses import dataclass, asdict
+from math import isfinite
 from typing import Optional
 
 
@@ -36,6 +37,29 @@ def _direction(frame):
         return "SELL"
     return "NEUTRAL"
 
+def _normalize_frame(frame, required, optional=()):
+    """Return a numeric, finite snapshot or None; never leak NaN/inf to decisions."""
+    if not isinstance(frame, dict):
+        return None
+    normalized = dict(frame)
+    for key in required:
+        value = frame.get(key)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        if not isfinite(float(value)):
+            return None
+        normalized[key] = float(value)
+    for key in optional:
+        if key not in frame or frame[key] is None:
+            continue
+        value = frame[key]
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        if not isfinite(float(value)):
+            return None
+        normalized[key] = float(value)
+    return normalized
+
 
 def evaluate_multitimeframe_setup(*, symbol: str, m30: dict, m15: dict, m5: dict,
                                   config: Optional[PrecisionConfig] = None):
@@ -48,20 +72,20 @@ def evaluate_multitimeframe_setup(*, symbol: str, m30: dict, m15: dict, m5: dict
     cfg = config or PrecisionConfig()
     required = ("ema20", "ema50", "adx", "rsi", "macd_hist", "close",
                 "atr", "candle_age_seconds", "timeframe_seconds")
-    if not symbol or not all(_valid_frame(f, required) for f in (m30, m15, m5)):
+    optional = ("previous_high", "previous_low", "swing_low", "swing_high")
+    normalized = [
+        _normalize_frame(frame, required, optional)
+        for frame in (m30, m15, m5)
+    ]
+    if not symbol or any(frame is None for frame in normalized):
         return {"signal": "ESPERAR", "quality": "INSUFICIENTE",
-                "reason": "Faltan datos completos de M30, M15 o M5."}
+                "reason": "Faltan datos completos o numéricamente válidos de M30, M15 o M5."}
+    m30, m15, m5 = normalized
 
     for label, frame in (("M30", m30), ("M15", m15), ("M5", m5)):
-        numeric = required
-        try:
-            if any(not isinstance(frame[k], (int, float)) for k in numeric):
-                raise ValueError()
-            if frame["atr"] <= 0 or frame["timeframe_seconds"] <= 0:
-                raise ValueError()
-            if frame["candle_age_seconds"] < 0:
-                raise ValueError()
-        except (TypeError, ValueError):
+        if (frame["atr"] <= 0 or frame["timeframe_seconds"] <= 0
+                or frame["candle_age_seconds"] < 0
+                or frame["adx"] < 0 or not 0 <= frame["rsi"] <= 100):
             return {"signal": "ESPERAR", "quality": "INSUFICIENTE",
                     "reason": f"Datos inválidos en {label}."}
         if frame["candle_age_seconds"] > frame["timeframe_seconds"] * cfg.max_candle_age_fraction:
@@ -140,21 +164,17 @@ def evaluate_m15_m5_setup(*, symbol: str, m15: dict, m5: dict,
     cfg = config or PrecisionConfig()
     required = ("ema20", "ema50", "adx", "rsi", "macd_hist", "close",
                 "atr", "candle_age_seconds", "timeframe_seconds")
-    frames = (("M15", m15, cfg.min_m15_adx), ("M5", m5, cfg.min_m5_adx))
-    if not symbol or any(not _valid_frame(frame, required) for _, frame, _ in frames):
+    optional = ("previous_high", "previous_low", "swing_low", "swing_high")
+    m15 = _normalize_frame(m15, required, optional)
+    m5 = _normalize_frame(m5, required, optional)
+    if not symbol or m15 is None or m5 is None:
         return {"signal": "ESPERAR", "quality": "INSUFICIENTE",
-                "reason": "Faltan datos completos de M15 o M5."}
+                "reason": "Faltan datos completos o numéricamente válidos de M15 o M5."}
 
-    for label, frame, _ in frames:
-        try:
-            values = [float(frame[key]) for key in required]
-            if not all(__import__("math").isfinite(value) for value in values):
-                raise ValueError()
-            if frame["atr"] <= 0 or frame["timeframe_seconds"] <= 0:
-                raise ValueError()
-            if frame["candle_age_seconds"] < 0:
-                raise ValueError()
-        except (TypeError, ValueError, OverflowError):
+    for label, frame in (("M15", m15), ("M5", m5)):
+        if (frame["atr"] <= 0 or frame["timeframe_seconds"] <= 0
+                or frame["candle_age_seconds"] < 0
+                or frame["adx"] < 0 or not 0 <= frame["rsi"] <= 100):
             return {"signal": "ESPERAR", "quality": "INSUFICIENTE",
                     "reason": f"Datos inválidos en {label}."}
         if frame["candle_age_seconds"] > frame["timeframe_seconds"] * cfg.max_candle_age_fraction:
@@ -205,7 +225,8 @@ def evaluate_m15_m5_setup(*, symbol: str, m15: dict, m5: dict,
         return {"signal": "ESPERAR", "quality": "BAJA",
                 "reason": "Stop demasiado amplio o inválido respecto al ATR de M5."}
 
-    m30_context = _direction(m30) if _valid_frame(m30, ("ema20", "ema50")) else None
+    m30_frame = _normalize_frame(m30, ("ema20", "ema50")) if m30 is not None else None
+    m30_context = _direction(m30_frame) if m30_frame is not None else None
     context_note = ("M30 acompaña." if m30_context == bias else
                     "M30 está en contra; revisar contexto manual." if m30_context else
                     "M30 no se exige para esta señal.")

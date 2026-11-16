@@ -1,6 +1,6 @@
 import unittest
 from datetime import datetime, timezone
-from biquote_stream import _extract_tick, publish_tick, snapshot
+from biquote_stream import SYMBOLS, SYMBOL_MAP, _extract_tick, publish_tick, snapshot
 
 class BiQuoteStreamTests(unittest.TestCase):
     def test_normalizes_tick(self):
@@ -13,11 +13,13 @@ class BiQuoteStreamTests(unittest.TestCase):
         self.assertIsNone(_extract_tick({"symbol":"UNKNOWN","bid":1,"ask":2}))
     def test_rejects_invalid_spread(self):
         self.assertIsNone(_extract_tick({"symbol":"EURUSD","bid":2,"ask":1,"timestamp":datetime.now(timezone.utc).isoformat()}))
-    def test_rejects_stale_tick(self):
-        self.assertIsNone(_extract_tick({"symbol":"BTCUSD","bid":1,"ask":2,"timestamp":"2020-01-01T00:00:00+00:00"}))
+    def test_btc_is_not_an_authorized_stream_symbol(self):
+        self.assertNotIn("BTCUSD", SYMBOL_MAP)
+        self.assertNotIn("BTCUSD", SYMBOLS)
+        self.assertIsNone(_extract_tick({"symbol":"BTCUSD","bid":1,"ask":2,"timestamp":datetime.now(timezone.utc).isoformat()}))
     def test_publish_updates_snapshot(self):
         now=datetime.now(timezone.utc).isoformat()
-        self.assertTrue(publish_tick({"symbol":"BTCUSD","bid":100000,"ask":100001,"timestamp":now}))
-        self.assertIn("BTC/USD",snapshot()["ticks"])
+        self.assertTrue(publish_tick({"symbol":"EURUSD","bid":1.05,"ask":1.0501,"timestamp":now}))
+        self.assertIn("EUR/USD",snapshot()["ticks"])
 
 if __name__=="__main__": unittest.main()

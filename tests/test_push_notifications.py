@@ -1,4 +1,5 @@
 import unittest
+from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 
 import app as scanner
@@ -167,6 +168,45 @@ class PushDeliveryOutboxTests(unittest.TestCase):
         send.assert_not_called()
 
 
+
+class M15ConfirmationFreshnessTests(unittest.TestCase):
+    def setUp(self):
+        self.now = datetime(2026, 11, 16, 12, 20, tzinfo=timezone.utc)
+
+    def confirmation(self, signal_at="2026-11-16T12:10:00Z", candle_time="2026-11-16T12:00:00Z"):
+        return {
+            "direction": "COMPRA",
+            "signal_at": signal_at,
+            "candle_time": candle_time,
+        }
+
+    def test_accepts_recent_m15_confirmation_aligned_with_m5_candle(self):
+        self.assertTrue(scanner.m15_confirmation_is_fresh(
+            self.confirmation(), "2026-11-16T12:10:00Z", now=self.now
+        ))
+
+    def test_rejects_old_database_signal_even_if_direction_matches(self):
+        self.assertFalse(scanner.m15_confirmation_is_fresh(
+            self.confirmation(signal_at="2026-11-16T11:30:00Z"),
+            "2026-11-16T12:10:00Z", now=self.now
+        ))
+
+    def test_rejects_old_m15_candle_relative_to_m5(self):
+        self.assertFalse(scanner.m15_confirmation_is_fresh(
+            self.confirmation(candle_time="2026-11-16T11:45:00Z"),
+            "2026-11-16T12:10:00Z", now=self.now
+        ))
+
+    def test_rejects_malformed_or_missing_timestamps(self):
+        self.assertFalse(scanner.m15_confirmation_is_fresh(
+            {"direction": "COMPRA", "signal_at": "bad", "candle_time": "bad"},
+            "2026-11-16T12:10:00Z", now=self.now
+        ))
+        self.assertFalse(scanner.m15_confirmation_is_fresh(
+            self.confirmation(), None, now=self.now
+        ))
+
+
 class PushScanDeliveryIntegrationTests(unittest.TestCase):
     class FakeAnalysisResponse:
         status_code = 200
@@ -176,6 +216,9 @@ class PushScanDeliveryIntegrationTests(unittest.TestCase):
             return {
                 "signal": "COMPRA",
                 "pre_signal": False,
+                "entry_readiness": {"ready": True, "status": "READY"},
+                "live_quote_validation": {"valid": True, "status": "VALIDATED_EXTERNAL_FEED"},
+                "live_quote": {"bid": 1.0849, "ask": 1.0850, "timestamp": "2026-11-16T12:00:00Z"},
                 "candle_time": "2026-11-16T12:00:00Z",
                 "entry": 1.085,
                 "stop_loss": 1.082,

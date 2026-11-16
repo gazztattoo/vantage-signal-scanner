@@ -54,6 +54,16 @@ class BiQuoteStreamTests(unittest.TestCase):
         self.assertIsNone(_extract_tick(self.make_tick(timestamp="2026-11-16T12:00:00")))
 
 
+
+    def test_publish_rejects_stale_and_out_of_order_ticks(self):
+        fresh = self.make_tick()
+        self.assertTrue(publish_tick(fresh))
+        old_time = (datetime.now(timezone.utc) - timedelta(seconds=30)).isoformat()
+        self.assertFalse(publish_tick(self.make_tick(timestamp=old_time, bid=1.09, ask=1.0901)))
+        self.assertFalse(publish_tick(self.make_tick(stale=True, bid=1.08, ask=1.0801)))
+        latest = snapshot()["ticks"]["EUR/USD"]
+        self.assertEqual(latest["bid"], 1.1)
+
     def test_seed_history_and_tick_builder_close_bars_without_future_candle(self):
         now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
         base = now - timedelta(minutes=60)

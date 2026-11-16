@@ -1,0 +1,32 @@
+name: Live BiQuote engine isolated tests
+
+on:
+  push:
+    branches: [fix/biquote-live-entry-mainline]
+    paths:
+      - "app.py"
+      - "biquote_stream.py"
+      - "panel_escaner_vantage.html"
+      - "tests/**"
+      - ".github/workflows/live-biquote-engine-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      ACCESS_TOKEN_SECRET: live-engine-ci-only-secret
+      PANEL_ACCESS_CODE: live-engine-ci-only-code
+      BIQUOTE_STREAM_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: pip install -r requirements.txt
+      - name: Run complete isolated test suite
+        run: python -m unittest discover -s tests -v

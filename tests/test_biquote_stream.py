@@ -1,7 +1,11 @@
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from biquote_stream import SYMBOLS, SYMBOL_MAP, _extract_tick, publish_tick, snapshot
+import biquote_stream
+from biquote_stream import (
+    SYMBOLS, SYMBOL_MAP, _extract_tick, publish_tick, snapshot,
+    seed_history, closed_candles, _update_local_candles,
+)
 
 
 class BiQuoteStreamTests(unittest.TestCase):
@@ -9,6 +13,8 @@ class BiQuoteStreamTests(unittest.TestCase):
         import biquote_stream
         with biquote_stream._lock:
             biquote_stream._latest.clear()
+            biquote_stream._CLOSED_CANDLES.clear()
+            biquote_stream._FORMING_CANDLES.clear()
             biquote_stream._state["last_tick_at"] = None
 
     def make_tick(self, **overrides):
@@ -46,6 +52,39 @@ class BiQuoteStreamTests(unittest.TestCase):
         old = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
         self.assertIsNone(_extract_tick(self.make_tick(timestamp=old)))
         self.assertIsNone(_extract_tick(self.make_tick(timestamp="2026-11-16T12:00:00")))
+
+
+    def test_seed_history_and_tick_builder_close_bars_without_future_candle(self):
+        now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+        base = now - timedelta(minutes=60)
+        historical = []
+        for index in range(12):
+            stamp = base + timedelta(minutes=5 * index)
+            price = 1.10 + index * 0.0001
+            historical.append({
+                "time": stamp.isoformat(), "open": price, "high": price + 0.0002,
+                "low": price - 0.0002, "close": price + 0.0001,
+            })
+        self.assertEqual(seed_history("EUR/USD", "5min", historical), 12)
+        self.assertEqual(len(closed_candles("EUR/USD", "5min")), 12)
+
+        first = now - timedelta(minutes=10)
+        first = first.replace(minute=(first.minute // 5) * 5)
+        second = first + timedelta(minutes=5)
+        _update_local_candles({"symbol": "EUR/USD", "mid": 1.101, "timestamp": first.isoformat()})
+        _update_local_candles({"symbol": "EUR/USD", "mid": 1.102, "timestamp": (first + timedelta(minutes=2)).isoformat()})
+        _update_local_candles({"symbol": "EUR/USD", "mid": 1.103, "timestamp": second.isoformat()})
+        bars = closed_candles("EUR/USD", "5min")
+        closed = [bar for bar in bars if bar.get("source") == "biquote_live_ticks"]
+        self.assertTrue(closed)
+        self.assertEqual(closed[-1]["open"], 1.101)
+        self.assertEqual(closed[-1]["high"], 1.102)
+        self.assertEqual(closed[-1]["close"], 1.102)
+        self.assertNotIn(second.isoformat(), [bar["time"] for bar in closed])
+
+    def test_seed_rejects_unknown_interval_and_symbol(self):
+        self.assertEqual(seed_history("BTC/USD", "5min", []), 0)
+        self.assertEqual(seed_history("EUR/USD", "1min", []), 0)
 
     def test_publish_updates_snapshot(self):
         self.assertTrue(publish_tick(self.make_tick()))

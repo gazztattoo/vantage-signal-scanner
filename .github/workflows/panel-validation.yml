@@ -1,0 +1,28 @@
+name: Production panel validation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "panel_escaner_vantage.html"
+      - "service-worker.js"
+      - "manifest.webmanifest"
+      - "tests/test_panel_script.py"
+      - ".github/workflows/panel-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  panel:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate panel JavaScript and market scope
+        run: python -m unittest discover -s tests -p "test_panel_script.py" -v

@@ -35,6 +35,23 @@ class PanelJavaScriptSyntaxTests(unittest.TestCase):
                 result = subprocess.run(["node", "--check", handle.name], capture_output=True, text=True, check=False)
             self.assertEqual(result.returncode, 0, f"Error de sintaxis en el script inline {index}:\n{result.stderr}")
 
+    def test_production_panel_has_no_test_push_control(self):
+        html = pathlib.Path("panel_escaner_vantage.html").read_text(encoding="utf-8")
+        self.assertNotIn('id="pushTest"', html)
+        self.assertNotIn('PUSH_API+"/test"', html)
+        self.assertIn('id="pushToggle"', html)
+
+    def test_pwa_cache_and_entry_url_are_bumped(self):
+        worker = pathlib.Path("service-worker.js").read_text(encoding="utf-8")
+        index = pathlib.Path("index.html").read_text(encoding="utf-8")
+        self.assertIn('global-signal-scanner-shell-v8', worker)
+        self.assertIn('panel_escaner_vantage.html?v=20261116-1', index)
+        with tempfile.NamedTemporaryFile("w", suffix=".js", encoding="utf-8") as handle:
+            handle.write(worker)
+            handle.flush()
+            result = subprocess.run(["node", "--check", handle.name], capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 0, f"Error de sintaxis en service-worker.js:\\n{result.stderr}")
+
 
 if __name__ == "__main__":
     unittest.main()

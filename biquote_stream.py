@@ -127,10 +127,19 @@ async def _run_client() -> None:
         if not publish_tick(message):
             LOGGER.debug("biquote_stream ignored invalid tick")
 
+    async def on_subscription_state(message: Any) -> None:
+        # BiQuote emits this hub event after Subscribe. Register it explicitly
+        # so SignalR does not report an unhandled client method. Keep the raw
+        # payload bounded and diagnostic-only; it never validates a trade.
+        state_text = str(message)[:240]
+        _set_state(subscription_state=state_text)
+        LOGGER.info("biquote_stream subscription_state=%s", state_text)
+
     client.on_open(on_open)
     client.on_close(on_close)
     client.on_error(on_error)
     client.on("ReceiveTick", on_tick)
+    client.on("ReceiveSubscriptionState", on_subscription_state)
     await client.run()
 
 

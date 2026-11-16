@@ -1,13 +1,16 @@
-name: Production panel validation
+name: Production panel and feed validation
 
 on:
   push:
     branches: [main]
     paths:
+      - "app.py"
+      - "biquote_stream.py"
       - "panel_escaner_vantage.html"
       - "service-worker.js"
       - "manifest.webmanifest"
       - "tests/test_panel_script.py"
+      - "tests/test_biquote_stream.py"
       - ".github/workflows/panel-validation.yml"
   workflow_dispatch:
 
@@ -25,4 +28,4 @@ jobs:
         with:
           python-version: "3.12"
       - name: Validate panel JavaScript and market scope
-        run: python -m unittest discover -s tests -p "test_panel_script.py" -v
+        run: python -m unittest discover -s tests -v

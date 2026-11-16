@@ -273,6 +273,12 @@ class PushScanDeliveryIntegrationTests(unittest.TestCase):
         self.assertEqual(check["queue_errors"], 0)
         self.assertEqual(response.get_json()["alerts_sent"], 2)
         self.assertEqual(sender.call_count, 2)
+        for call in sender.call_args_list:
+            payload = call.args[1]
+            self.assertIn("https://vantage-signal-scanner.onrender.com/panel_escaner_vantage.html", payload["url"])
+            self.assertIn("symbol=EUR%2FUSD", payload["url"])
+            self.assertNotIn("push-test-panel", payload["url"])
+            self.assertEqual(payload["data"]["stage"], "validated_entry")
         delete.assert_not_called()
 
     def test_partial_outbox_failure_resets_transition_for_retry(self):

@@ -14,7 +14,11 @@ import logging
 import threading
 
 from biquote_quota import BiquoteQuotaError, reserve_biquote_request, get_biquote_usage
-from biquote_stream import SYMBOLS as BIQUOTE_STREAM_SYMBOLS, start_stream, snapshot as biquote_stream_snapshot
+from biquote_stream import (
+    SYMBOLS as BIQUOTE_STREAM_SYMBOLS, start_stream,
+    snapshot as biquote_stream_snapshot, seed_history as seed_biquote_history,
+    closed_candles as biquote_closed_candles,
+)
 
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
@@ -503,10 +507,23 @@ def twelve_data_get(endpoint, params=None, timeout=20):
 
 
 def fetch_candles(symbol, interval):
-    """Obtiene velas OHLC desde biquote; nunca usa velas Twelve Data como fallback."""
+    """Usa velas locales formadas por ticks; OHLC BiQuote solo para bootstrap/recuperación."""
     provider_symbol = {"EUR/USD": "EURUSD", "XAU/USD": "XAUUSD"}[symbol]
     provider_interval = {"5min": "5m", "15min": "15m", "30min": "30m"}[interval]
-    # Count every outbound attempt globally; cached analysis never reaches here.
+    now = datetime.now(timezone.utc)
+    interval_seconds = INTERVAL_MINUTES[interval] * 60
+
+    # Una vez sembrado el histórico OHLC, las velas cerradas se actualizan
+    # localmente desde el stream. No se consulta REST en cada nuevo análisis.
+    local_candles = biquote_closed_candles(symbol, interval)
+    if len(local_candles) >= 55:
+        local_time = parse_candle_time(local_candles[-1]["time"])
+        local_age = max((now - local_time.astimezone(timezone.utc)).total_seconds(), 0)
+        if local_age <= interval_seconds * 2 + 90:
+            return local_candles, local_time.astimezone(CANARY_TZ).isoformat(), round(local_age / 60, 2)
+
+    # Sin histórico local suficiente o si quedó desactualizado, recuperar
+    # una sola base OHLC bajo el control global de cuota.
     reserve_biquote_request()
     response = requests.get(
         f"https://biquote.io/api/{provider_symbol}/ohlc",
@@ -550,6 +567,9 @@ def fetch_candles(symbol, interval):
     max_age_seconds = interval_seconds * 2 + 90
     if age_seconds > max_age_seconds:
         raise RuntimeError(f"Velas biquote desactualizadas ({int(age_seconds // 60)} min). No se genera señal.")
+    # Sembrar el agregador local con las velas cerradas verificadas. Los ticks
+    # posteriores completan M5/M15/M30 y sustituyen este histórico por orden temporal.
+    seed_biquote_history(symbol, interval, candles)
     return candles, latest_time.astimezone(CANARY_TZ).isoformat(), round(age_seconds / 60, 2)
 
 

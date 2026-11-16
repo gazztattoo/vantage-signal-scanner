@@ -97,6 +97,9 @@ class BiQuoteStreamTests(unittest.TestCase):
         base = datetime.now(timezone.utc).replace(second=0, microsecond=0)
         for interval, minutes in (("15min", 15), ("30min", 30)):
             with self.subTest(interval=interval):
+                with biquote_stream._lock:
+                    biquote_stream._CLOSED_CANDLES.clear()
+                    biquote_stream._FORMING_CANDLES.clear()
                 start = base.replace(minute=(base.minute // minutes) * minutes)
                 first = start + timedelta(seconds=5)
                 next_bucket = start + timedelta(minutes=minutes)

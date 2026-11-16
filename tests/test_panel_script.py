@@ -57,6 +57,15 @@ class PanelJavaScriptSyntaxTests(unittest.TestCase):
         self.assertLess(app.index('for symbol, interval in ('), app.index('if interval == "5min" and direction in ("COMPRA", "VENTA")'))
         self.assertIn('"timeframe": "eq.15min"', app)
 
+    def test_scheduled_runner_orders_m15_before_m5(self):
+        runner = pathlib.Path("scripts/run_signal_scan.py").read_text(encoding="utf-8")
+        self.assertLess(runner.index('due_scans.append(("XAU/USD", "15min"))'),
+                        runner.index('due_scans.append(("XAU/USD", "5min"))'))
+        self.assertLess(runner.index('due_scans.append(("EUR/USD", "15min"))'),
+                        runner.index('due_scans.append(("EUR/USD", "5min"))'))
+        self.assertLess(runner.index('if enabled not in {"1", "true", "yes", "on"}'),
+                        runner.index('session = requests.Session()'))
+
     def test_production_scan_workflow_remains_paused(self):
         workflow = pathlib.Path(".github/workflows/vantage-signal-scanner-cron.yml").read_text(encoding="utf-8")
         self.assertIn("workflow_dispatch:", workflow)

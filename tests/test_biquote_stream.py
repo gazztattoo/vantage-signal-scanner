@@ -48,6 +48,16 @@ class BiQuoteStreamTests(unittest.TestCase):
         self.assertIsNone(_extract_tick(self.make_tick(bid=0)))
         self.assertIsNone(_extract_tick(self.make_tick(bid=2, ask=1)))
 
+    def test_accepts_biquote_documented_time_field(self):
+        stamp = datetime.now(timezone.utc).isoformat()
+        tick = self.make_tick()
+        tick.pop("timestamp")
+        tick["time"] = stamp
+        parsed = _extract_tick(tick)
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed["timestamp"], datetime.fromisoformat(stamp).isoformat())
+        self.assertEqual(parsed["symbol"], "EUR/USD")
+
     def test_rejects_stale_timezone_naive_and_undated_ticks(self):
         old = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
         self.assertIsNone(_extract_tick(self.make_tick(timestamp=old)))

@@ -66,6 +66,24 @@ class PanelJavaScriptSyntaxTests(unittest.TestCase):
         self.assertLess(runner.index('if enabled not in {"1", "true", "yes", "on"}'),
                         runner.index('session = requests.Session()'))
 
+    def test_push_payload_targets_production_card_and_worker_opens_same_origin(self):
+        app = pathlib.Path("app.py").read_text(encoding="utf-8")
+        worker = pathlib.Path("service-worker.js").read_text(encoding="utf-8")
+        panel = pathlib.Path("panel_escaner_vantage.html").read_text(encoding="utf-8")
+        self.assertIn('https://vantage-signal-scanner.onrender.com/panel_escaner_vantage.html?view=scanner&symbol=', app)
+        self.assertIn('&timeframe=', app)
+        self.assertIn('new URL(event.notification.data?.url', worker)
+        self.assertIn('if (targetOrigin !== self.location.origin) return;', worker)
+        self.assertIn('notificationParams.get("symbol")', panel)
+        self.assertIn('scrollIntoView({behavior:"smooth",block:"center"})', panel)
+
+    def test_push_subscription_endpoints_require_panel_authentication(self):
+        app = pathlib.Path("app.py").read_text(encoding="utf-8")
+        self.assertIn('"/api/push/subscribe"', app)
+        self.assertIn('"/api/push/unsubscribe"', app)
+        self.assertIn('"/api/push/test"', app)
+        self.assertIn('authorization.startswith("Bearer ")', app)
+
     def test_production_scan_workflow_remains_paused(self):
         workflow = pathlib.Path(".github/workflows/vantage-signal-scanner-cron.yml").read_text(encoding="utf-8")
         self.assertIn("workflow_dispatch:", workflow)

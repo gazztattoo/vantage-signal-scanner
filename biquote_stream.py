@@ -26,6 +26,10 @@ SYMBOLS = tuple(dict.fromkeys(item for item in _requested_symbols if item in SYM
 
 _lock = threading.RLock()
 _latest: dict[str, dict[str, Any]] = {}
+_CANDLE_SECONDS = {"5min": 300, "15min": 900, "30min": 1800}
+_CLOSED_CANDLES: dict[tuple[str, str], list[dict[str, Any]]] = {}
+_FORMING_CANDLES: dict[tuple[str, str], dict[str, Any]] = {}
+_MAX_CANDLES = 240
 _state: dict[str, Any] = {
     "enabled": False, "status": "stopped", "connected": False,
     "started_at": None, "last_tick_at": None, "last_error": None,
@@ -75,6 +79,86 @@ def _extract_tick(message: Any) -> dict[str, Any] | None:
     }
 
 
+def _parse_candle_stamp(value: Any) -> datetime | None:
+    try:
+        stamp = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if stamp.tzinfo is None:
+            return None
+        return stamp.astimezone(timezone.utc)
+    except (TypeError, ValueError):
+        return None
+
+
+def seed_history(symbol: str, interval: str, candles: list[dict[str, Any]]) -> int:
+    """Seed the local builder with provider-closed OHLC bars; no network calls."""
+    if symbol not in ("EUR/USD", "XAU/USD") or interval not in _CANDLE_SECONDS:
+        return 0
+    seconds = _CANDLE_SECONDS[interval]
+    seeded = []
+    for item in candles:
+        stamp = _parse_candle_stamp(item.get("time"))
+        if stamp is None:
+            continue
+        try:
+            values = {key: float(item[key]) for key in ("open", "high", "low", "close")}
+        except (KeyError, TypeError, ValueError):
+            continue
+        if min(values.values()) <= 0 or values["high"] < max(values["open"], values["close"], values["low"]) or values["low"] > min(values["open"], values["close"], values["high"]):
+            continue
+        bucket = int(stamp.timestamp()) // seconds * seconds
+        seeded.append({
+            "time": datetime.fromtimestamp(bucket, timezone.utc).isoformat(),
+            **values,
+            "source": "biquote_ohlc_seed",
+        })
+    seeded.sort(key=lambda item: item["time"])
+    deduped = {item["time"]: item for item in seeded}
+    with _lock:
+        key = (symbol, interval)
+        existing = {item["time"]: item for item in _CLOSED_CANDLES.get(key, [])}
+        existing.update(deduped)
+        _CLOSED_CANDLES[key] = [existing[k] for k in sorted(existing)][-_MAX_CANDLES:]
+    return len(seeded)
+
+
+def _update_local_candles(tick: dict[str, Any]) -> None:
+    stamp = _parse_candle_stamp(tick.get("timestamp"))
+    if stamp is None:
+        return
+    price = float(tick["mid"])
+    with _lock:
+        for interval, seconds in _CANDLE_SECONDS.items():
+            key = (tick["symbol"], interval)
+            bucket = int(stamp.timestamp()) // seconds * seconds
+            bucket_time = datetime.fromtimestamp(bucket, timezone.utc).isoformat()
+            forming = _FORMING_CANDLES.get(key)
+            if forming and forming["time"] == bucket_time:
+                forming["high"] = max(forming["high"], price)
+                forming["low"] = min(forming["low"], price)
+                forming["close"] = price
+                forming["tick_count"] += 1
+                forming["last_tick_at"] = tick["timestamp"]
+            elif not forming or bucket > int(datetime.fromisoformat(forming["time"]).timestamp() // seconds) * seconds:
+                if forming and bucket > int(datetime.fromisoformat(forming["time"]).timestamp()):
+                    closed = {k: v for k, v in forming.items() if k not in ("tick_count", "last_tick_at")}
+                    closed["source"] = "biquote_live_ticks"
+                    history = _CLOSED_CANDLES.setdefault(key, [])
+                    if not history or history[-1]["time"] < closed["time"]:
+                        history.append(closed)
+                        del history[:-_MAX_CANDLES]
+                if not forming or bucket > int(datetime.fromisoformat(forming["time"]).timestamp()):
+                    _FORMING_CANDLES[key] = {
+                        "time": bucket_time, "open": price, "high": price,
+                        "low": price, "close": price, "tick_count": 1,
+                        "last_tick_at": tick["timestamp"],
+                    }
+
+
+def closed_candles(symbol: str, interval: str) -> list[dict[str, Any]]:
+    with _lock:
+        return [dict(item) for item in _CLOSED_CANDLES.get((symbol, interval), [])]
+
+
 def publish_tick(message: Any) -> bool:
     tick = _extract_tick(message)
     if not tick:
@@ -82,6 +166,7 @@ def publish_tick(message: Any) -> bool:
     with _lock:
         _latest[tick["symbol"]] = tick
         _state["last_tick_at"] = tick["received_at"]
+    _update_local_candles(tick)
     return True
 
 

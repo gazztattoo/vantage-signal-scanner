@@ -176,6 +176,9 @@ class PushScanDeliveryIntegrationTests(unittest.TestCase):
             return {
                 "signal": "COMPRA",
                 "pre_signal": False,
+                "entry_readiness": {"ready": True, "status": "READY"},
+                "live_quote_validation": {"valid": True, "status": "VALIDATED_EXTERNAL_FEED"},
+                "live_quote": {"bid": 1.0849, "ask": 1.0850, "timestamp": "2026-11-16T12:00:00Z"},
                 "candle_time": "2026-11-16T12:00:00Z",
                 "entry": 1.085,
                 "stop_loss": 1.082,

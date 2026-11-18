@@ -614,6 +614,29 @@ def credits_status():
     })
 
 
+@app.route("/api/stream/health", methods=["GET"])
+def biquote_stream_health():
+    # Diagnóstico público limitado: no expone credenciales ni datos privados.
+    # Permite verificar estado del worker sin activar el escáner ni consumir REST.
+    data = biquote_stream_snapshot()
+    stream = data.get("stream", {})
+    return jsonify({
+        "provider": "biquote",
+        "enabled_by_config": os.environ.get("BIQUOTE_STREAM_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on"),
+        "status": stream.get("status"),
+        "connected": bool(stream.get("connected")),
+        "subscription_state": stream.get("subscription_state"),
+        "last_tick_at": stream.get("last_tick_at"),
+        "last_error": stream.get("last_error"),
+        "retry_attempt": stream.get("retry_attempt"),
+        "retry_in_seconds": stream.get("retry_in_seconds"),
+        "fresh_symbols": stream.get("fresh_symbols", []),
+        "quote_health": stream.get("quote_health"),
+        "expected_symbols": [{"EURUSD": "EUR/USD", "XAUUSD": "XAU/USD"}[s] for s in BIQUOTE_STREAM_SYMBOLS],
+        "is_vantage_quote": False,
+    })
+
+
 @app.route("/api/stream/ticks")
 def biquote_stream_ticks():
     # Streaming is opt-in at the production service level. No scanner or push

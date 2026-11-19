@@ -54,7 +54,7 @@ class PrecisionEngineV2Tests(unittest.TestCase):
         m5 = frame(300, ema20=99, ema50=100, rsi=40, macd=-0.2,
                    close=97, previous_low=98, swing_high=97.2, adx=18)
         result = evaluate_multitimeframe_setup(
-            symbol="EUR/USD", m30=m30, m15=m15, m5=m5)
+            symbol="XAU/USD", m30=m30, m15=m15, m5=m5)
         self.assertEqual(result["signal"], "SELL")
         self.assertGreaterEqual(result["risk_reward"], 2)
 
@@ -77,13 +77,13 @@ class M15M5PrecisionGateTests(unittest.TestCase):
     def test_missing_m5_breakout_level_waits(self):
         from precision_engine_v2 import evaluate_m15_m5_setup
         m5 = {k: v for k, v in self.m5.items() if k != "previous_high"}
-        result = evaluate_m15_m5_setup(symbol="EUR/USD", m15=self.m15, m5=m5)
+        result = evaluate_m15_m5_setup(symbol="XAU/USD", m15=self.m15, m5=m5)
         self.assertEqual(result["signal"], "ESPERAR")
 
     def test_stale_m15_blocks_candidate(self):
         from precision_engine_v2 import evaluate_m15_m5_setup
         m15 = {**self.m15, "candle_age_seconds": 1200}
-        result = evaluate_m15_m5_setup(symbol="BTC/USD", m15=m15, m5=self.m5)
+        result = evaluate_m15_m5_setup(symbol="XAU/USD", m15=m15, m5=self.m5)
         self.assertEqual(result["signal"], "ESPERAR")
         self.assertIn("antigua", result["reason"])
 
@@ -91,7 +91,7 @@ class M15M5PrecisionGateTests(unittest.TestCase):
         from precision_engine_v2 import evaluate_m15_m5_setup
         m30_against = frame(1800, ema20=98, ema50=99)
         result = evaluate_m15_m5_setup(
-            symbol="EUR/USD", m15=self.m15, m5=self.m5, m30=m30_against)
+            symbol="XAU/USD", m15=self.m15, m5=self.m5, m30=m30_against)
         self.assertEqual(result["signal"], "BUY")
         self.assertEqual(result["m30_context"], "SELL")
         self.assertIn("M30 está en contra", result["reason"])
@@ -102,7 +102,7 @@ class M15M5PrecisionGateTests(unittest.TestCase):
                     rsi=40, macd=-0.3)
         m5 = frame(300, adx=18, close=97, ema20=98, ema50=99,
                    rsi=40, macd=-0.2, previous_low=97.5, swing_high=98)
-        result = evaluate_m15_m5_setup(symbol="EUR/USD", m15=m15, m5=m5)
+        result = evaluate_m15_m5_setup(symbol="XAU/USD", m15=m15, m5=m5)
         self.assertEqual(result["signal"], "SELL")
         self.assertGreaterEqual(result["risk_reward"], 2)
 

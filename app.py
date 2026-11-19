@@ -554,7 +554,8 @@ def cached_biquote_research_ohlc(symbol, interval):
     result.update({
         "research_only": True,
         "signals_activated": False,
-        "data_mode": DATA_MODE,
+        "data_mode": "provider_research",
+        "operational_data_mode": DATA_MODE,
         "cache": {"hit": False, "ttl_seconds": BIQUOTE_RESEARCH_CACHE_TTL[interval]},
     })
     BIQUOTE_RESEARCH_CACHE[key] = {"stored_at": now_mono, "payload": result}
@@ -601,7 +602,8 @@ def biquote_research_analysis():
             "research_only": True,
             "signals_activated": False,
             "execution_price": False,
-            "data_mode": DATA_MODE,
+            "data_mode": "provider_research",
+            "operational_data_mode": DATA_MODE,
             "provider": "biquote",
             "price_basis": "provider_feed_not_verified_as_VANTAGE",
             "signal_research": strategy.get("signal", "WAIT"),
@@ -673,7 +675,8 @@ def biquote_research_ohlc():
     result.update({
         "research_only": True,
         "signals_activated": False,
-        "data_mode": DATA_MODE,
+        "data_mode": "provider_research",
+        "operational_data_mode": DATA_MODE,
         "cache": {"hit": False, "ttl_seconds": BIQUOTE_RESEARCH_CACHE_TTL[interval]},
     })
     BIQUOTE_RESEARCH_CACHE[key] = {"stored_at": now_mono, "payload": result}

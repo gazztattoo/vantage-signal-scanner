@@ -123,7 +123,7 @@ def protect_signal_endpoints():
     return None
 TWELVE_DATA_URL = "https://api.twelvedata.com"
 
-ALLOWED_SYMBOLS = {"EUR/USD", "XAU/USD"}
+ALLOWED_SYMBOLS = {"XAU/USD"}
 ALLOWED_INTERVALS = {"5min", "15min", "30min"}
 
 CANARY_TZ = ZoneInfo("Atlantic/Canary")
@@ -149,7 +149,6 @@ def market_session(symbol, now=None):
 
     schedules = {
         # (hora de apertura, cierre lun-jue, cierre viernes), en minutos del servidor.
-        "EUR/USD": (1, 23 * 60 + 58, 23 * 60 + 57),
         "XAU/USD": (61, 23 * 60 + 58, 23 * 60 + 57),
     }
     if symbol not in schedules:
@@ -1716,7 +1715,7 @@ def push_scan():
     sent_total = 0
     token = access_serializer().dumps({"access": True})
     intervals = ["5min", "15min", "30min"]
-    symbols = ["EUR/USD", "XAU/USD"]
+    symbols = ["XAU/USD"]
 
     # El escáner programado procesa una combinación por petición para respetar
     # el límite HTTP de la plataforma. El runner solo invoca las combinaciones
@@ -1935,7 +1934,7 @@ def push_scan():
                             continue
 
                         # Solo se notifica una transición nueva a COMPRA o VENTA.
-                        price_digits = 5 if symbol == "EUR/USD" else 2
+                        price_digits = 2
 
                         def display_price(value):
                             return f"{float(value):,.{price_digits}f}" if value is not None else "—"

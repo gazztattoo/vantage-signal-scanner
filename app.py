@@ -906,6 +906,23 @@ def analysis():
             ),
             "data_mode": DATA_MODE,
             "warning": warning,
+            "indicator_diagnostics": {
+                "adx": {
+                    "value": round(float(strategy.get("adx14")), 2) if strategy.get("adx14") is not None else None,
+                    "required": "contexto >=18",
+                    "passed": strategy.get("adx14") is not None and float(strategy.get("adx14")) >= 18,
+                },
+                "macd": {
+                    "value": round(float(strategy.get("macd_histogram")), 6) if strategy.get("macd_histogram") is not None else None,
+                    "buy_passed": strategy.get("macd_histogram") is not None and float(strategy.get("macd_histogram")) > 0,
+                    "sell_passed": strategy.get("macd_histogram") is not None and float(strategy.get("macd_histogram")) < 0,
+                },
+                "rsi": {
+                    "value": round(float(strategy.get("rsi14")), 2) if strategy.get("rsi14") is not None else None,
+                    "buy_passed": strategy.get("rsi14") is not None and 50 <= float(strategy.get("rsi14")) <= 70,
+                    "sell_passed": strategy.get("rsi14") is not None and 30 <= float(strategy.get("rsi14")) <= 50,
+                },
+            },
         }
         # Shadow-only comparison: the original signal is never modified or activated.
         response_payload["experimental_shadow"] = evaluate_shadow_gate(

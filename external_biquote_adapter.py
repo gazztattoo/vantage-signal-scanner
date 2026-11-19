@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-SYMBOLS = {"XAU/USD": "XAUUSD", "EUR/USD": "EURUSD", "BTC/USD": "BTCUSD"}
+SYMBOLS = {"XAU/USD": "XAUUSD"}
 INTERVALS = {"5m", "15m", "30m"}
 
 

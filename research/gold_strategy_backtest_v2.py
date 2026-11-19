@@ -62,7 +62,10 @@ def backtest_v2(bars, timeframe, pivot_left=2, pivot_right=2, retest_bars=8,
     n = len(bars)
     if not n:
         return {"timeframe": f"M{timeframe}", **_metrics([]), "trade_records": [],
-                "gap_exits": 0, "invalidated_setups": 0}
+                "gap_exits": 0, "invalidated_setups": 0,
+                "slippage_per_side_price_units": slippage_per_side,
+                "commission_price_units_per_side": commission_price_units_per_side,
+                "commission_calibrated": commission_price_units_per_side > 0}
     closes = [b.c for b in bars]
     e50, e200, av = ema(closes, 50), ema(closes, 200), atr(bars, 14)
     piv_hi = piv_lo = None

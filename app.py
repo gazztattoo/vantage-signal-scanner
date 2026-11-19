@@ -217,7 +217,19 @@ def gold_session_clock(now=None):
                 transition = probe
             break
         previous = state
-    return {"market": "XAU/USD", "current": current,
+    sessions = []
+    for name, zone, opening, closing in (
+        ("Asia · Tokio", "Asia/Tokyo", 9, 18),
+        ("Europa · Londres", "Europe/London", 8, 17),
+        ("América · Nueva York", "America/New_York", 8, 17),
+    ):
+        local = now.astimezone(ZoneInfo(zone))
+        is_active = local.weekday() < 5 and opening <= local.hour < closing
+        sessions.append({"name": name, "timezone": zone, "active": is_active,
+                         "local_time": local.isoformat(),
+                         "activity_window": f"{opening:02d}:00–{closing:02d}:00",
+                         "type": "indicative_liquidity_window_not_exchange_hours"})
+    return {"market": "XAU/USD", "current": current, "liquidity_sessions": sessions,
             "next_transition": ({"at_utc": transition.isoformat(),
                                  "at_spain": transition.astimezone(ZoneInfo("Europe/Madrid")).isoformat(),
                                  "event": "OPEN" if not current["open"] else "CLOSE"} if transition else None),

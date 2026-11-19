@@ -51,21 +51,21 @@ body{
   border-radius:0;
   background:#080d0b
 }
-.status-row{
-  display:flex;
-  justify-content:flex-end;
-  margin:7px 2px 13px;
-}
 .status{
+  position:absolute;
+  top:12px;
+  right:12px;
+  z-index:2;
   display:inline-flex;
   align-items:center;
-  max-width:100%;
-  border:1px solid var(--line);
-  background:rgba(13,23,17,.72);
-  padding:6px 10px;
+  max-width:calc(100% - 24px);
+  border:1px solid rgba(143,166,154,.28);
+  background:rgba(13,23,17,.88);
+  padding:8px 12px;
   border-radius:99px;
-  font-size:11px;
-  color:var(--muted)
+  font-size:clamp(10px,2.8vw,13px);
+  color:var(--muted);
+  backdrop-filter:blur(8px)
 }
 .dot{display:inline-block;width:8px;height:8px;background:var(--amber);border-radius:50%;margin-right:7px}
 .intro{color:var(--muted);font-size:14px;line-height:1.5;margin:16px 0}
@@ -646,13 +646,11 @@ select,button{border-radius:9px}
     src="./global-signal-header.jpg"
     alt="GLOBAL SIGNAL SCANNER — Gold Trading Intelligence"
   >
-</header>
-<div class="status-row">
   <div class="status">
     <span class="dot" id="dot"></span>
     <span id="status">Esperando conexión</span>
   </div>
-</div>
+</header>
 
 
 <section class="live-feed" id="biquoteLiveFeed" aria-label="Cotizaciones BiQuote en tiempo real">

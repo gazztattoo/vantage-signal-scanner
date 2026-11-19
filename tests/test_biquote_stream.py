@@ -65,7 +65,7 @@ class BiQuoteStreamTests(unittest.TestCase):
         parsed = _extract_tick(tick)
         self.assertIsNotNone(parsed)
         self.assertEqual(parsed["timestamp"], datetime.fromisoformat(stamp).isoformat())
-        self.assertEqual(parsed["symbol"], "EUR/USD")
+        self.assertEqual(parsed["symbol"], "XAU/USD")
 
     def test_rejects_stale_timezone_naive_and_undated_ticks(self):
         old = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
@@ -82,7 +82,7 @@ class BiQuoteStreamTests(unittest.TestCase):
         old_time = (datetime.now(timezone.utc) - timedelta(seconds=30)).isoformat()
         self.assertFalse(publish_tick(self.make_tick(timestamp=old_time, bid=1.09, ask=1.0901)))
         self.assertFalse(publish_tick(self.make_tick(stale=True, bid=1.08, ask=1.0801)))
-        latest = snapshot()["ticks"]["EUR/USD"]
+        latest = snapshot()["ticks"]["XAU/USD"]
         self.assertEqual(latest["bid"], 1.1)
 
     def test_seed_history_and_tick_builder_close_bars_without_future_candle(self):
@@ -96,16 +96,16 @@ class BiQuoteStreamTests(unittest.TestCase):
                 "time": stamp.isoformat(), "open": price, "high": price + 0.0002,
                 "low": price - 0.0002, "close": price + 0.0001,
             })
-        self.assertEqual(seed_history("EUR/USD", "5min", historical), 10)
-        self.assertEqual(len(closed_candles("EUR/USD", "5min")), 10)
+        self.assertEqual(seed_history("XAU/USD", "5min", historical), 10)
+        self.assertEqual(len(closed_candles("XAU/USD", "5min")), 10)
 
         first = now - timedelta(minutes=10)
         first = first.replace(minute=(first.minute // 5) * 5)
         second = first + timedelta(minutes=5)
-        _update_local_candles({"symbol": "EUR/USD", "mid": 1.101, "timestamp": first.isoformat()})
-        _update_local_candles({"symbol": "EUR/USD", "mid": 1.102, "timestamp": (first + timedelta(minutes=2)).isoformat()})
-        _update_local_candles({"symbol": "EUR/USD", "mid": 1.103, "timestamp": second.isoformat()})
-        bars = closed_candles("EUR/USD", "5min")
+        _update_local_candles({"symbol": "XAU/USD", "mid": 1.101, "timestamp": first.isoformat()})
+        _update_local_candles({"symbol": "XAU/USD", "mid": 1.102, "timestamp": (first + timedelta(minutes=2)).isoformat()})
+        _update_local_candles({"symbol": "XAU/USD", "mid": 1.103, "timestamp": second.isoformat()})
+        bars = closed_candles("XAU/USD", "5min")
         closed = [bar for bar in bars if bar.get("source") == "biquote_live_ticks"]
         self.assertTrue(closed)
         self.assertEqual(closed[-1]["open"], 1.101)
@@ -137,23 +137,23 @@ class BiQuoteStreamTests(unittest.TestCase):
         start = now - timedelta(minutes=10)
         start = start.replace(minute=(start.minute // 5) * 5)
         next_bucket = start + timedelta(minutes=5)
-        _update_local_candles({"symbol": "EUR/USD", "mid": 1.1, "timestamp": start.isoformat()})
-        _update_local_candles({"symbol": "EUR/USD", "mid": 1.2, "timestamp": next_bucket.isoformat()})
-        before = closed_candles("EUR/USD", "5min")
-        _update_local_candles({"symbol": "EUR/USD", "mid": 9.9, "timestamp": (start + timedelta(minutes=1)).isoformat()})
-        after = closed_candles("EUR/USD", "5min")
+        _update_local_candles({"symbol": "XAU/USD", "mid": 1.1, "timestamp": start.isoformat()})
+        _update_local_candles({"symbol": "XAU/USD", "mid": 1.2, "timestamp": next_bucket.isoformat()})
+        before = closed_candles("XAU/USD", "5min")
+        _update_local_candles({"symbol": "XAU/USD", "mid": 9.9, "timestamp": (start + timedelta(minutes=1)).isoformat()})
+        after = closed_candles("XAU/USD", "5min")
         self.assertEqual(after, before)
         self.assertEqual(after[-1]["close"], 1.1)
 
     def test_seed_rejects_unknown_interval_and_symbol(self):
         self.assertEqual(seed_history("BTC/USD", "5min", []), 0)
-        self.assertEqual(seed_history("EUR/USD", "1min", []), 0)
+        self.assertEqual(seed_history("XAU/USD", "1min", []), 0)
 
     def test_snapshot_marks_old_cached_tick_as_not_fresh(self):
         old = (datetime.now(timezone.utc) - timedelta(seconds=150)).isoformat()
         self.assertTrue(publish_tick(self.make_tick(timestamp=old)))
         data = snapshot()
-        self.assertFalse(data["ticks"]["EUR/USD"]["fresh"])
+        self.assertFalse(data["ticks"]["XAU/USD"]["fresh"])
         self.assertEqual(data["stream"]["quote_health"], "no_fresh_quotes")
 
     def test_start_stream_does_not_overwrite_worker_startup_state(self):
@@ -186,11 +186,11 @@ class BiQuoteStreamTests(unittest.TestCase):
     def test_publish_updates_snapshot(self):
         self.assertTrue(publish_tick(self.make_tick()))
         data = snapshot()
-        self.assertIn("EUR/USD", data["ticks"])
+        self.assertIn("XAU/USD", data["ticks"])
         self.assertEqual(data["provider"], "biquote")
         self.assertFalse(data["is_vantage_quote"])
         self.assertIsNotNone(data["stream"]["last_tick_at"])
-        self.assertIn("EUR/USD|5min", data["candles"])
+        self.assertIn("XAU/USD|5min", data["candles"])
 
 
 if __name__ == "__main__":

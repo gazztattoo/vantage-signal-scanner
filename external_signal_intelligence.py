@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 
-SUPPORTED_SYMBOLS = {"XAU/USD", "EUR/USD", "BTC/USD"}
+SUPPORTED_SYMBOLS = {"XAU/USD"}
 SIDE_MAP = {
     "BUY": "BUY", "LONG": "BUY", "BULLISH": "BUY", "COMPRA": "BUY",
     "SELL": "SELL", "SHORT": "SELL", "BEARISH": "SELL", "VENTA": "SELL",

@@ -413,7 +413,6 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 
 <body class="trade-mode">
 
-<section class="access-gate" id="accessGate" aria-label="Acceso privado"><form class="access-box" id="accessForm"><h1>GLOBAL SIGNAL SCANNER</h1><p>Plataforma de acceso privado. Introduce el código que te compartió el administrador.</p><input id="accessCode" type="password" autocomplete="current-password" placeholder="Código de acceso" required><button id="accessSubmit" type="submit">ENTRAR AL SCANNER</button><p class="access-error" id="accessError" role="alert"></p></form></section>
 <main class="wrap">
 
 <header class="top">
@@ -576,45 +575,8 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 </main>
 
 <script>
-const API_BASE="https://vantage-signal-api-carlos.onrender.com";
-let accessToken=sessionStorage.getItem("gss_access_token")||"";
-const accessGate=document.getElementById("accessGate"), accessForm=document.getElementById("accessForm"), accessCodeInput=document.getElementById("accessCode"), accessError=document.getElementById("accessError"), accessSubmit=document.getElementById("accessSubmit");
-function showAccessGate(){accessGate.hidden=false;} function hideAccessGate(){accessGate.hidden=true;}
-async function requestAccess(code){
-  const response=await fetch(API_BASE+"/api/access",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code})});
-  const data=await response.json().catch(()=>({}));
-  if(!response.ok||!data.token)throw new Error(data.error||`No se pudo validar el código (HTTP ${response.status}).`);
-  accessToken=data.token;
-  sessionStorage.setItem("gss_access_token",accessToken);
-
-  // Confirmar con la misma API que acaba de emitir el token antes de cerrar la pantalla.
-  const check=await fetch(API_BASE+"/api/access/check",{method:"GET",headers:authHeaders(),cache:"no-store"});
-  const checkData=await check.json().catch(()=>({}));
-  if(!check.ok||checkData.valid!==true){
-    accessToken="";
-    sessionStorage.removeItem("gss_access_token");
-    throw new Error(checkData.error||`El servidor emitió el acceso, pero no validó la sesión (HTTP ${check.status}).`);
-  }
-}
-accessForm.addEventListener("submit",async event=>{
-  event.preventDefault();
-  accessSubmit.disabled=true;
-  accessError.textContent="Verificando código y sesión…";
-  try{
-    await requestAccess(accessCodeInput.value);
-    accessCodeInput.value="";
-    accessError.textContent="";
-    hideAccessGate();
-    document.dispatchEvent(new Event("gss-access-ready"));
-    statusEl.textContent="Sesión verificada · Cargando scanner…";
-    await update();
-  }catch(error){
-    showAccessGate();
-    accessError.textContent=error.message||"No se pudo completar el acceso.";
-  }finally{
-    accessSubmit.disabled=false;
-  }
-});
+const API_BASE="https://global-signal-push-test.onrender.com";
+const accessToken="";
 
 const markets=[
   {symbol:"XAU/USD",category:"ORO"}
@@ -913,7 +875,7 @@ async function load(m){
     interval:document.getElementById("interval").value
   });
 
-  const r=await fetch(`${API_BASE}/api/analysis?${p}`,{headers:{"Authorization":"Bearer "+accessToken}});
+  const r=await fetch(`${API_BASE}/api/analysis?${p}`,{});
 
   let d;
   try{
@@ -1067,27 +1029,6 @@ async function update(){
     }
   }
 
-  // HTTP status is more reliable than matching localized error text.
-  const authExpired=out.some(x=>x.status===401||(
-    x.err && (
-      x.err.includes("Sesión caducada") ||
-      x.err.includes("Acceso requerido") ||
-      x.err.includes("Introduce el código")
-    )
-  ));
-
-  if(authExpired){
-    const authFailure=out.find(x=>x.status===401);
-    accessToken="";
-    sessionStorage.removeItem("gss_access_token");
-    showAccessGate();
-    accessError.textContent=authFailure?.err||"La API rechazó la sesión. Vuelve a introducir el código.";
-    statusEl.textContent="Acceso requerido";
-    dot.style.background="var(--amber)";
-    button.disabled=false;
-    return;
-  }
-
   const fails=out.filter(x=>x.err).length;
   const closed=out.filter(x=>x.marketClosed).length;
   const active=out.length-fails-closed;
@@ -1137,9 +1078,9 @@ async function loadTechnicalAnalysis(){
   message.textContent="Consultando indicadores…";result.innerHTML="";
   try{
     const params=new URLSearchParams({symbol,interval});
-    const response=await fetch(API_BASE+"/api/analysis?"+params,{headers:authHeaders()});
+    const response=await fetch(API_BASE+"/api/analysis?"+params,{});
     const data=await response.json().catch(()=>({}));
-    if(response.status===401){message.textContent="Sesión caducada. Vuelve a entrar al panel.";showAccessGate();return;}
+    if(response.status===401){message.textContent="API TEST rechazó la solicitud (401).";return;}
     if(!response.ok||data.error)throw new Error(data.error||"No se pudo obtener el análisis.");
     const fields=[
       ["Señal",first(data,["signal","direction","recommendation"])||"—"],
@@ -1172,9 +1113,9 @@ async function loadLabStatus(){
   message.textContent="Consultando almacenamiento y configuración del motor…";
   stats.innerHTML="";details.innerHTML="";
   try{
-    const response=await fetch(API_BASE+"/api/lab-status",{headers:authHeaders()});
+    const response=await fetch(API_BASE+"/api/lab-status",{});
     const data=await response.json().catch(()=>({}));
-    if(response.status===401){message.textContent="Sesión caducada. Vuelve a entrar al panel.";showAccessGate();return;}
+    if(response.status===401){message.textContent="API TEST rechazó la solicitud (401).";return;}
     if(!response.ok)throw new Error(data.error||"No se pudo cargar el diagnóstico.");
     const records=data.records||{};
     const values=[
@@ -1193,7 +1134,7 @@ async function loadLabStatus(){
 }
 document.getElementById("labRefresh").addEventListener("click",loadLabStatus);
 
-function authHeaders(){return {"Authorization":"Bearer "+accessToken};}
+function authHeaders(){return {};}
 function statusClass(status){return status==="TP"?"tp":status==="SL"?"sl":"";}
 async function loadHistory(){
   const message=document.getElementById("historyMessage");
@@ -1212,9 +1153,9 @@ async function loadHistory(){
   const controller=new AbortController();
   const timeoutId=setTimeout(()=>controller.abort(),60000);
   try{
-    const response=await fetch(API_BASE+"/api/history?"+params,{headers:authHeaders(),signal:controller.signal});
+    const response=await fetch(API_BASE+"/api/history?"+params,{signal:controller.signal});
     const data=await response.json().catch(()=>({}));
-    if(response.status===401){message.textContent="Sesión caducada. Vuelve a entrar al panel.";showAccessGate();return;}
+    if(response.status===401){message.textContent="API TEST rechazó la solicitud (401).";return;}
     if(!response.ok)throw new Error(data.error||"No se pudo cargar el historial.");
     const rows=data.signals||[];
     message.textContent=deepLink.has("candle_time")?"Señal de la notificación · "+rows.length+" registro(s) exacto(s).":rows.length+" señal(es) encontrada(s).";
@@ -1239,9 +1180,9 @@ async function loadPerformance(){
   const breakdown=document.getElementById("performanceBreakdown");
   message.textContent="Calculando efectividad…";stats.innerHTML="";breakdown.innerHTML="";
   try{
-    const response=await fetch(API_BASE+"/api/performance",{headers:authHeaders()});
+    const response=await fetch(API_BASE+"/api/performance",{});
     const data=await response.json().catch(()=>({}));
-    if(response.status===401){message.textContent="Sesión caducada. Vuelve a entrar al panel.";showAccessGate();return;}
+    if(response.status===401){message.textContent="API TEST rechazó la solicitud (401).";return;}
     if(!response.ok)throw new Error(data.error||"No se pudieron cargar las estadísticas.");
     const values=[
       ["Señales registradas",data.total_signals??0],
@@ -1267,7 +1208,7 @@ document.getElementById("historyRefresh").addEventListener("click",loadHistory);
 
 button.addEventListener("click",update);
 document.getElementById("interval").addEventListener("change",update);
-if(accessToken){hideAccessGate();update();}else{showAccessGate();statusEl.textContent="Acceso requerido";}
+update();
 
 const pushStatus=document.getElementById("pushStatus");
 const pushToggleButton=document.getElementById("pushToggle");
@@ -1309,13 +1250,12 @@ function urlBase64ToUint8Array(value){
 pushToggleButton.addEventListener("click",async()=>{
   pushToggleButton.disabled=true;
   try{
-    if(!accessToken)throw new Error("Primero debes entrar al scanner.");
     if(!("serviceWorker" in navigator)||!("PushManager" in window)||!("Notification" in window))throw new Error("Este navegador no admite notificaciones push.");
     const registration=await navigator.serviceWorker.ready;
     let subscription=await registration.pushManager.getSubscription();
     if(subscription){
       pushStatus.textContent="Desactivando notificaciones…";
-      const response=await fetch(PUSH_API+"/unsubscribe",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+accessToken},body:JSON.stringify({endpoint:subscription.endpoint})});
+      const response=await fetch(PUSH_API+"/unsubscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({endpoint:subscription.endpoint})});
       const result=await response.json().catch(()=>({}));
       if(!response.ok)throw new Error(result.error||"No se pudo eliminar la suscripción del servidor.");
       await subscription.unsubscribe();
@@ -1328,7 +1268,7 @@ pushToggleButton.addEventListener("click",async()=>{
       const keyData=await keyResponse.json().catch(()=>({}));
       if(!keyResponse.ok||!keyData.public_key)throw new Error(keyData.error||"No se pudo obtener la clave pública.");
       subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(keyData.public_key)});
-      const response=await fetch(PUSH_API+"/subscribe",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+accessToken},body:JSON.stringify({subscription:subscription.toJSON()})});
+      const response=await fetch(PUSH_API+"/subscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({subscription:subscription.toJSON()})});
       const result=await response.json().catch(()=>({}));
       if(!response.ok)throw new Error(result.error||"No se pudo guardar la suscripción.");
       pushStatus.textContent="Notificaciones activadas en este dispositivo";
@@ -1402,10 +1342,10 @@ if ("serviceWorker" in navigator) {
   const setStatus=(message,state="")=>{status.textContent=message;dot.className="live-feed-dot"+(state?" "+state:"");};
   const fmt=(v,d)=>Number(v).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
   const update=async()=>{
-    if(busy||!accessToken)return;
+    if(busy)return;
     busy=true;
     try{
-      const response=await fetch(API_BASE+"/api/stream/ticks",{headers:authHeaders(),cache:"no-store"});
+      const response=await fetch(API_BASE+"/api/stream/ticks",{cache:"no-store"});
       const data=await response.json().catch(()=>({}));
       if(response.status===401){setStatus("Sesión caducada · vuelve a entrar","error");return;}
       if(!response.ok)throw new Error(data.error||"Streaming de servidor desactivado o no disponible");
@@ -1442,9 +1382,8 @@ if ("serviceWorker" in navigator) {
     update();
     timer=setInterval(update,POLL_INTERVAL_MS);
   };
-  if(accessToken)begin();
-  document.addEventListener("gss-access-ready",begin);
-  document.addEventListener("visibilitychange",()=>{if(document.hidden)stop();else if(accessToken)begin();});
+  begin();
+  document.addEventListener("visibilitychange",()=>{if(document.hidden)stop();else begin();});
 })();
 </script>
 

@@ -9,9 +9,9 @@ def utc(value):
 
 
 class VantageMarketSessionTests(unittest.TestCase):
-    def test_eurusd_opens_after_sunday_server_rollover_in_winter(self):
+    def test_eurusd_is_not_an_authorized_market(self):
         result = market_session("EUR/USD", utc("2026-11-01T22:02:00Z"))
-        self.assertTrue(result["open"])
+        self.assertFalse(result["open"])
         self.assertEqual(result["server_utc_offset"], "UTC+2")
 
     def test_xauusd_remains_closed_during_first_hour_after_sunday_rollover(self):
@@ -26,17 +26,9 @@ class VantageMarketSessionTests(unittest.TestCase):
         result = market_session("XAU/USD", utc("2026-11-02T22:30:00Z"))
         self.assertFalse(result["open"])
 
-    def test_eurusd_daily_rollover_pause_is_closed(self):
-        result = market_session("EUR/USD", utc("2026-11-02T21:58:00Z"))
-        self.assertFalse(result["open"])
-
-    def test_eurusd_is_open_before_daily_rollover_pause(self):
-        result = market_session("EUR/USD", utc("2026-11-02T21:57:00Z"))
-        self.assertTrue(result["open"])
-
     def test_friday_close_is_respected(self):
-        before_close = market_session("EUR/USD", utc("2026-11-06T21:56:00Z"))
-        at_close = market_session("EUR/USD", utc("2026-11-06T21:57:00Z"))
+        before_close = market_session("XAU/USD", utc("2026-11-06T21:56:00Z"))
+        at_close = market_session("XAU/USD", utc("2026-11-06T21:57:00Z"))
         self.assertTrue(before_close["open"])
         self.assertFalse(at_close["open"])
 
@@ -44,7 +36,6 @@ class VantageMarketSessionTests(unittest.TestCase):
         server_now, offset = vantage_server_time(utc("2026-07-05T21:02:00Z"))
         self.assertEqual(offset, 3)
         self.assertEqual(server_now.weekday(), 0)
-        self.assertTrue(market_session("EUR/USD", utc("2026-07-05T21:02:00Z"))["open"])
         self.assertFalse(market_session("XAU/USD", utc("2026-07-05T21:02:00Z"))["open"])
 
     def test_xauusd_opens_after_summer_daily_pause(self):

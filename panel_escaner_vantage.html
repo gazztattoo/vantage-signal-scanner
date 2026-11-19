@@ -1632,7 +1632,7 @@ if ("serviceWorker" in navigator) {
         throw new Error(data.error||"Cotización no disponible");
       }
       price.textContent=fmt(data.mid);
-      meta.textContent="Bid "+fmt(data.bid)+" · Ask "+fmt(data.ask)+"\\nSpread "+fmt(data.spread)+" · "+stamp(data.timestamp)+"\\nReferencia BiQuote; no usar como precio de entrada";
+      meta.textContent="Bid "+fmt(data.bid)+" · Ask "+fmt(data.ask)+"\nSpread "+fmt(data.spread)+" · "+stamp(data.timestamp)+"\nReferencia BiQuote; no usar como precio de entrada";
       status.textContent="BiQuote conectado · referencia";
       dot.className="live-feed-dot connected";
     }catch(error){

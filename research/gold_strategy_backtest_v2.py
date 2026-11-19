@@ -177,10 +177,10 @@ def backtest_v2(bars, timeframe, pivot_left=2, pivot_right=2, retest_bars=8,
             if i-pending["sweep_i"] > retest_bars*2:
                 pending = None
                 invalidated_setups += 1
-            elif pending["side"] == "long" and piv_hi and pending["sweep_i"] < piv_hi[1] < i and b.c > piv_hi[0]:
+            elif pending["side"] == "long" and piv_hi and piv_hi[1] < i and b.c > piv_hi[0]:
                 pending.update({"level":piv_hi[0], "bos_i":i})
                 pending.pop("await_bos")
-            elif pending["side"] == "short" and piv_lo and pending["sweep_i"] < piv_lo[1] < i and b.c < piv_lo[0]:
+            elif pending["side"] == "short" and piv_lo and piv_lo[1] < i and b.c < piv_lo[0]:
                 pending.update({"level":piv_lo[0], "bos_i":i})
                 pending.pop("await_bos")
 

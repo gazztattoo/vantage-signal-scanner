@@ -6,9 +6,9 @@ import unittest
 
 
 class PanelJavaScriptSyntaxTests(unittest.TestCase):
-    def test_production_panel_only_lists_eurusd_and_xauusd(self):
+    def test_production_panel_is_gold_only(self):
         html = pathlib.Path("panel_escaner_vantage.html").read_text(encoding="utf-8")
-        self.assertIn('symbol:"EUR/USD"', html)
+        self.assertNotIn('symbol:"EUR/USD"', html)
         self.assertIn('symbol:"XAU/USD"', html)
         self.assertNotIn("BTC/USD", html)
         self.assertNotIn('class="trend-name">CRIPTO', html)
@@ -60,8 +60,7 @@ class PanelJavaScriptSyntaxTests(unittest.TestCase):
         runner = pathlib.Path("scripts/run_signal_scan.py").read_text(encoding="utf-8")
         self.assertLess(runner.index('due_scans.append(("XAU/USD", "15min"))'),
                         runner.index('due_scans.append(("XAU/USD", "5min"))'))
-        self.assertLess(runner.index('due_scans.append(("EUR/USD", "15min"))'),
-                        runner.index('due_scans.append(("EUR/USD", "5min"))'))
+        self.assertNotIn("EUR/USD", runner)
         self.assertLess(runner.index('if enabled not in {"1", "true", "yes", "on"}'),
                         runner.index('session = requests.Session()'))
 

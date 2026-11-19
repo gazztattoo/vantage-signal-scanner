@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 SYMBOLS = {"XAU/USD": "XAUUSD", "EUR/USD": "EURUSD", "BTC/USD": "BTCUSD"}
-INTERVALS = {"5m", "15m", "30m"}
+INTERVALS = {"5m", "15m", "30m", "1h", "4h"}
 
 
 def _parse_utc(value: Any) -> datetime | None:

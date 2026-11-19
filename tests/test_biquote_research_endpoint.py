@@ -171,7 +171,8 @@ class BiQuoteResearchEndpointTests(unittest.TestCase):
             "signal": "WAIT", "pre_signal": False, "primary_bias": "BULL",
             "mtf": {"timeframe_1": "M15", "bias_1": "BULL", "timeframe_2": "M30", "bias_2": "BULL"},
             "regime": "TREND", "structure": {"type": "NONE"}, "score": 5,
-            "score_max": 7, "quality_grade": "B", "reason": "research only",
+            "score_max": 7, "confluence_grade": "A", "setup_grade": "C",
+            "quality_grade": "C", "reason": "research only",
         }
         with patch.object(app, "BIQUOTE_RESEARCH_ENABLED", True), patch(
             "app.cached_biquote_research_ohlc",
@@ -183,6 +184,9 @@ class BiQuoteResearchEndpointTests(unittest.TestCase):
         self.assertTrue(data["research_only"])
         self.assertFalse(data["signals_activated"])
         self.assertFalse(data["execution_price"])
+        self.assertEqual(data["confluence_grade"], "A")
+        self.assertEqual(data["setup_grade"], "C")
+        self.assertEqual(data["quality_grade"], "C")
         self.assertEqual(data["candles"], {"5m": 120, "15m": 60, "30m": 60})
         kwargs = analyze.call_args.kwargs
         self.assertEqual(len(kwargs["higher_timeframes"]["15min"]), 60)

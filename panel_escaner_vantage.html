@@ -430,6 +430,28 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 }
 
 
+
+.desk-strip{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin:0 0 10px;padding:10px 12px;border:1px solid #263a45;border-radius:12px;
+  background:linear-gradient(110deg,#101c24,#0a1219);
+  box-shadow:inset 0 1px rgba(255,255,255,.025)
+}
+.desk-strip-title{font-size:9px;font-weight:950;letter-spacing:1px;color:#dce8ed;white-space:nowrap}
+.desk-live-indicator{display:inline-block;width:7px;height:7px;margin-right:5px;border-radius:50%;background:#e9b85c;box-shadow:0 0 9px rgba(233,184,92,.35)}
+.desk-strip-muted{color:#8295a1;font-weight:700}
+.desk-timeframes{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+.desk-timeframes span{
+  padding:5px 7px;border:1px solid #273b46;border-radius:7px;
+  background:#091119;color:#92a5b0;font-size:8px;font-weight:800;letter-spacing:.3px
+}
+.desk-timeframes b{color:#e9b85c;margin-right:3px}
+@media(max-width:560px){
+  .desk-strip{align-items:flex-start;flex-direction:column;gap:7px;padding:9px 10px}
+  .desk-timeframes{width:100%;justify-content:space-between}
+  .desk-timeframes span{flex:1;text-align:center;padding:6px 3px;font-size:7px}
+}
+
 /* GEDEÓN 2.0 — professional trading terminal visual system */
 :root{
   --bg:#070b10;
@@ -672,6 +694,15 @@ select,button{border-radius:9px}
   </section>
 </section>
 
+<section class="desk-strip" aria-label="Plan operativo de Gedeón">
+  <div class="desk-strip-title"><span class="desk-live-indicator"></span> GEDEÓN 2.0 <span class="desk-strip-muted">· GOLD TRADING DESK</span></div>
+  <div class="desk-timeframes">
+    <span><b>M5</b> EJECUCIÓN</span>
+    <span><b>M15</b> ESTRUCTURA</span>
+    <span><b>M30</b> CONTEXTO</span>
+  </div>
+</section>
+
 <section class="toolbar">
   <label for="interval">Temporalidad</label>
   <select id="interval">
@@ -701,7 +732,7 @@ select,button{border-radius:9px}
       </div>
       <span class="pill">CARGANDO</span>
     </div>
-    <p class="reason">La tarjeta del oro permanece visible mientras se consulta el análisis. La cotización BiQuote de arriba es un módulo independiente.</p>
+    <p class="reason">Preparando lectura técnica de XAU/USD…</p>
   </article>
 </section>
 

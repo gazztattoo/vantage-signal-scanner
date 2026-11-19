@@ -1222,75 +1222,41 @@ function updateOverview(results){
 }
 
 async function update(){
+  if(button.disabled)return;
   button.disabled=true;
-  statusEl.textContent="Consultando análisis…";
+  button.textContent="Consultando…";
+  statusEl.textContent="Consultando análisis de XAU/USD…";
   dot.style.background="var(--amber)";
-
-  cards.innerHTML=markets.map(m=>`
-    <article class="card">
-      <div class="symbol">${m.symbol}</div>
-      <p class="reason">Consultando el motor…</p>
-    </article>
-  `).join("");
-
-  let marketState={};
+  updated.textContent="Solicitud en curso…";
+  const interval=document.getElementById("interval").value;
+  const controller=new AbortController();
+  const timeoutId=setTimeout(()=>controller.abort(),25000);
+  cards.innerHTML='<article class="card"><div class="cardhead"><div class="instrument-copy"><div class="symbol">XAU/USD · ORO</div><div class="market">Gedeón 2.0 · '+esc(interval)+'</div></div><span class="pill">ANALIZANDO</span></div><p class="reason">Esperando respuesta del motor TEST…</p></article>';
   try{
-    const marketResponse=await fetch(API_BASE+"/api/market-status");
-    if(marketResponse.ok){
-      const marketData=await marketResponse.json();
-      marketState=marketData.markets||{};
-    }
+    const params=new URLSearchParams({symbol:"XAU/USD",interval});
+    const response=await fetch(API_BASE+"/api/analysis?"+params.toString(),{
+      method:"GET",cache:"no-store",signal:controller.signal
+    });
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok||data.error)throw new Error(data.error||("Error HTTP "+response.status));
+    cards.innerHTML=render(markets[0],data,null,false);
+    updateOverview([{m:markets[0],d:data}]);
+    statusEl.textContent="Motor TEST respondió · datos simulados";
+    dot.style.background="var(--amber)";
+    updated.textContent="Prueba simulada · "+new Date().toLocaleTimeString("es-ES");
   }catch(error){
-    console.warn("No se pudo consultar el horario de mercado",error);
+    const message=error.name==="AbortError"
+      ?"Tiempo de espera agotado: la API TEST no respondió en 25 segundos."
+      :(error.message||"No se pudo completar el análisis TEST.");
+    cards.innerHTML='<article class="card"><div class="cardhead"><div class="symbol">XAU/USD · ORO</div><span class="pill sell">SIN RESPUESTA</span></div><p class="reason">'+esc(message)+'</p><div class="foot">No se ha generado ninguna señal. Producción permanece pausada.</div></article>';
+    statusEl.textContent="Error en el motor TEST";
+    dot.style.background="var(--red)";
+    updated.textContent="Último intento: "+new Date().toLocaleTimeString("es-ES");
+  }finally{
+    clearTimeout(timeoutId);
+    button.disabled=false;
+    button.textContent="↻ Actualizar análisis";
   }
-
-  const out=await Promise.all(markets.map(async m=>{
-    const session=marketState[m.symbol];
-    if(session && !session.open){
-      return {m,marketClosed:true,err:"MERCADO CERRADO · No se generan señales ni alertas fuera de la sesión habitual."};
-    }
-    try{
-      return {m,d:await load(m)};
-    }catch(e){
-      return {m,err:e.message||"No se pudo conectar",status:e.status||0};
-    }
-  }));
-
-  cards.innerHTML=out.map(x=>render(x.m,x.d,x.err,!!x.marketClosed)).join("");
-  updateOverview(out);
-  const notificationParams=new URLSearchParams(window.location.search);
-  const targetSymbol=notificationParams.get("symbol");
-  if(notificationParams.get("view")==="scanner" && targetSymbol){
-    const target=out.find(x=>x.m.symbol===targetSymbol);
-    const targetCard=[...cards.querySelectorAll(".card")].find(card=>card.querySelector(".symbol")?.textContent.trim()===targetSymbol);
-    if(targetCard){
-      targetCard.scrollIntoView({behavior:"smooth",block:"center"});
-      targetCard.style.outline="2px solid var(--green)";
-      targetCard.style.outlineOffset="3px";
-    }
-    if(target){
-      statusEl.textContent=target.err?"Scanner abierto · "+targetSymbol+" · "+target.err:"Señal de notificación · "+targetSymbol+" · "+document.getElementById("interval").value.toUpperCase();
-    }
-  }
-
-  const fails=out.filter(x=>x.err).length;
-  const closed=out.filter(x=>x.marketClosed).length;
-  const active=out.length-fails-closed;
-
-  statusEl.textContent=
-    fails===0
-      ?(closed>0
-        ?`Motor conectado · ${active} activos · ${closed} mercados cerrados`
-        :"Motor conectado")
-      :fails===markets.length-closed
-        ?"Error de conexión"
-        :"Conexión parcial";
-
-  dot.style.background=fails===0?"var(--green)": "var(--red)";
-  updated.textContent="Actualizado: "+
-    new Date().toLocaleTimeString("es-ES");
-
-  button.disabled=false;
 }
 
 

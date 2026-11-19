@@ -632,6 +632,11 @@ def biquote_stream_health():
         "retry_in_seconds": stream.get("retry_in_seconds"),
         "fresh_symbols": stream.get("fresh_symbols", []),
         "quote_health": stream.get("quote_health"),
+        "tick_events_received": stream.get("tick_events_received", 0),
+        "tick_events_accepted": stream.get("tick_events_accepted", 0),
+        "tick_events_rejected": stream.get("tick_events_rejected", 0),
+        "last_tick_event_at": stream.get("last_tick_event_at"),
+        "last_tick_event_shape": stream.get("last_tick_event_shape"),
         "expected_symbols": [{"EURUSD": "EUR/USD", "XAUUSD": "XAU/USD"}[s] for s in BIQUOTE_STREAM_SYMBOLS],
         "is_vantage_quote": False,
     })

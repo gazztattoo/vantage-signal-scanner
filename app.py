@@ -443,6 +443,35 @@ def generate_mock_candles(symbol, interval, count=1200):
 BIQUOTE_RESEARCH_ENABLED = os.environ.get("BIQUOTE_RESEARCH_ENABLED", "true").strip().lower() in ("1", "true", "yes", "on")
 BIQUOTE_RESEARCH_CACHE = {}
 BIQUOTE_RESEARCH_CACHE_TTL = {"5m": 20, "15m": 45, "30m": 90}
+BIQUOTE_TICK_RESEARCH_CACHE = {}
+BIQUOTE_TICK_RESEARCH_TTL_SECONDS = 3
+
+
+def fetch_biquote_research_tick(symbol):
+    """Fetch a fresh BiQuote quote for display/research only; never for signals."""
+    from external_biquote_adapter import normalize_biquote_tick
+
+    provider_symbol = {"EUR/USD": "EURUSD", "XAU/USD": "XAUUSD", "BTC/USD": "BTCUSD"}[symbol]
+    response = requests.get(
+        f"https://biquote.io/api/{provider_symbol}",
+        params={"allowStale": "false"},
+        timeout=8,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    result = normalize_biquote_tick(
+        payload,
+        symbol=symbol,
+        max_age_seconds=60,
+    )
+    if not result.get("accepted"):
+        raise RuntimeError(result.get("reason", "Cotización BiQuote rechazada."))
+    result.update({
+        "research_only": True,
+        "signals_activated": False,
+        "execution_price": False,
+    })
+    return result
 
 
 def fetch_biquote_research_ohlc(symbol, interval):
@@ -479,6 +508,38 @@ def fetch_biquote_research_ohlc(symbol, interval):
     if normalized["closed_bars"] < 55:
         raise RuntimeError("BiQuote devolvió menos de 55 velas cerradas; no se publican datos.")
     return normalized
+
+
+@app.route("/api/research/biquote/tick", methods=["GET"])
+def biquote_research_tick():
+    """On-demand fresh Bid/Ask snapshot; isolated from signal generation."""
+    if not BIQUOTE_RESEARCH_ENABLED:
+        return jsonify({"enabled": False, "research_only": True, "signals_activated": False}), 503
+    symbol = get_symbol(request.args.get("symbol"))
+    if not symbol:
+        return jsonify({"error": "Símbolo no permitido.", "allowed_symbols": sorted(ALLOWED_SYMBOLS)}), 400
+
+    now_mono = time.monotonic()
+    cached = BIQUOTE_TICK_RESEARCH_CACHE.get(symbol)
+    if cached and now_mono - cached["stored_at"] < BIQUOTE_TICK_RESEARCH_TTL_SECONDS:
+        result = dict(cached["payload"])
+        result["cache"] = {"hit": True, "age_seconds": round(now_mono - cached["stored_at"], 1)}
+        return jsonify(result)
+
+    try:
+        result = fetch_biquote_research_tick(symbol)
+    except (requests.RequestException, ValueError, TypeError, KeyError, RuntimeError) as exc:
+        app.logger.warning("BiQuote research tick rejected symbol=%s reason=%s", symbol, str(exc)[:160])
+        return jsonify({
+            "error": "No hay cotización BiQuote válida y reciente.",
+            "research_only": True,
+            "signals_activated": False,
+            "execution_price": False,
+        }), 503
+
+    result["cache"] = {"hit": False, "ttl_seconds": BIQUOTE_TICK_RESEARCH_TTL_SECONDS}
+    BIQUOTE_TICK_RESEARCH_CACHE[symbol] = {"stored_at": now_mono, "payload": result}
+    return jsonify(result)
 
 
 @app.route("/api/research/biquote/ohlc", methods=["GET"])

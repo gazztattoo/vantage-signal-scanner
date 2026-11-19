@@ -1325,9 +1325,11 @@ function updateDeskTimeframes(data){
         :{text:"NO EVALUADO",cls:"neutral"},
     "30min":selected==="5min"
       ?biasLabel(mtf.bias_2)
-      :selected==="30min"
-        ?biasLabel(data.primary_bias)
-        :{text:"NO EVALUADO",cls:"neutral"}
+      :selected==="15min"
+        ?biasLabel(mtf.bias_1)
+        :selected==="30min"
+          ?biasLabel(data.primary_bias)
+          :{text:"NO EVALUADO",cls:"neutral"}
   };
   Object.entries(ids).forEach(([tf,id])=>{
     const node=document.getElementById(id);

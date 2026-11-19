@@ -103,7 +103,7 @@ def _parse_candle_stamp(value: Any) -> datetime | None:
 
 def seed_history(symbol: str, interval: str, candles: list[dict[str, Any]]) -> int:
     """Seed the local builder with provider-closed OHLC bars; no network calls."""
-    if symbol not in ("EUR/USD", "XAU/USD") or interval not in _CANDLE_SECONDS:
+    if symbol != "XAU/USD" or interval not in _CANDLE_SECONDS:
         return 0
     seconds = _CANDLE_SECONDS[interval]
     seeded = []

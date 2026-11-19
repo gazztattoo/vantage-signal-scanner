@@ -615,6 +615,8 @@ def biquote_research_analysis():
             "structure": strategy.get("structure"),
             "score": strategy.get("score"),
             "score_max": strategy.get("score_max"),
+            "confluence_grade": strategy.get("confluence_grade"),
+            "setup_grade": strategy.get("setup_grade", strategy.get("quality_grade")),
             "quality_grade": strategy.get("quality_grade"),
             "reason": strategy.get("reason"),
             "entry": None,

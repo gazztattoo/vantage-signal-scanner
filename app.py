@@ -118,7 +118,8 @@ def access_configuration_status():
     return jsonify({
         "service": "global-signal-push-test",
         "data_mode": DATA_MODE,
-        "market_api_enabled": bool(API_KEY),
+        "market_api_enabled": False,
+        "data_mode": DATA_MODE,
         "panel_code_configured": bool(PANEL_ACCESS_CODE),
         "token_secret_configured": bool(ACCESS_TOKEN_SECRET),
         "token_ttl_seconds": TOKEN_MAX_AGE_SECONDS,

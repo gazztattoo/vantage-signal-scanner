@@ -26,7 +26,7 @@ jobs:
           from urllib.request import Request, urlopen
 
           BASE = "https://biquote.io"
-          SYMBOLS = ("EURUSD", "XAUUSD")
+          SYMBOLS = ("XAUUSD",)
           INTERVALS = {"5m": 5, "15m": 15, "30m": 30}
           failures = []
 
@@ -59,7 +59,7 @@ jobs:
           except Exception as exc:
               failures.append(f"XAUUSD quote: {type(exc).__name__}: {exc}")
 
-          # Six read-only OHLC requests: 2 active instruments x 3 timeframes.
+          # Three read-only OHLC requests: the active gold instrument x 3 timeframes.
           for symbol in SYMBOLS:
               for interval, minutes in INTERVALS.items():
                   try:
@@ -93,5 +93,5 @@ jobs:
               for failure in failures:
                   print(" - " + failure)
               sys.exit(1)
-          print("PASS: XAUUSD live quote and all six EURUSD/XAUUSD OHLC combinations are fresh and valid (7 read-only requests max).")
+          print("PASS: XAUUSD live quote and all three XAUUSD OHLC timeframes are fresh and valid (4 read-only requests max).")
           PY

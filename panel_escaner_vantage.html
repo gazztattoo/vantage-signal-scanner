@@ -1370,14 +1370,24 @@ if ("serviceWorker" in navigator) {
       const next=clock.next_transition;
       session.textContent="XAU/USD "+(clock.current?.open?"ABIERTO":"CERRADO")+
         (next?" · Próximo "+(next.event==="OPEN"?"abre":"cierra")+": "+fmt(next.at_spain)+" (hora peninsular española)":" · Horario no disponible");
-      events.textContent=(news.upcoming_events||[]).slice(0,3).map(x=>fmt(x.at_utc)+" · "+x.title).join("\\n")||"Sin próximos eventos verificados";
+      events.textContent=(news.upcoming_events||[]).slice(0,3).map(x=>fmt(x.at_utc)+" · "+x.title).join("\n")||"Sin próximos eventos verificados";
       const liquidity=document.getElementById("goldLiquiditySessions");
       if(liquidity)liquidity.textContent=(clock.liquidity_sessions||[]).map(s=>
         s.name+" "+(s.active?"● ACTIVA":"○ INACTIVA")+" · "+new Date(s.local_time).toLocaleTimeString("es-ES",{timeZone:s.timezone,hour:"2-digit",minute:"2-digit"})+" local · franja "+s.activity_window
       ).join(" | ");
     }catch(error){status.textContent="NOTICIAS NO DISPONIBLES · SOLO CONTEXTO";session.textContent="Horario no disponible";events.textContent="";}
   }
-  const refresh=document.getElementById("goldNewsRefresh");\n  if(refresh)refresh.addEventListener("click",()=>{refresh.disabled=true;refresh.textContent="Actualizando…";update().finally(()=>{refresh.disabled=false;refresh.textContent="↻ Actualizar noticias";});});\n  update();setInterval(()=>{if(!document.hidden)update();},60000);
+  const refresh=document.getElementById("goldNewsRefresh");
+  if(refresh)refresh.addEventListener("click",()=>{
+    refresh.disabled=true;
+    refresh.textContent="Actualizando…";
+    update().finally(()=>{
+      refresh.disabled=false;
+      refresh.textContent="↻ Actualizar noticias";
+    });
+  });
+  update();
+  setInterval(()=>{if(!document.hidden)update();},60000);
 })();
 
 /* BiQuote ticks are streamed into the production backend; this panel reads only our API. */

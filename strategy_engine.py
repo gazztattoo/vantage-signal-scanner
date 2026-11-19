@@ -334,7 +334,7 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "") -> dict:
     structure_ok = structure["direction"] == best_side and structure["type"] in ("BREAKOUT", "RETEST")
     primary_aligned = primary == ("BULL" if best_side == "BUY" else "BEAR")
     opposite = "BEAR" if best_side == "BUY" else "BULL"
-    higher_timeframes_both_opposed = bias1 == opposite and bias2 == opposite
+    higher_timeframes_both_opposed = False  # M15/M30 son contexto; no bloquean por sí solos.
     # ADX/RSI/MACD/MTF aportan contexto y puntuación; no son candados individuales.
     # La estructura, la dirección primaria y el riesgo sí protegen la entrada.
     if structure_ok and primary_aligned and not higher_timeframes_both_opposed and score >= 6 and adx_now >= 25:
@@ -367,14 +367,6 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "") -> dict:
         "candles": len(bars),
         "data_warning": "Evaluación técnica; la puntuación no representa probabilidad de acierto.",
     }
-
-    if bias1 == "INSUFFICIENT" or bias2 == "INSUFFICIENT":
-        return {
-            **common, **_wait(
-                "MTF_INSUFICIENTE",
-                "Falta contexto superior suficiente para clasificar la oportunidad.",
-            ),
-        }
 
     if structure_ok and primary_aligned and not higher_timeframes_both_opposed and score >= 5:
         level = float(structure["level"])

@@ -58,7 +58,7 @@ class ExternalSignalIntelligenceTests(unittest.TestCase):
         self.assertEqual(result["decision_role"], "CONTEXT_ONLY_NOT_A_TRADE_SIGNAL")
 
     def test_no_external_data_never_generates_trade(self):
-        result = summarize_external_consensus([], symbol="EUR/USD", now=NOW)
+        result = summarize_external_consensus([], symbol="XAU/USD", now=NOW)
         self.assertEqual(result["external_bias"], "NO_DATA")
         self.assertEqual(result["decision_role"], "CONTEXT_ONLY_NOT_A_TRADE_SIGNAL")
 

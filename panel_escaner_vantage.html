@@ -379,7 +379,7 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 .news-eyebrow,.news-kicker{font-size:10px;letter-spacing:1.2px;font-weight:900;color:var(--green)}
 .news-intro h1{margin:8px 0 6px;font-size:clamp(25px,6vw,34px);letter-spacing:-.8px}
 .news-intro p{max-width:620px;margin:0;color:var(--muted);font-size:13px;line-height:1.55}
-.news-context-note{display:flex;align-items:center;gap:8px;margin-top:16px;color:#b8d0c0;font-size:11px}
+.news-context-note{display:flex;align-items:center;gap:8px;margin-top:16px;color:#b8d0c0;font-size:11px}\n.news-refresh{margin-top:15px;padding:10px 14px;border-radius:10px;font-size:11px;font-weight:850;background:rgba(88,242,154,.12);border:1px solid rgba(88,242,154,.32);color:var(--green)}\n.news-refresh:active{transform:scale(.98)}
 .news-pulse{width:8px;height:8px;flex:0 0 8px;border-radius:50%;background:var(--green);box-shadow:0 0 12px rgba(88,242,154,.7)}
 .news-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .news-card{min-width:0;padding:17px;border:1px solid var(--line);border-radius:17px;background:linear-gradient(155deg,rgba(18,31,23,.98),rgba(8,16,11,.98));box-shadow:0 9px 22px rgba(0,0,0,.16)}
@@ -392,9 +392,9 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 .news-status,.news-session{font-size:13px;line-height:1.55;color:#dcebe0;overflow-wrap:anywhere}
 .news-status{font-weight:750}
 .news-divider{height:1px;margin:16px 0;border-top:1px solid rgba(143,166,154,.16)}
-.news-events{display:grid;gap:9px}
+.news-events{display:grid;gap:9px;white-space:pre-line;line-height:1.8;font-size:12px;color:#d4e4d8}
 .news-events .news-empty,.news-empty{padding:11px;border:1px dashed rgba(143,166,154,.2);border-radius:10px;color:var(--muted);font-size:11px;line-height:1.5}
-.news-sessions{font-size:12px;line-height:1.8;color:#d4e4d8;overflow-wrap:anywhere}
+.news-sessions{font-size:12px;line-height:1.9;color:#d4e4d8;overflow-wrap:anywhere;white-space:pre-line}
 .news-disclaimer{margin:13px 0 0;padding-top:12px;border-top:1px solid rgba(143,166,154,.14);color:var(--muted);font-size:10px;line-height:1.55}
 .news-footer{display:flex;justify-content:space-between;gap:12px;margin:14px 2px 4px;color:var(--muted);font-size:10px;line-height:1.5}
 .news-footer span:first-child{color:var(--green);font-weight:900;letter-spacing:.8px;white-space:nowrap}
@@ -533,7 +533,7 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
     <div class="news-eyebrow">GEDEÓN 2.0 · CONTEXTO DE MERCADO</div>
     <h1>Noticias del oro</h1>
     <p>Calendario económico, sesiones y acontecimientos que pueden aumentar la volatilidad de XAU/USD.</p>
-    <div class="news-context-note"><span class="news-pulse"></span><span>Información contextual · No predice la dirección del precio</span></div>
+    <div class="news-context-note"><span class="news-pulse"></span><span>Información contextual · No predice la dirección del precio</span></div><button class="news-refresh" id="goldNewsRefresh" type="button">↻ Actualizar noticias</button>
   </section>
   <section class="news-grid" aria-label="Contexto macroeconómico del oro">
     <article class="news-card news-card-primary">
@@ -1370,14 +1370,14 @@ if ("serviceWorker" in navigator) {
       const next=clock.next_transition;
       session.textContent="XAU/USD "+(clock.current?.open?"ABIERTO":"CERRADO")+
         (next?" · Próximo "+(next.event==="OPEN"?"abre":"cierra")+": "+fmt(next.at_spain)+" (hora peninsular española)":" · Horario no disponible");
-      events.textContent=(news.upcoming_events||[]).slice(0,3).map(x=>fmt(x.at_utc)+" · "+x.title).join(" | ")||"Sin próximos eventos verificados";
+      events.textContent=(news.upcoming_events||[]).slice(0,3).map(x=>fmt(x.at_utc)+" · "+x.title).join("\\n")||"Sin próximos eventos verificados";
       const liquidity=document.getElementById("goldLiquiditySessions");
       if(liquidity)liquidity.textContent=(clock.liquidity_sessions||[]).map(s=>
         s.name+" "+(s.active?"● ACTIVA":"○ INACTIVA")+" · "+new Date(s.local_time).toLocaleTimeString("es-ES",{timeZone:s.timezone,hour:"2-digit",minute:"2-digit"})+" local · franja "+s.activity_window
       ).join(" | ");
     }catch(error){status.textContent="NOTICIAS NO DISPONIBLES · SOLO CONTEXTO";session.textContent="Horario no disponible";events.textContent="";}
   }
-  update();setInterval(()=>{if(!document.hidden)update();},60000);
+  const refresh=document.getElementById("goldNewsRefresh");\n  if(refresh)refresh.addEventListener("click",()=>{refresh.disabled=true;refresh.textContent="Actualizando…";update().finally(()=>{refresh.disabled=false;refresh.textContent="↻ Actualizar noticias";});});\n  update();setInterval(()=>{if(!document.hidden)update();},60000);
 })();
 
 /* BiQuote ticks are streamed into the production backend; this panel reads only our API. */

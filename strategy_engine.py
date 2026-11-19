@@ -341,11 +341,17 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timefr
     higher_timeframes_both_opposed = False  # M15/M30 son contexto; no bloquean por sí solos.
     # ADX/RSI/MACD/MTF aportan contexto y puntuación; no son candados individuales.
     # La estructura, la dirección primaria y el riesgo sí protegen la entrada.
+    # Confluence grade describes indicator alignment; setup grade also requires
+    # a valid structural trigger. Never label a high-scoring context as a ready setup.
+    if score >= 6:
+        confluence_grade = "A"
+    elif score >= 5:
+        confluence_grade = "B"
+    else:
+        confluence_grade = "C"
     if structure_ok and primary_aligned and not higher_timeframes_both_opposed and score >= 6 and adx_now >= 25:
         grade = "A"
     elif structure_ok and primary_aligned and not higher_timeframes_both_opposed and score >= 5:
-        grade = "B"
-    elif best["mtf_aligned"] and score >= 5:
         grade = "B"
     else:
         grade = "C"
@@ -363,7 +369,9 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timefr
             "aligned_sell": sides["SELL"]["mtf_aligned"],
         },
         "regime": regime, "structure": structure,
-        "score": score, "score_max": 7, "quality_grade": grade,
+        "score": score, "score_max": 7,
+        "confluence_grade": confluence_grade,
+        "setup_grade": grade, "quality_grade": grade,
         "quality_score": round(score / 7 * 100), "quality_max": 100,
         "buy_score": sides["BUY"]["score"], "sell_score": sides["SELL"]["score"],
         "score_components": best["checks"],

@@ -379,7 +379,7 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
   <img
     class="brand-banner"
     src="./global-signal-header.jpg"
-    alt="GLOBAL SIGNAL SCANNER — Trading Intelligence — Forex y Gold"
+    alt="GLOBAL SIGNAL SCANNER — Gold Trading Intelligence"
   >
   <div class="status">
     <span class="dot" id="dot"></span>
@@ -395,7 +395,6 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
   </div>
   <div class="live-feed-grid">
     <article class="live-feed-card"><div class="live-feed-symbol">ORO · XAU/USD</div><div class="live-feed-price" id="bqPriceXAU">—</div><div class="live-feed-meta" id="bqMetaXAU">Esperando primer tick</div></article>
-    <article class="live-feed-card"><div class="live-feed-symbol">EURO · EUR/USD</div><div class="live-feed-price" id="bqPriceEUR">—</div><div class="live-feed-meta" id="bqMetaEUR">Esperando primer tick</div></article>
   </div>
   <div class="live-feed-note">Fuente externa BiQuote (feed MT5, no Vantage). El motor usa velas OHLC de BiQuote para indicadores y Bid/Ask del streaming para validar el precio de entrada. No ejecuta órdenes. Si no hay ticks recientes, la entrada queda bloqueada.</div>
 </section>
@@ -415,7 +414,6 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
   <section class="overview-panel">
     <div class="overview-heading"><span class="overview-icon">▥</span> TENDENCIA GENERAL DEL MERCADO</div>
     <div class="trend-list" id="trendList">
-      <div class="trend-card"><div class="trend-name">FOREX</div><div class="trend-note">Esperando análisis…</div></div>
       <div class="trend-card"><div class="trend-name">ORO</div><div class="trend-note">Esperando análisis…</div></div>
           </div>
   </section>
@@ -469,7 +467,7 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
     <h2>Historial de señales</h2>
     <p>Operaciones registradas automáticamente por el escáner. Solo se muestran registros reales guardados en el servidor.</p>
     <div class="data-toolbar">
-      <select id="historySymbol"><option value="">Todos los mercados</option><option>EUR/USD</option><option>XAU/USD</option></select>
+      <select id="historySymbol"><option value="XAU/USD" selected>Oro · XAU/USD</option></select>
       <select id="historyTimeframe"><option value="">Todas las temporalidades</option><option value="5min">M5</option><option value="15min">M15</option><option value="30min">M30</option></select>
       <select id="historyStatus"><option value="">Todos los estados</option><option>PENDIENTE</option><option>TP</option><option>SL</option><option>CADUCADA</option><option>CANCELADA</option></select>
       <button id="historyRefresh" type="button">Actualizar</button>
@@ -495,7 +493,7 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
     <p>El escaneo automático de producción está pausado. M5 y M15 se consultan manualmente; M30 también queda reservado para consulta manual. Los datos son análisis técnicos experimentales, no una garantía de resultado.</p>
     <p class="hint">No hay análisis en segundo plano mientras producción permanezca pausada. Cada consulta manual solicita velas al proveedor y puede consumir cuota. M30 nunca se ejecuta en segundo plano.</p>
     <div class="data-toolbar">
-      <select id="analysisSymbol"><option value="EUR/USD">EUR/USD</option><option value="XAU/USD">XAU/USD</option></select>
+      <select id="analysisSymbol"><option value="XAU/USD" selected>Oro · XAU/USD</option></select>
       <select id="analysisTimeframe"><option value="5min">M5 · consulta</option><option value="15min">M15 · consulta</option><option value="30min">M30 · manual</option></select>
       <button id="analysisRefresh" type="button">Analizar temporalidad seleccionada</button>
     </div>
@@ -565,7 +563,6 @@ accessForm.addEventListener("submit",async event=>{
 });
 
 const markets=[
-  {symbol:"EUR/USD",category:"FOREX"},
   {symbol:"XAU/USD",category:"ORO"}
 ];
 
@@ -914,7 +911,7 @@ function updateOverview(results){
     market:item.m,
     bias:item.err?null:technicalBias(item.d)
   }));
-  const names={FOREX:"FOREX",ORO:"ORO"};
+  const names={ORO:"ORO"};
   trendList.innerHTML=analyzed.map(item=>{
     const name=names[item.market.category]||item.market.category;
     const b=item.bias;
@@ -1303,8 +1300,7 @@ if ("serviceWorker" in navigator) {
 /* BiQuote ticks are streamed into the production backend; this panel reads only our API. */
 (()=>{
   const instruments={
-    XAUUSD:{symbol:"XAU/USD",price:"bqPriceXAU",meta:"bqMetaXAU",digits:2},
-    EURUSD:{symbol:"EUR/USD",price:"bqPriceEUR",meta:"bqMetaEUR",digits:5}
+    XAUUSD:{symbol:"XAU/USD",price:"bqPriceXAU",meta:"bqMetaXAU",digits:2}
   };
   const status=document.getElementById("bqLiveStatus");
   const dot=document.getElementById("bqLiveDot");

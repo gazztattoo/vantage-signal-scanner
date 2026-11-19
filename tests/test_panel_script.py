@@ -92,8 +92,8 @@ class PanelJavaScriptSyntaxTests(unittest.TestCase):
     def test_pwa_cache_and_entry_url_are_bumped(self):
         worker = pathlib.Path("service-worker.js").read_text(encoding="utf-8")
         index = pathlib.Path("index.html").read_text(encoding="utf-8")
-        self.assertIn('global-signal-scanner-shell-v10', worker)
-        self.assertIn('panel_escaner_vantage.html?v=20261116-3', index)
+        self.assertIn('global-signal-scanner-shell-v11', worker)
+        self.assertIn('panel_escaner_vantage.html?v=20261119-gold1', index)
         with tempfile.NamedTemporaryFile("w", suffix=".js", encoding="utf-8") as handle:
             handle.write(worker)
             handle.flush()

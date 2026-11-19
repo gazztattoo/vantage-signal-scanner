@@ -1,4 +1,5 @@
 import unittest
+import requests
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
@@ -10,7 +11,7 @@ class GoldNewsContextTests(unittest.TestCase):
         gold_news._CACHE.update(at=0.0, events=[], verified=False, error="not_loaded")
 
     def test_calendar_unavailable_does_not_block_technical_signals(self):
-        with patch.object(gold_news.requests, "get", side_effect=TimeoutError):
+        with patch.object(gold_news.requests, "get", side_effect=requests.Timeout):
             context = gold_news.gold_news_context(datetime.now(timezone.utc))
         self.assertFalse(context["verified"])
         self.assertFalse(context["block_new_entries"])

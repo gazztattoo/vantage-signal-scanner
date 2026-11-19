@@ -10,7 +10,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 SYMBOLS = {"XAU/USD": "XAUUSD", "EUR/USD": "EURUSD", "BTC/USD": "BTCUSD"}
-INTERVALS = {"5m", "15m", "30m", "1h", "4h"}
+INTERVAL_MINUTES = {"5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240}
+INTERVALS = set(INTERVAL_MINUTES)
 
 
 def _parse_utc(value: Any) -> datetime | None:
@@ -83,7 +84,7 @@ def normalize_biquote_ohlc(
 
     closed.sort(key=lambda item: item["time"])
     newest_open = _parse_utc(closed[-1]["time"])
-    interval_minutes = int(interval[:-1])
+    interval_minutes = INTERVAL_MINUTES[interval]
     newest_close = newest_open + timedelta(minutes=interval_minutes)
     age_minutes = (now - newest_close).total_seconds() / 60
     if age_minutes < -1:

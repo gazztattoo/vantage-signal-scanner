@@ -333,7 +333,6 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "") -> dict:
     score = int(best["score"])
     structure_ok = structure["direction"] == best_side and structure["type"] in ("BREAKOUT", "RETEST")
     primary_aligned = primary == ("BULL" if best_side == "BUY" else "BEAR")
-    opposite = "BEAR" if best_side == "BUY" else "BULL"
     higher_timeframes_both_opposed = False  # M15/M30 son contexto; no bloquean por sí solos.
     # ADX/RSI/MACD/MTF aportan contexto y puntuación; no son candados individuales.
     # La estructura, la dirección primaria y el riesgo sí protegen la entrada.

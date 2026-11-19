@@ -667,7 +667,7 @@ def price():
     symbol = get_symbol(request.args.get("symbol"))
     if not symbol:
         return jsonify({"error": "Símbolo no permitido", "allowed_symbols": sorted(ALLOWED_SYMBOLS)}), 400
-    provider_symbol = {"EUR/USD": "EURUSD", "XAU/USD": "XAUUSD"}[symbol]
+    provider_symbol = "XAUUSD"
     try:
         # Quote calls share the same global daily budget as OHLC calls.
         reserve_biquote_request()

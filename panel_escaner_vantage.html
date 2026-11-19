@@ -367,6 +367,47 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 .live-feed-note{font-size:10px;color:var(--muted);margin-top:9px;line-height:1.45}
 @media(max-width:560px){.live-feed-grid{gap:6px}.live-feed-card{padding:8px}.live-feed-price{font-size:clamp(15px,4.4vw,21px)}}
 
+ 
+/* GEDEÓN 2.0 — visual refresh for mobile-first news and navigation */
+.brand-banner{transform:none!important;max-height:190px;object-fit:contain}
+@media(max-width:760px){.brand-banner{transform:none!important;max-height:none;object-fit:contain}}
+.top{background:#050b08;box-shadow:0 10px 28px rgba(0,0,0,.22)}
+.app-nav{padding:8px;gap:5px;border-color:rgba(88,242,154,.24);box-shadow:0 14px 38px rgba(0,0,0,.62),0 0 24px rgba(88,242,154,.07)}
+.app-nav button{min-height:58px}
+.app-nav button.active{box-shadow:inset 0 0 0 1px rgba(88,242,154,.12),0 4px 16px rgba(20,180,95,.10)}
+.news-intro{position:relative;overflow:hidden;margin:4px 0 14px;padding:22px 20px;border:1px solid rgba(88,242,154,.23);border-radius:20px;background:radial-gradient(ellipse at 92% 0%,rgba(40,180,105,.18),transparent 48%),linear-gradient(145deg,#14251b,#09110c 76%);box-shadow:0 12px 28px rgba(0,0,0,.22)}
+.news-eyebrow,.news-kicker{font-size:10px;letter-spacing:1.2px;font-weight:900;color:var(--green)}
+.news-intro h1{margin:8px 0 6px;font-size:clamp(25px,6vw,34px);letter-spacing:-.8px}
+.news-intro p{max-width:620px;margin:0;color:var(--muted);font-size:13px;line-height:1.55}
+.news-context-note{display:flex;align-items:center;gap:8px;margin-top:16px;color:#b8d0c0;font-size:11px}\n.news-refresh{margin-top:15px;padding:10px 14px;border-radius:10px;font-size:11px;font-weight:850;background:rgba(88,242,154,.12);border:1px solid rgba(88,242,154,.32);color:var(--green)}\n.news-refresh:active{transform:scale(.98)}
+.news-pulse{width:8px;height:8px;flex:0 0 8px;border-radius:50%;background:var(--green);box-shadow:0 0 12px rgba(88,242,154,.7)}
+.news-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.news-card{min-width:0;padding:17px;border:1px solid var(--line);border-radius:17px;background:linear-gradient(155deg,rgba(18,31,23,.98),rgba(8,16,11,.98));box-shadow:0 9px 22px rgba(0,0,0,.16)}
+.news-card-primary{background:radial-gradient(ellipse at 100% 0%,rgba(50,190,110,.12),transparent 55%),linear-gradient(155deg,#14251b,#09110c)}
+.news-card-wide{grid-column:1/-1}
+.news-card-heading{display:flex;align-items:center;gap:11px;margin-bottom:14px}
+.news-icon{display:grid;place-items:center;width:38px;height:38px;flex:0 0 38px;border-radius:12px;background:rgba(88,242,154,.10);border:1px solid rgba(88,242,154,.18);color:var(--green);font-size:19px}
+.news-kicker{display:block;font-size:9px;letter-spacing:1px}
+.news-card h2{margin:3px 0 0;font-size:15px;letter-spacing:-.2px}
+.news-status,.news-session{font-size:13px;line-height:1.55;color:#dcebe0;overflow-wrap:anywhere}
+.news-status{font-weight:750}
+.news-divider{height:1px;margin:16px 0;border-top:1px solid rgba(143,166,154,.16)}
+.news-events{display:grid;gap:9px;white-space:pre-line;line-height:1.8;font-size:12px;color:#d4e4d8}
+.news-events .news-empty,.news-empty{padding:11px;border:1px dashed rgba(143,166,154,.2);border-radius:10px;color:var(--muted);font-size:11px;line-height:1.5}
+.news-sessions{font-size:12px;line-height:1.9;color:#d4e4d8;overflow-wrap:anywhere;white-space:pre-line}
+.news-disclaimer{margin:13px 0 0;padding-top:12px;border-top:1px solid rgba(143,166,154,.14);color:var(--muted);font-size:10px;line-height:1.55}
+.news-footer{display:flex;justify-content:space-between;gap:12px;margin:14px 2px 4px;color:var(--muted);font-size:10px;line-height:1.5}
+.news-footer span:first-child{color:var(--green);font-weight:900;letter-spacing:.8px;white-space:nowrap}
+@media(max-width:560px){
+ .news-intro{padding:19px 16px;border-radius:17px}
+ .news-grid{grid-template-columns:1fr;gap:10px}
+ .news-card{padding:15px;border-radius:15px}
+ .news-card-wide{grid-column:auto}
+ .news-footer{display:block}
+ .news-footer span{display:block}
+ .news-footer span+span{margin-top:4px}
+}
+
 </style>
 </head>
 
@@ -402,7 +443,7 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 
 <nav class="app-nav" aria-label="Navegación principal">
   <button type="button" class="active" data-view="scanner" aria-label="Scanner"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></span><span>Scanner</span></button>
-  <button type="button" data-view="analysis" aria-label="Análisis"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 3v18M20 3v18M4 7h4v6H4zM10 5h4v11h-4zM16 9h4v7h-4z"/></svg></span><span>Análisis</span></button>
+  <button type="button" data-view="analysis" aria-label="Noticias"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v13a1 1 0 0 1-1.5 1H5a2 2 0 0 1-2-2V6.5a2 2 0 0 1 2-2Z"/><path d="M7 8h10M7 12h10M7 16h6"/></svg></span><span>Noticias</span></button>
   <button type="button" data-view="performance" aria-label="Rendimiento"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 20h18M5 16l5-5 3 2 6-7"/><path d="M14 6h5v5"/><path d="M5 20V17M10 20v-3M15 20v-5M20 20v-8"/></svg></span><span>Rendimiento</span></button>
   <button type="button" data-view="history" aria-label="Historial"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"/><path d="M3 3v5h5M12 7v5l3.5 2"/></svg></span><span>Historial</span></button>
   <button type="button" data-view="lab" aria-label="Lab"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5.5 9.2A2 2 0 0 0 6.2 21h11.6a2 2 0 0 0 1.7-2.8L14 9V3"/><path d="M8 15h8M10 12h4"/></svg></span><span>Lab</span></button>
@@ -432,15 +473,6 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
     </div>
     <div class="overview-foot" id="overviewFoot">Se calculará con EMA 20, EMA 50 y RSI 14 cuando llegue el análisis.</div>
   </section>
-</section>
-
-<section class="overview-panel" aria-label="Noticias y horarios del oro" style="margin:12px 0;padding:16px">
-  <div class="overview-heading">◷ ORO · NOTICIAS MACRO Y HORARIOS</div>
-  <div id="goldNewsStatus" class="hint">Consultando calendario de alto impacto…</div>
-  <div id="goldSessionStatus" class="hint" style="margin-top:8px">Calculando próxima apertura o cierre…</div>
-  <div id="goldNewsEvents" class="hint" style="margin-top:8px"></div>
-  <div id="goldLiquiditySessions" class="hint" style="margin-top:8px"></div>
-  <div class="hint" style="margin-top:8px">Horarios Vantage orientativos, no verificados con el bróker. Noticias: calendario externo, no predicción direccional.</div>
 </section>
 
 <section class="toolbar">
@@ -497,18 +529,31 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 </section>
 
 <section class="app-view" id="viewAnalysis" hidden>
-  <div class="data-panel">
-    <h2>Análisis técnico</h2>
-    <p>El escaneo automático de producción está pausado. M5 y M15 se consultan manualmente; M30 también queda reservado para consulta manual. Los datos son análisis técnicos experimentales, no una garantía de resultado.</p>
-    <p class="hint">No hay análisis en segundo plano mientras producción permanezca pausada. Cada consulta manual solicita velas al proveedor y puede consumir cuota. M30 nunca se ejecuta en segundo plano.</p>
-    <div class="data-toolbar">
-      <select id="analysisSymbol"><option value="XAU/USD" selected>Oro · XAU/USD</option></select>
-      <select id="analysisTimeframe"><option value="5min">M5 · consulta</option><option value="15min">M15 · consulta</option><option value="30min">M30 · manual</option></select>
-      <button id="analysisRefresh" type="button">Analizar temporalidad seleccionada</button>
-    </div>
-    <div id="analysisMessage" class="hint" style="margin-bottom:12px">Selecciona mercado y temporalidad. M30 se consulta únicamente al pulsar el botón.</div>
-    <div id="analysisResult" class="stat-grid"></div>
-  </div>
+  <section class="news-intro">
+    <div class="news-eyebrow">GEDEÓN 2.0 · CONTEXTO DE MERCADO</div>
+    <h1>Noticias del oro</h1>
+    <p>Calendario económico, sesiones y acontecimientos que pueden aumentar la volatilidad de XAU/USD.</p>
+    <div class="news-context-note"><span class="news-pulse"></span><span>Información contextual · No predice la dirección del precio</span></div><button class="news-refresh" id="goldNewsRefresh" type="button">↻ Actualizar noticias</button>
+  </section>
+  <section class="news-grid" aria-label="Contexto macroeconómico del oro">
+    <article class="news-card news-card-primary">
+      <div class="news-card-heading"><span class="news-icon">◷</span><div><span class="news-kicker">CALENDARIO ECONÓMICO</span><h2>Estado de las noticias</h2></div></div>
+      <div id="goldNewsStatus" class="news-status">Consultando calendario…</div>
+      <div class="news-divider"></div>
+      <div class="news-card-heading"><span class="news-icon">◉</span><div><span class="news-kicker">MERCADO XAU/USD</span><h2>Horario del oro</h2></div></div>
+      <div id="goldSessionStatus" class="news-session">Calculando próxima apertura o cierre…</div>
+    </article>
+    <article class="news-card">
+      <div class="news-card-heading"><span class="news-icon">▤</span><div><span class="news-kicker">PRÓXIMOS EVENTOS</span><h2>Agenda macro</h2></div></div>
+      <div id="goldNewsEvents" class="news-events"><div class="news-empty">Esperando eventos del calendario…</div></div>
+    </article>
+    <article class="news-card news-card-wide">
+      <div class="news-card-heading"><span class="news-icon">◷</span><div><span class="news-kicker">SESIONES INTERNACIONALES</span><h2>Actividad por mercado</h2></div></div>
+      <div id="goldLiquiditySessions" class="news-sessions"><div class="news-empty">Calculando horarios locales…</div></div>
+      <p class="news-disclaimer">Los horarios mostrados son orientativos y pueden variar según el instrumento y el bróker. La agenda es una fuente externa; no constituye una señal de compra o venta.</p>
+    </article>
+  </section>
+  <div class="news-footer"><span>GEDEÓN 2.0</span><span>Las noticias aportan contexto; el análisis técnico conserva su evaluación independiente.</span></div>
 </section>
 
 <section class="app-view" id="viewLab" hidden>
@@ -1072,7 +1117,7 @@ function switchView(name){
   });
   if(name==="history")loadHistory();
   if(name==="performance")loadPerformance();
-  if(name==="analysis")loadTechnicalAnalysis();
+  if(name==="analysis"){}
   if(name==="lab")loadLabStatus();
 }
 viewButtons.forEach(button=>button.addEventListener("click",()=>switchView(button.dataset.view)));
@@ -1319,20 +1364,30 @@ if ("serviceWorker" in navigator) {
       if(!response.ok)throw Error("No se pudo consultar el calendario");
       const data=await response.json();
       const news=data.news||{};
-      status.textContent=!news.verified?"NOTICIAS SIN VERIFICAR · ENTRADAS BLOQUEADAS":
+      status.textContent=!news.verified?"CALENDARIO SIN VERIFICAR · INFORMACIÓN NO CONFIRMADA":
         news.high_impact_window?"ALTO IMPACTO · ENTRADAS BLOQUEADAS":"Calendario macro verificado · sin evento de alto impacto inmediato";
       const clock=data.session||{};
       const next=clock.next_transition;
       session.textContent="XAU/USD "+(clock.current?.open?"ABIERTO":"CERRADO")+
         (next?" · Próximo "+(next.event==="OPEN"?"abre":"cierra")+": "+fmt(next.at_spain)+" (hora peninsular española)":" · Horario no disponible");
-      events.textContent=(news.upcoming_events||[]).slice(0,3).map(x=>fmt(x.at_utc)+" · "+x.title).join(" | ")||"Sin próximos eventos verificados";
+      events.textContent=(news.upcoming_events||[]).slice(0,3).map(x=>fmt(x.at_utc)+" · "+x.title).join("\n")||"Sin próximos eventos verificados";
       const liquidity=document.getElementById("goldLiquiditySessions");
       if(liquidity)liquidity.textContent=(clock.liquidity_sessions||[]).map(s=>
         s.name+" "+(s.active?"● ACTIVA":"○ INACTIVA")+" · "+new Date(s.local_time).toLocaleTimeString("es-ES",{timeZone:s.timezone,hour:"2-digit",minute:"2-digit"})+" local · franja "+s.activity_window
       ).join(" | ");
-    }catch(error){status.textContent="NOTICIAS NO DISPONIBLES · ENTRADAS BLOQUEADAS";session.textContent="Horario no disponible";events.textContent="";}
+    }catch(error){status.textContent="NOTICIAS NO DISPONIBLES · SOLO CONTEXTO";session.textContent="Horario no disponible";events.textContent="";}
   }
-  update();setInterval(()=>{if(!document.hidden)update();},60000);
+  const refresh=document.getElementById("goldNewsRefresh");
+  if(refresh)refresh.addEventListener("click",()=>{
+    refresh.disabled=true;
+    refresh.textContent="Actualizando…";
+    update().finally(()=>{
+      refresh.disabled=false;
+      refresh.textContent="↻ Actualizar noticias";
+    });
+  });
+  update();
+  setInterval(()=>{if(!document.hidden)update();},60000);
 })();
 
 /* BiQuote ticks are streamed into the production backend; this panel reads only our API. */

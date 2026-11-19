@@ -11,7 +11,7 @@ from math import isfinite
 from typing import Any
 
 TIMEFRAME_MINUTES = {"5min": 5, "15min": 15, "30min": 30}
-MTF_MAP = {"5min": (15, 60), "15min": (30, 60), "30min": (60, 240)}
+MTF_MAP = {"5min": (15, 30), "15min": (30, 60), "30min": (60, 240)}
 
 
 def _time_seconds(value: Any) -> int:
@@ -332,11 +332,16 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "") -> dict:
     best = sides[best_side]
     score = int(best["score"])
     structure_ok = structure["direction"] == best_side and structure["type"] in ("BREAKOUT", "RETEST")
-    if structure_ok and best["mtf_aligned"] and score == 7 and adx_now >= 28 and regime == "TREND":
-        grade = "A+"
-    elif structure_ok and best["mtf_aligned"] and score >= 6 and adx_now >= 20 and regime == "TREND":
+    primary_aligned = primary == ("BULL" if best_side == "BUY" else "BEAR")
+    opposite = "BEAR" if best_side == "BUY" else "BULL"
+    higher_timeframes_both_opposed = bias1 == opposite and bias2 == opposite
+    # ADX/RSI/MACD/MTF aportan contexto y puntuación; no son candados individuales.
+    # La estructura, la dirección primaria y el riesgo sí protegen la entrada.
+    if structure_ok and primary_aligned and not higher_timeframes_both_opposed and score >= 6 and adx_now >= 25:
         grade = "A"
-    elif best["mtf_aligned"] and score >= 5 and regime == "TREND":
+    elif structure_ok and primary_aligned and not higher_timeframes_both_opposed and score >= 5:
+        grade = "B"
+    elif best["mtf_aligned"] and score >= 5:
         grade = "B"
     else:
         grade = "C"
@@ -363,29 +368,15 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "") -> dict:
         "data_warning": "Evaluación técnica; la puntuación no representa probabilidad de acierto.",
     }
 
-    if regime != "TREND":
-        return {
-            **common, **_wait(
-                "FILTRO_REGIMEN",
-                "Mercado lateral o en transición: se bloquean entradas confirmadas.",
-            ),
-        }
     if bias1 == "INSUFFICIENT" or bias2 == "INSUFFICIENT":
         return {
             **common, **_wait(
                 "MTF_INSUFICIENTE",
-                "No hay suficientes velas cerradas en las temporalidades superiores.",
-            ),
-        }
-    if not best["mtf_aligned"]:
-        return {
-            **common, **_wait(
-                "MTF_NO_ALINEADO",
-                "Las temporalidades superiores no confirman la misma dirección.",
+                "Falta contexto superior suficiente para clasificar la oportunidad.",
             ),
         }
 
-    if structure_ok and score >= 6:
+    if structure_ok and primary_aligned and not higher_timeframes_both_opposed and score >= 5:
         level = float(structure["level"])
         # Stop anchored to the broken/retested structure with an ATR buffer.
         if best_side == "BUY":
@@ -408,17 +399,17 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "") -> dict:
             "signal": best_side, "pre_signal": False, "pre_signal_side": None,
             "entry": closes[-1], "stop_loss": sl, "take_profit": tp,
             "risk_distance": risk, "risk_reward": 2.0,
-            "reason": f"Ruptura/retest confirmado; confluencia {score}/7 y MTF alineado.",
+            "reason": f"Ruptura/retest confirmado; confluencia {score}/7. ADX y MTF se usan como contexto.",
             "structure_trigger": structure["type"],
         }
 
-    if score >= 5 and structure["near_direction"] == best_side:
+    if primary_aligned and not higher_timeframes_both_opposed and score >= 4 and structure["near_direction"] == best_side:
         return {
             **common,
             "signal": "WAIT", "pre_signal": True, "pre_signal_side": best_side,
             "entry": None, "stop_loss": None, "take_profit": None,
             "risk_distance": None, "risk_reward": None,
-            "reason": f"Preseñal {best_side}: MTF alineado y precio cerca de una zona estructural. Esperar ruptura/retest confirmado.",
+            "reason": f"Preseñal {best_side}: estructura cercana y confluencia {score}/7. Preparar MT5; esperar activación del precio.",
             "structure_trigger": "PENDING",
         }
 

@@ -394,7 +394,7 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "") -> dict:
             "structure_trigger": structure["type"],
         }
 
-    if primary_aligned and not higher_timeframes_both_opposed and score >= 4 and structure["near_direction"] == best_side:
+    if regime != "RANGE" and primary_aligned and not higher_timeframes_both_opposed and score >= 4 and structure["near_direction"] == best_side:
         return {
             **common,
             "signal": "WAIT", "pre_signal": True, "pre_signal_side": best_side,

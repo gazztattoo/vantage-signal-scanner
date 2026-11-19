@@ -48,6 +48,15 @@ class BiQuoteStreamTests(unittest.TestCase):
         self.assertIsNone(_extract_tick(self.make_tick(bid=0)))
         self.assertIsNone(_extract_tick(self.make_tick(bid=2, ask=1)))
 
+    def test_prefers_iso_timestamp_over_native_mt_time(self):
+        stamp = datetime.now(timezone.utc).isoformat()
+        tick = self.make_tick()
+        tick["time"] = "2026.11.19 17:20:00"
+        tick["timestamp"] = stamp
+        parsed = _extract_tick(tick)
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed["timestamp"], datetime.fromisoformat(stamp).isoformat())
+
     def test_accepts_biquote_documented_time_field(self):
         stamp = datetime.now(timezone.utc).isoformat()
         tick = self.make_tick()

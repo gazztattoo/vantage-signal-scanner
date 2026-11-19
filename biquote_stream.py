@@ -18,10 +18,10 @@ from typing import Any
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.INFO)
 HUB_URL = "https://biquote.io/hubs/tick"
-SYMBOL_MAP = {"EURUSD": "EUR/USD", "XAUUSD": "XAU/USD"}
+SYMBOL_MAP = {"XAUUSD": "XAU/USD"}
 _requested_symbols = [
     item.strip().upper().replace("/", "")
-    for item in os.getenv("BIQUOTE_STREAM_SYMBOLS", "EURUSD,XAUUSD").split(",")
+    for item in os.getenv("BIQUOTE_STREAM_SYMBOLS", "XAUUSD").split(",")
     if item.strip()
 ]
 SYMBOLS = tuple(dict.fromkeys(item for item in _requested_symbols if item in SYMBOL_MAP))

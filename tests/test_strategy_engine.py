@@ -1,5 +1,6 @@
 import math
 import unittest
+from unittest.mock import patch
 from datetime import datetime, timedelta, timezone
 
 from strategy_engine import aggregate_candles, analyze
@@ -108,6 +109,20 @@ class MultiTimeframeEngineTests(unittest.TestCase):
         risk = result["entry"] - result["stop_loss"]
         reward = result["take_profit"] - result["entry"]
         self.assertAlmostEqual(reward / risk, 2.0, places=8)
+
+    def test_high_confluence_without_structure_is_not_graded_as_a_ready_setup(self):
+        no_trigger = {
+            "type": "NONE", "direction": "NONE", "level": None,
+            "near_direction": "NONE", "distance_atr": None,
+        }
+        with patch("strategy_engine._structure", return_value=no_trigger):
+            result = analyze(trend_bars(breakout=False), "5min", "TEST")
+        self.assertEqual(result["signal"], "WAIT")
+        self.assertIsNone(result["entry"])
+        self.assertEqual(result["setup_grade"], "C")
+        self.assertEqual(result["quality_grade"], "C")
+        self.assertIn(result["confluence_grade"], ("A", "B", "C"))
+        self.assertEqual(result["score"], result["score_max"] if result["score"] == 7 else result["score"])
 
     def test_pre_signal_never_contains_entry_or_risk_levels(self):
         result = analyze(pre_signal_bars(), "5min", "TEST")

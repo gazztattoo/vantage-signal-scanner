@@ -442,7 +442,9 @@ def generate_mock_candles(symbol, interval, count=1200):
 # explicitly enabled in the TEST service environment. It never changes DATA_MODE.
 BIQUOTE_RESEARCH_ENABLED = os.environ.get("BIQUOTE_RESEARCH_ENABLED", "true").strip().lower() in ("1", "true", "yes", "on")
 BIQUOTE_RESEARCH_CACHE = {}
-BIQUOTE_RESEARCH_CACHE_TTL = {"5m": 20, "15m": 45, "30m": 90}
+BIQUOTE_RESEARCH_CACHE_TTL = {"5m": 20, "15m": 45, "30m": 90, "1h": 180, "4h": 360}
+BIQUOTE_INTERVAL_MINUTES = {"5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240}
+BIQUOTE_INTERVAL_LIMITS = {"5m": 288, "15m": 192, "30m": 192, "1h": 168, "4h": 180}
 BIQUOTE_TICK_RESEARCH_CACHE = {}
 BIQUOTE_TICK_RESEARCH_TTL_SECONDS = 3
 
@@ -481,7 +483,7 @@ def fetch_biquote_research_ohlc(symbol, interval):
     provider_symbol = {"EUR/USD": "EURUSD", "XAU/USD": "XAUUSD", "BTC/USD": "BTCUSD"}[symbol]
     response = requests.get(
         f"https://biquote.io/api/{provider_symbol}/ohlc",
-        params={"interval": interval, "limit": 120},
+        params={"interval": interval, "limit": BIQUOTE_INTERVAL_LIMITS[interval]},
         timeout=12,
     )
     response.raise_for_status()
@@ -501,7 +503,7 @@ def fetch_biquote_research_ohlc(symbol, interval):
         payload,
         symbol=symbol,
         interval=interval,
-        max_last_closed_age_minutes=(int(interval[:-1]) * 2 + 2),
+        max_last_closed_age_minutes=(BIQUOTE_INTERVAL_MINUTES[interval] * 2 + 2),
     )
     if not normalized.get("accepted"):
         raise RuntimeError(normalized.get("reason", "Datos BiQuote rechazados."))
@@ -551,8 +553,8 @@ def biquote_research_ohlc():
     interval = (request.args.get("interval") or "5m").strip()
     if not symbol:
         return jsonify({"error": "Símbolo no permitido.", "allowed_symbols": sorted(ALLOWED_SYMBOLS)}), 400
-    if interval not in ("5m", "15m", "30m"):
-        return jsonify({"error": "Temporalidad no permitida.", "allowed_intervals": ["5m", "15m", "30m"]}), 400
+    if interval not in BIQUOTE_INTERVAL_MINUTES:
+        return jsonify({"error": "Temporalidad no permitida.", "allowed_intervals": sorted(BIQUOTE_INTERVAL_MINUTES)}), 400
 
     key = (symbol, interval)
     now_mono = time.monotonic()

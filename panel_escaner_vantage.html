@@ -1379,9 +1379,11 @@ async function loadTechnicalAnalysis(){
     message.textContent=symbol+" · "+({"5min":"M5","15min":"M15","30min":"M30"})[interval]+" · Datos recibidos del motor.";
   }catch(error){message.textContent=error.message||"Error al consultar el análisis.";}
 }
-document.getElementById("analysisRefresh").addEventListener("click",loadTechnicalAnalysis);
-document.getElementById("analysisSymbol").addEventListener("change",loadTechnicalAnalysis);
-document.getElementById("analysisTimeframe").addEventListener("change",loadTechnicalAnalysis);
+// La vista de Noticias no contiene controles de análisis técnico.
+["analysisRefresh","analysisSymbol","analysisTimeframe"].forEach(id=>{
+  const control=document.getElementById(id);
+  if(control)control.addEventListener(id==="analysisRefresh"?"click":"change",loadTechnicalAnalysis);
+});
 
 async function loadLabStatus(){
   const message=document.getElementById("labMessage");

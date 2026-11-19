@@ -8,8 +8,8 @@
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="VANTAGE TEST">
-<title>VANTAGE TEST</title>
+<meta name="apple-mobile-web-app-title" content="GLOBAL SCANNER">
+<title>GLOBAL SIGNAL SCANNER</title>
 
 <style>
 :root{
@@ -92,7 +92,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 }
 .overview-icon{color:var(--green);font-size:15px}
 .trend-list{
-  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
   gap:7px;padding:8px;
 }
 .trend-card{
@@ -166,8 +166,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
   .instrument-mark{width:40px;height:40px;flex-basis:40px;font-size:22px}
   .instrument-mark.forex{font-size:18px;gap:0}
   .instrument-mark.gold .gold-bars{transform:scale(.88)}
-  .instrument-mark.crypto{font-size:25px}
-  .market-overview{grid-template-columns:minmax(0,1.15fr) minmax(132px,.85fr);gap:7px;margin-bottom:13px}
+    .market-overview{grid-template-columns:minmax(0,1.15fr) minmax(132px,.85fr);gap:7px;margin-bottom:13px}
   .overview-panel{border-radius:12px}
   .overview-heading{padding:8px 8px;font-size:9px;letter-spacing:0;gap:5px}
   .overview-icon{font-size:12px}
@@ -245,12 +244,6 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .gold-bars i:nth-child(2){right:1px;bottom:3px}
 .gold-bars i:nth-child(3){left:8px;top:1px}
 
-.instrument-mark.crypto{
-  background:radial-gradient(circle at 32% 25%,#ffd28a 0%,#f7931a 48%,#a84c00 100%);
-  border:2px solid #ffc06a;color:#fff4df;font-size:29px;font-weight:950;
-  text-shadow:0 2px 5px rgba(91,39,0,.65);
-  box-shadow:0 0 12px rgba(247,147,26,.48),inset 0 0 8px rgba(255,255,255,.25);
-}
 .instrument-copy{min-width:0}
 .instrument-copy .symbol{white-space:nowrap}
 
@@ -336,7 +329,29 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
   .status{top:8px;right:8px;padding:7px 9px;font-size:10px;z-index:2}
 }
 
-/* BiQuote live tick monitor — TEST only */
+/* Vista operativa: prioriza decisión y niveles sin alterar el análisis */
+.trade-mode .market-overview{display:none!important}
+.trade-mode .metrics{display:none!important}
+.trade-mode .card{border-color:#315b40;box-shadow:0 8px 24px rgba(0,0,0,.22)}
+.trade-mode .price{font-size:clamp(28px,6vw,36px);margin:13px 0 2px;font-variant-numeric:tabular-nums}
+.trade-mode .levels{grid-template-columns:1fr;gap:8px}
+.trade-mode .level{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 13px}
+.trade-mode .level-top{flex:1;margin:0}
+.trade-mode .level span{font-size:11px;font-weight:850;letter-spacing:.35px}
+.trade-mode .level strong{font-size:17px;font-variant-numeric:tabular-nums}
+.trade-mode .level-top .copy-btn{padding:8px 11px;font-size:11px;min-height:36px}
+.trade-mode #tradeMode{background:#123b26;color:var(--green);border-color:#58f29a}
+@media(max-width:560px){
+  .toolbar #tradeMode{flex:1}
+  .trade-mode .card{padding:13px}
+  .trade-mode .levels{gap:7px}
+  .trade-mode .level{padding:11px 10px}
+  .trade-mode .level strong{font-size:16px}
+  .trade-mode .reason{min-height:0;margin:8px 0;font-size:11px}
+}
+
+
+/* BiQuote live quotes — production read-only monitor */
 .live-feed{margin:0 0 16px;padding:12px;border:1px solid var(--line);border-radius:15px;background:linear-gradient(145deg,rgba(15,39,27,.96),rgba(7,16,11,.98))}
 .live-feed-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .live-feed-title{font-size:12px;font-weight:900;letter-spacing:.3px}
@@ -348,38 +363,64 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 .live-feed-card{min-width:0;padding:10px;border:1px solid var(--line);border-radius:11px;background:rgba(2,10,6,.48)}
 .live-feed-symbol{font-size:10px;color:var(--muted);font-weight:800}
 .live-feed-price{font-size:clamp(18px,4vw,25px);font-weight:900;letter-spacing:-.6px;margin:6px 0;white-space:nowrap}
-.live-feed-meta{font-size:10px;color:var(--muted);line-height:1.5}
+.live-feed-meta{font-size:10px;color:var(--muted);line-height:1.5;white-space:pre-line}
 .live-feed-note{font-size:10px;color:var(--muted);margin-top:9px;line-height:1.45}
 @media(max-width:560px){.live-feed-grid{gap:6px}.live-feed-card{padding:8px}.live-feed-price{font-size:clamp(15px,4.4vw,21px)}}
 
-/* Manual BiQuote OHLC research panel — never connected to the signal engine */
-.bq-ohlc{margin:0 0 16px;padding:13px;border:1px solid var(--line);border-radius:15px;background:var(--panel)}
-.bq-ohlc-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px}
-.bq-ohlc-title{font-size:12px;font-weight:900;letter-spacing:.25px}
-.bq-ohlc-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.bq-ohlc-controls select,.bq-ohlc-controls button{min-height:36px;border-radius:9px;padding:7px 10px}
-.bq-ohlc-status{font-size:11px;color:var(--muted);margin:8px 0}
-.bq-ohlc-table-wrap{overflow-x:auto}
-.bq-ohlc-table{width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap}
-.bq-ohlc-table th,.bq-ohlc-table td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:right}
-.bq-ohlc-table th:first-child,.bq-ohlc-table td:first-child{text-align:left}
-.bq-ohlc-table th{color:var(--muted);font-weight:800}
-.bq-ohlc-note{font-size:10px;color:var(--muted);line-height:1.45;margin-top:9px}
-
+ 
+/* GEDEÓN 2.0 — visual refresh for mobile-first news and navigation */
+.brand-banner{transform:none!important;max-height:190px;object-fit:contain}
+@media(max-width:760px){.brand-banner{transform:none!important;max-height:none;object-fit:contain}}
+.top{background:#050b08;box-shadow:0 10px 28px rgba(0,0,0,.22)}
+.app-nav{padding:8px;gap:5px;border-color:rgba(88,242,154,.24);box-shadow:0 14px 38px rgba(0,0,0,.62),0 0 24px rgba(88,242,154,.07)}
+.app-nav button{min-height:58px}
+.app-nav button.active{box-shadow:inset 0 0 0 1px rgba(88,242,154,.12),0 4px 16px rgba(20,180,95,.10)}
+.news-intro{position:relative;overflow:hidden;margin:4px 0 14px;padding:22px 20px;border:1px solid rgba(88,242,154,.23);border-radius:20px;background:radial-gradient(ellipse at 92% 0%,rgba(40,180,105,.18),transparent 48%),linear-gradient(145deg,#14251b,#09110c 76%);box-shadow:0 12px 28px rgba(0,0,0,.22)}
+.news-eyebrow,.news-kicker{font-size:10px;letter-spacing:1.2px;font-weight:900;color:var(--green)}
+.news-intro h1{margin:8px 0 6px;font-size:clamp(25px,6vw,34px);letter-spacing:-.8px}
+.news-intro p{max-width:620px;margin:0;color:var(--muted);font-size:13px;line-height:1.55}
+.news-context-note{display:flex;align-items:center;gap:8px;margin-top:16px;color:#b8d0c0;font-size:11px}\n.news-refresh{margin-top:15px;padding:10px 14px;border-radius:10px;font-size:11px;font-weight:850;background:rgba(88,242,154,.12);border:1px solid rgba(88,242,154,.32);color:var(--green)}\n.news-refresh:active{transform:scale(.98)}
+.news-pulse{width:8px;height:8px;flex:0 0 8px;border-radius:50%;background:var(--green);box-shadow:0 0 12px rgba(88,242,154,.7)}
+.news-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.news-card{min-width:0;padding:17px;border:1px solid var(--line);border-radius:17px;background:linear-gradient(155deg,rgba(18,31,23,.98),rgba(8,16,11,.98));box-shadow:0 9px 22px rgba(0,0,0,.16)}
+.news-card-primary{background:radial-gradient(ellipse at 100% 0%,rgba(50,190,110,.12),transparent 55%),linear-gradient(155deg,#14251b,#09110c)}
+.news-card-wide{grid-column:1/-1}
+.news-card-heading{display:flex;align-items:center;gap:11px;margin-bottom:14px}
+.news-icon{display:grid;place-items:center;width:38px;height:38px;flex:0 0 38px;border-radius:12px;background:rgba(88,242,154,.10);border:1px solid rgba(88,242,154,.18);color:var(--green);font-size:19px}
+.news-kicker{display:block;font-size:9px;letter-spacing:1px}
+.news-card h2{margin:3px 0 0;font-size:15px;letter-spacing:-.2px}
+.news-status,.news-session{font-size:13px;line-height:1.55;color:#dcebe0;overflow-wrap:anywhere}
+.news-status{font-weight:750}
+.news-divider{height:1px;margin:16px 0;border-top:1px solid rgba(143,166,154,.16)}
+.news-events{display:grid;gap:9px;white-space:pre-line;line-height:1.8;font-size:12px;color:#d4e4d8}
+.news-events .news-empty,.news-empty{padding:11px;border:1px dashed rgba(143,166,154,.2);border-radius:10px;color:var(--muted);font-size:11px;line-height:1.5}
+.news-sessions{font-size:12px;line-height:1.9;color:#d4e4d8;overflow-wrap:anywhere;white-space:pre-line}
+.news-disclaimer{margin:13px 0 0;padding-top:12px;border-top:1px solid rgba(143,166,154,.14);color:var(--muted);font-size:10px;line-height:1.55}
+.news-footer{display:flex;justify-content:space-between;gap:12px;margin:14px 2px 4px;color:var(--muted);font-size:10px;line-height:1.5}
+.news-footer span:first-child{color:var(--green);font-weight:900;letter-spacing:.8px;white-space:nowrap}
+@media(max-width:560px){
+ .news-intro{padding:19px 16px;border-radius:17px}
+ .news-grid{grid-template-columns:1fr;gap:10px}
+ .news-card{padding:15px;border-radius:15px}
+ .news-card-wide{grid-column:auto}
+ .news-footer{display:block}
+ .news-footer span{display:block}
+ .news-footer span+span{margin-top:4px}
+}
 
 </style>
 </head>
 
-<body>
+<body class="trade-mode">
 
-<section class="access-gate" id="accessGate" aria-label="Acceso libre TEST" hidden><form class="access-box" id="accessForm"><h1>VANTAGE TEST</h1><p>Acceso libre para pruebas. No necesitas código.</p><input id="accessCode" type="password" autocomplete="current-password" placeholder="Código de acceso" required><button id="accessSubmit" type="submit">ENTRAR AL SCANNER</button><p class="access-error" id="accessError" role="alert"></p></form></section>
+<section class="access-gate" id="accessGate" aria-label="Acceso privado"><form class="access-box" id="accessForm"><h1>GLOBAL SIGNAL SCANNER</h1><p>Plataforma de acceso privado. Introduce el código que te compartió el administrador.</p><input id="accessCode" type="password" autocomplete="current-password" placeholder="Código de acceso" required><button id="accessSubmit" type="submit">ENTRAR AL SCANNER</button><p class="access-error" id="accessError" role="alert"></p></form></section>
 <main class="wrap">
 
 <header class="top">
   <img
     class="brand-banner"
     src="./global-signal-header.jpg"
-    alt="GLOBAL SIGNAL SCANNER — Trading Intelligence — Forex, Gold, Crypto"
+    alt="GLOBAL SIGNAL SCANNER — Gold Trading Intelligence"
   >
   <div class="status">
     <span class="dot" id="dot"></span>
@@ -390,48 +431,19 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 
 <section class="live-feed" id="biquoteLiveFeed" aria-label="Cotizaciones BiQuote en tiempo real">
   <div class="live-feed-head">
-    <div class="live-feed-title">BIQUOTE · STREAMING EN TIEMPO REAL · TEST</div>
-    <div class="live-feed-status"><span class="live-feed-dot" id="bqLiveDot"></span><span id="bqLiveStatus">Conectando al flujo de cotizaciones…</span></div>
+    <div class="live-feed-title">BIQUOTE · COTIZACIONES EN TIEMPO REAL</div>
+    <div class="live-feed-status"><span class="live-feed-dot" id="bqLiveDot"></span><span id="bqLiveStatus">Preparando conexión…</span></div>
   </div>
   <div class="live-feed-grid">
     <article class="live-feed-card"><div class="live-feed-symbol">ORO · XAU/USD</div><div class="live-feed-price" id="bqPriceXAU">—</div><div class="live-feed-meta" id="bqMetaXAU">Esperando primer tick</div></article>
-    <article class="live-feed-card"><div class="live-feed-symbol">EURO · EUR/USD</div><div class="live-feed-price" id="bqPriceEUR">—</div><div class="live-feed-meta" id="bqMetaEUR">Esperando primer tick</div></article>
-    <article class="live-feed-card"><div class="live-feed-symbol">BITCOIN · BTC/USD</div><div class="live-feed-price" id="bqPriceBTC">—</div><div class="live-feed-meta" id="bqMetaBTC">Esperando primer tick</div></article>
   </div>
-  <div class="live-feed-note">Feed externo BiQuote (no cotización Vantage). Los ticks se reciben mientras esta pantalla permanece abierta. Este monitor no ejecuta órdenes ni activa alertas.</div>
+  <div class="live-feed-note">Fuente externa BiQuote (feed MT5, no Vantage). El motor usa velas OHLC de BiQuote para indicadores y Bid/Ask del streaming para validar el precio de entrada. No ejecuta órdenes. Si no hay ticks recientes, la entrada queda bloqueada.</div>
 </section>
 
-<section class="bq-ohlc" id="biquoteOhlcResearch" aria-label="Velas BiQuote para investigación">
-  <div class="bq-ohlc-head">
-    <div class="bq-ohlc-title">BIQUOTE · VELAS OHLC · INVESTIGACIÓN TEST</div>
-    <span class="hint">Consulta manual</span>
-  </div>
-  <div class="bq-ohlc-controls">
-    <select id="bqOhlcSymbol" aria-label="Activo BiQuote">
-      <option value="XAU/USD">XAU/USD</option>
-      <option value="EUR/USD">EUR/USD</option>
-      <option value="BTC/USD">BTC/USD</option>
-    </select>
-    <select id="bqOhlcInterval" aria-label="Temporalidad BiQuote">
-      <option value="5m">M5</option>
-      <option value="15m">M15</option>
-      <option value="30m">M30</option>
-    </select>
-    <button id="bqOhlcLoad" type="button">Consultar velas</button>
-  </div>
-  <div class="bq-ohlc-status" id="bqOhlcStatus">No se ha realizado ninguna consulta. Pulsa «Consultar velas» para cargar datos.</div>
-  <div class="bq-ohlc-table-wrap">
-    <table class="bq-ohlc-table">
-      <thead><tr><th>Hora</th><th>Open</th><th>High</th><th>Low</th><th>Close</th></tr></thead>
-      <tbody id="bqOhlcRows"><tr><td colspan="5" style="text-align:left">Esperando consulta…</td></tr></tbody>
-    </table>
-  </div>
-  <div class="bq-ohlc-note">Fuente externa BiQuote (feed MT5 agregado, no Vantage). Solo se muestran velas cerradas. Estos datos no alimentan el motor de señales, no activan alertas y no ejecutan operaciones.</div>
-</section>
 
 <nav class="app-nav" aria-label="Navegación principal">
   <button type="button" class="active" data-view="scanner" aria-label="Scanner"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></span><span>Scanner</span></button>
-  <button type="button" data-view="analysis" aria-label="Análisis"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 3v18M20 3v18M4 7h4v6H4zM10 5h4v11h-4zM16 9h4v7h-4z"/></svg></span><span>Análisis</span></button>
+  <button type="button" data-view="analysis" aria-label="Noticias"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v13a1 1 0 0 1-1.5 1H5a2 2 0 0 1-2-2V6.5a2 2 0 0 1 2-2Z"/><path d="M7 8h10M7 12h10M7 16h6"/></svg></span><span>Noticias</span></button>
   <button type="button" data-view="performance" aria-label="Rendimiento"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 20h18M5 16l5-5 3 2 6-7"/><path d="M14 6h5v5"/><path d="M5 20V17M10 20v-3M15 20v-5M20 20v-8"/></svg></span><span>Rendimiento</span></button>
   <button type="button" data-view="history" aria-label="Historial"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"/><path d="M3 3v5h5M12 7v5l3.5 2"/></svg></span><span>Historial</span></button>
   <button type="button" data-view="lab" aria-label="Lab"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5.5 9.2A2 2 0 0 0 6.2 21h11.6a2 2 0 0 0 1.7-2.8L14 9V3"/><path d="M8 15h8M10 12h4"/></svg></span><span>Lab</span></button>
@@ -443,10 +455,8 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
   <section class="overview-panel">
     <div class="overview-heading"><span class="overview-icon">▥</span> TENDENCIA GENERAL DEL MERCADO</div>
     <div class="trend-list" id="trendList">
-      <div class="trend-card"><div class="trend-name">FOREX</div><div class="trend-note">Esperando análisis…</div></div>
       <div class="trend-card"><div class="trend-name">ORO</div><div class="trend-note">Esperando análisis…</div></div>
-      <div class="trend-card"><div class="trend-name">CRIPTO</div><div class="trend-note">Esperando análisis…</div></div>
-    </div>
+          </div>
   </section>
   <section class="overview-panel">
     <div class="overview-heading"><span class="overview-icon">◉</span> SENTIMIENTO TÉCNICO</div>
@@ -468,16 +478,18 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 <section class="toolbar">
   <label for="interval">Temporalidad</label>
   <select id="interval">
-    <option value="5min">M5 · automático</option>
-    <option value="15min">M15 · automático</option>
+    <option value="5min">M5 · consulta</option>
+    <option value="15min">M15 · consulta</option>
     <option value="30min">M30 · manual</option>
-  </select>  <button id="refresh">↻ Actualizar análisis</button>
-  <span class="hint" id="updated">M5 y M15 se escanean automáticamente. M30 solo al solicitarlo.</span>
+  </select>
+  <button id="refresh">↻ Actualizar análisis</button>
+  <span class="hint" id="updated">Producción pausada: M5/M15 disponibles bajo consulta. M30 solo al solicitarlo.</span>
 </section>
 
 
-<section class="toolbar" aria-label="Notificaciones TEST">
-  <span class="hint">Notificaciones deshabilitadas en TEST. Las alertas se habilitarán únicamente después de validar producción.</span>
+<section class="toolbar" aria-label="Notificaciones">
+  <button id="pushToggle" type="button">🔔 Activar notificaciones</button>
+  <span class="hint" id="pushStatus">Notificaciones desactivadas</span>
 </section>
 
 <section class="grid" id="cards" aria-live="polite"></section>
@@ -496,7 +508,7 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
     <h2>Historial de señales</h2>
     <p>Operaciones registradas automáticamente por el escáner. Solo se muestran registros reales guardados en el servidor.</p>
     <div class="data-toolbar">
-      <select id="historySymbol"><option value="">Todos los mercados</option><option>EUR/USD</option><option>XAU/USD</option><option>BTC/USD</option></select>
+      <select id="historySymbol"><option value="XAU/USD" selected>Oro · XAU/USD</option></select>
       <select id="historyTimeframe"><option value="">Todas las temporalidades</option><option value="5min">M5</option><option value="15min">M15</option><option value="30min">M30</option></select>
       <select id="historyStatus"><option value="">Todos los estados</option><option>PENDIENTE</option><option>TP</option><option>SL</option><option>CADUCADA</option><option>CANCELADA</option></select>
       <button id="historyRefresh" type="button">Actualizar</button>
@@ -517,18 +529,31 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 </section>
 
 <section class="app-view" id="viewAnalysis" hidden>
-  <div class="data-panel">
-    <h2>Análisis técnico</h2>
-    <p>Consulta los indicadores del motor para un mercado y temporalidad. Los datos son análisis técnicos experimentales, no una garantía de resultado.</p>
-    <p class="hint">M5 y M15 se actualizan mediante el escáner automático. M30 no se ejecuta en segundo plano: cada consulta manual consume datos solo cuando pulsas Analizar.</p>
-    <div class="data-toolbar">
-      <select id="analysisSymbol"><option value="EUR/USD">EUR/USD</option><option value="XAU/USD">XAU/USD</option><option value="BTC/USD">BTC/USD</option></select>
-      <select id="analysisTimeframe"><option value="5min">M5 · automático</option><option value="15min">M15 · automático</option><option value="30min">M30 · manual</option></select>
-      <button id="analysisRefresh" type="button">Analizar temporalidad seleccionada</button>
-    </div>
-    <div id="analysisMessage" class="hint" style="margin-bottom:12px">Selecciona mercado y temporalidad. M30 se consulta únicamente al pulsar el botón.</div>
-    <div id="analysisResult" class="stat-grid"></div>
-  </div>
+  <section class="news-intro">
+    <div class="news-eyebrow">GEDEÓN 2.0 · CONTEXTO DE MERCADO</div>
+    <h1>Noticias del oro</h1>
+    <p>Calendario económico, sesiones y acontecimientos que pueden aumentar la volatilidad de XAU/USD.</p>
+    <div class="news-context-note"><span class="news-pulse"></span><span>Información contextual · No predice la dirección del precio</span></div><button class="news-refresh" id="goldNewsRefresh" type="button">↻ Actualizar noticias</button>
+  </section>
+  <section class="news-grid" aria-label="Contexto macroeconómico del oro">
+    <article class="news-card news-card-primary">
+      <div class="news-card-heading"><span class="news-icon">◷</span><div><span class="news-kicker">CALENDARIO ECONÓMICO</span><h2>Estado de las noticias</h2></div></div>
+      <div id="goldNewsStatus" class="news-status">Consultando calendario…</div>
+      <div class="news-divider"></div>
+      <div class="news-card-heading"><span class="news-icon">◉</span><div><span class="news-kicker">MERCADO XAU/USD</span><h2>Horario del oro</h2></div></div>
+      <div id="goldSessionStatus" class="news-session">Calculando próxima apertura o cierre…</div>
+    </article>
+    <article class="news-card">
+      <div class="news-card-heading"><span class="news-icon">▤</span><div><span class="news-kicker">PRÓXIMOS EVENTOS</span><h2>Agenda macro</h2></div></div>
+      <div id="goldNewsEvents" class="news-events"><div class="news-empty">Esperando eventos del calendario…</div></div>
+    </article>
+    <article class="news-card news-card-wide">
+      <div class="news-card-heading"><span class="news-icon">◷</span><div><span class="news-kicker">SESIONES INTERNACIONALES</span><h2>Actividad por mercado</h2></div></div>
+      <div id="goldLiquiditySessions" class="news-sessions"><div class="news-empty">Calculando horarios locales…</div></div>
+      <p class="news-disclaimer">Los horarios mostrados son orientativos y pueden variar según el instrumento y el bróker. La agenda es una fuente externa; no constituye una señal de compra o venta.</p>
+    </article>
+  </section>
+  <div class="news-footer"><span>GEDEÓN 2.0</span><span>Las noticias aportan contexto; el análisis técnico conserva su evaluación independiente.</span></div>
 </section>
 
 <section class="app-view" id="viewLab" hidden>
@@ -551,75 +576,48 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 </main>
 
 <script>
-const API_BASE="https://global-signal-push-test.onrender.com";
-const TEST_RESULTS_URL="https://viiraygjdqwiuawnzyrc.supabase.co/functions/v1/gss-test-results";
-const TEST_DASHBOARD_URL="https://viiraygjdqwiuawnzyrc.supabase.co/functions/v1/gss-test-dashboard";
-let dashboardPromise=null;
-async function readTestDashboard(){
-  if(!dashboardPromise){
-    dashboardPromise=(async()=>{
-      const response=await fetch(TEST_DASHBOARD_URL,{cache:"no-store",headers:{"apikey":SUPABASE_ANON_KEY,"Authorization":"Bearer "+SUPABASE_ANON_KEY}});
-      const data=await response.json().catch(()=>({}));
-      if(!response.ok||data.error)throw new Error(data.detail||data.error||"No se pudo leer el resumen TEST.");
-      return data;
-    })();
-  }
-  return dashboardPromise;
-}
-const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpaXJheWdqZHF3aXVhd256eXJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NTkxNDQsImV4cCI6MjEwOTAzNTE0NH0.aRyOsuKO7wqZNz6A_pn1ZVaLlR0LssoQHb3qdFzLfpE";
-let accessToken="";
-let storedResultsPromise=null;
-
-async function readLatestTestResults(){
-  if(!storedResultsPromise){
-    storedResultsPromise=(async()=>{
-      const response=await fetch(TEST_RESULTS_URL,{
-        cache:"no-store",
-        headers:{"apikey":SUPABASE_ANON_KEY,"Authorization":"Bearer "+SUPABASE_ANON_KEY}
-      });
-      const data=await response.json().catch(()=>({}));
-      if(!response.ok||data.error)throw new Error(data.detail||data.error||"No se pudieron leer los resultados de Supabase TEST.");
-      if(!data.latest_run)throw new Error("Supabase TEST todavía no tiene una ejecución completada.");
-      return data;
-    })();
-  }
-  return storedResultsPromise;
-}
-
-async function loadStoredTestAnalysis(symbol,interval){
-  const snapshot=await readLatestTestResults();
-  const row=(snapshot.results||[]).find(item=>item.symbol===symbol&&item.timeframe===interval);
-  if(!row)throw new Error("Aún no hay resultados guardados para "+symbol+" · "+interval.toUpperCase()+".");
-  const details=row.details||{};
-  const displaySignal=row.pre_signal?"PRESEÑAL":row.signal==="BUY"?"COMPRA":row.signal==="SELL"?"VENTA":"ESPERAR";
-  return {
-    ...details,
-    symbol:row.symbol,
-    interval:row.timeframe,
-    signal:displaySignal,
-    pre_signal:row.pre_signal===true,
-    pre_signal_side:row.pre_signal_side||null,
-    price:row.price??details.price,
-    entry:row.entry??null,
-    stop_loss:row.stop_loss??null,
-    take_profit:row.take_profit??null,
-    risk_reward:row.risk_reward??null,
-    candle_time:row.candle_time??details.candle_time,
-    quality_grade:row.quality_grade??details.quality_grade,
-    score:row.score??details.score,
-    warning:"DATOS SIMULADOS: entorno TEST. No usar para operar ni enviar órdenes.",
-    method:"Motor MTF · EMA 20/50 · RSI 14 · ATR 14 · ADX/DI · MACD · ruptura/retest · objetivo 2R."
-  };
-}
+const API_BASE="https://vantage-signal-api-carlos.onrender.com";
+let accessToken=sessionStorage.getItem("gss_access_token")||"";
 const accessGate=document.getElementById("accessGate"), accessForm=document.getElementById("accessForm"), accessCodeInput=document.getElementById("accessCode"), accessError=document.getElementById("accessError"), accessSubmit=document.getElementById("accessSubmit");
-function showAccessGate(){accessGate.hidden=true;} function hideAccessGate(){accessGate.hidden=true;}
-async function requestAccess(code){const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),20000);try{const response=await fetch(API_BASE+"/api/access",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json","Cache-Control":"no-cache"},body:JSON.stringify({code}),signal:controller.signal});const data=await response.json().catch(()=>({}));if(!response.ok||!data.token)throw new Error(data.error||`No se pudo validar el código (HTTP ${response.status}).`);const check=await fetch(API_BASE+"/api/access/verify",{cache:"no-store",headers:{"Authorization":"Bearer "+data.token,"Cache-Control":"no-cache"},signal:controller.signal});const verification=await check.json().catch(()=>({}));if(!check.ok||verification.valid!==true)throw new Error("El servidor aceptó el código, pero rechazó la sesión ("+(verification.stage||"verificación fallida")+", HTTP "+check.status+").");accessToken=data.token;sessionStorage.setItem("gss_access_token",accessToken);}catch(error){if(error.name==="AbortError")throw new Error("El servidor TEST no respondió en 20 segundos.");throw error;}finally{clearTimeout(timeout);}}
-accessForm.addEventListener("submit",async event=>{event.preventDefault();accessSubmit.disabled=true;accessError.textContent="Verificando acceso…";try{await requestAccess(accessCodeInput.value);hideAccessGate();await update();if(accessGate.hidden){accessCodeInput.value="";}}catch(error){showAccessGate();accessError.textContent=error.message||"Código incorrecto."; }finally{accessSubmit.disabled=false;}});
+function showAccessGate(){accessGate.hidden=false;} function hideAccessGate(){accessGate.hidden=true;}
+async function requestAccess(code){
+  const response=await fetch(API_BASE+"/api/access",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||!data.token)throw new Error(data.error||`No se pudo validar el código (HTTP ${response.status}).`);
+  accessToken=data.token;
+  sessionStorage.setItem("gss_access_token",accessToken);
+
+  // Confirmar con la misma API que acaba de emitir el token antes de cerrar la pantalla.
+  const check=await fetch(API_BASE+"/api/access/check",{method:"GET",headers:authHeaders(),cache:"no-store"});
+  const checkData=await check.json().catch(()=>({}));
+  if(!check.ok||checkData.valid!==true){
+    accessToken="";
+    sessionStorage.removeItem("gss_access_token");
+    throw new Error(checkData.error||`El servidor emitió el acceso, pero no validó la sesión (HTTP ${check.status}).`);
+  }
+}
+accessForm.addEventListener("submit",async event=>{
+  event.preventDefault();
+  accessSubmit.disabled=true;
+  accessError.textContent="Verificando código y sesión…";
+  try{
+    await requestAccess(accessCodeInput.value);
+    accessCodeInput.value="";
+    accessError.textContent="";
+    hideAccessGate();
+    document.dispatchEvent(new Event("gss-access-ready"));
+    statusEl.textContent="Sesión verificada · Cargando scanner…";
+    await update();
+  }catch(error){
+    showAccessGate();
+    accessError.textContent=error.message||"No se pudo completar el acceso.";
+  }finally{
+    accessSubmit.disabled=false;
+  }
+});
 
 const markets=[
-  {symbol:"EUR/USD",category:"FOREX"},
-  {symbol:"XAU/USD",category:"ORO"},
-  {symbol:"BTC/USD",category:"CRIPTO"}
+  {symbol:"XAU/USD",category:"ORO"}
 ];
 
 const cards=document.getElementById("cards");
@@ -676,9 +674,6 @@ function instrumentIdentity(m){
   if(m.category==="ORO"){
     return `<span class="instrument-mark gold" aria-label="Lingotes de oro"><span class="gold-bars"><i></i><i></i><i></i></span></span>`;
   }
-  if(m.category==="CRIPTO"){
-    return `<span class="instrument-mark crypto" aria-label="Bitcoin">₿</span>`;
-  }
   return `<span class="instrument-mark">${esc(m.symbol.slice(0,1))}</span>`;
 }
 
@@ -725,38 +720,24 @@ function render(m,d,err,marketClosed=false){
   const raw=String(
     first(d,["signal","action","recommendation","side"])||"ESPERAR"
   ).toUpperCase();
-  const isPreSignal=Boolean(first(d,["pre_signal"]));
-  const preSide=String(first(d,["pre_signal_side"])||"").toUpperCase();
-
-  const s=isPreSignal
-    ?{t:"PRESEÑAL "+(preSide==="BUY"?"COMPRA":preSide==="SELL"?"VENTA":"EN FORMACIÓN"),c:preSide==="BUY"?"buy":preSide==="SELL"?"sell":""}
-    :raw.includes("COMPRA")||raw.includes("BUY")
-      ?{t:"COMPRA",c:"buy"}
-      :raw.includes("VENTA")||raw.includes("SELL")
-        ?{t:"VENTA",c:"sell"}
-        :{t:raw.includes("WAIT")?"ESPERAR":raw,c:""};
-
-  const entry=(isPreSignal||raw==="WAIT"||raw==="ESPERAR"||raw==="PRESEÑAL")?null:first(d,["entry","price"]);
-  const sl=first(d,["stop_loss","stopLoss","sl"]);
-  const tp=first(d,["take_profit","takeProfit","tp"]);
+  const live=d.live_quote||{};
+  const validation=d.live_quote_validation||{};
+  const isBuy=raw.includes("COMPRA")||raw.includes("BUY");
+  const isSell=raw.includes("VENTA")||raw.includes("SELL");
+  const liveEntry=isBuy?Number(live.ask):isSell?Number(live.bid):NaN;
+  const liveValid=validation.valid===true && validation.is_vantage_quote===false &&
+    Number.isFinite(liveEntry) && liveEntry>0 && Number(live.age_seconds)<=15;
+  const actionable=(isBuy||isSell)&&liveValid;
+  const safeRaw=actionable?raw:"ESPERAR";
+  const s=safeRaw.includes("COMPRA")||safeRaw.includes("BUY")?{t:"COMPRA",c:"buy"}:
+    safeRaw.includes("VENTA")||safeRaw.includes("SELL")?{t:"VENTA",c:"sell"}:{t:"ESPERAR",c:""};
+  const entry=actionable?liveEntry:null;
+  const sl=actionable?first(d,["stop_loss","stopLoss","sl"]):null;
+  const tp=actionable?first(d,["take_profit","takeProfit","tp"]):null;
   const reason=first(
     d,["reason","explanation","message","warning","method"]
   )||"Análisis recibido desde la API.";
-  const mtf=first(d,["mtf"])||{};
-  const biasLabel=b=>b==="BULL"?"ALCISTA":b==="BEAR"?"BAJISTA":b==="NEUTRAL"?"NEUTRAL":b==="INSUFFICIENT"?"SIN DATOS":"—";
-  const mtfLabel=mtf.timeframe_1
-    ?mtf.timeframe_1+" "+biasLabel(mtf.bias_1)+" · "+mtf.timeframe_2+" "+biasLabel(mtf.bias_2)
-    :"Sin confirmación MTF";
-  const structure=first(d,["structure"])||{};
-  const structureType=String(first(d,["structure_trigger"])||structure.type||"NONE").toUpperCase();
-  const structureLabel=structureType==="BREAKOUT"?"RUPTURA":structureType==="RETEST"?"RETEST":structureType==="PENDING"?"ZONA PRÓXIMA":"SIN CONFIRMAR";
-  const regime=String(first(d,["regime"])||"—").toUpperCase();
-  const regimeLabel=regime==="TREND"?"TENDENCIA":regime==="RANGE"?"LATERAL":regime==="TRANSITION"?"TRANSICIÓN":regime;
-  const shadow=first(d,["experimental_shadow"])||{};
-  const shadowLabel=shadow.decision==="WOULD_ALLOW"?"LA DEJARÍA PASAR":shadow.decision==="WOULD_BLOCK"?"LA BLOQUEARÍA":"SIN ENTRADA QUE FILTRAR";
-  const shadowPanel=shadow.mode==="shadow"
-    ? '<div style="margin:10px 0;padding:10px 12px;border:1px dashed #68716b;border-radius:10px;background:#101512"><div style="font-size:9px;letter-spacing:.7px;color:var(--muted)">FILTRO EXPERIMENTAL · MODO SOMBRA · NO APLICA BLOQUEOS</div><strong style="display:block;margin-top:4px;font-size:13px">'+esc(shadowLabel)+'</strong><div style="font-size:10px;color:var(--muted);margin-top:3px">'+esc(shadow.reason||"Comparación informativa.")+'</div></div>'
-    : "";
+  const safeReason=actionable?reason:((isBuy||isSell)?(d.entry_readiness?.reason||"ENTRADA BLOQUEADA: falta validación de cotización en directo reciente. No copiar ni operar."):reason);
 
   return `
     <article class="card">
@@ -775,35 +756,31 @@ function render(m,d,err,marketClosed=false){
         <span class="pill ${s.c}">${esc(s.t)}</span>
       </div>
 
-      <div class="price">${fmt(first(d,["price","entry"]),8)}</div>
-      <div class="priceLabel">PRECIO / ENTRADA DE REFERENCIA</div>
-      <p class="reason">${esc(reason)}</p>
+      <div class="live-card-price" data-live-quote="${m.symbol}" style="margin:12px 0;padding:10px 12px;border:1px solid #28543a;border-radius:10px;background:#07130c">
+        <div style="font-size:9px;letter-spacing:.8px;color:var(--muted)">COTIZACIÓN EN DIRECTO · BIQUOTE</div>
+        <strong data-live-mid style="display:block;font-size:22px;font-variant-numeric:tabular-nums">Esperando tick…</strong>
+        <div data-live-detail style="font-size:10px;color:var(--muted);margin-top:3px">Bid — · Ask — · Spread —</div>
+      </div>
+      <div class="price">${fmt(first(d,["price"]),8)}</div>
+      <div class="priceLabel">CIERRE DE LA VELA ANALIZADA · REFERENCIA HISTÓRICA, NO PRECIO EN DIRECTO</div>
+      <p class="reason">${esc(safeReason)}</p>
+
+      ${(()=>{const x=d.indicator_diagnostics||{};const adx=x.adx||{};const macd=x.macd||{};const rsi=x.rsi||{};const rows=[["ADX",adx.value,adx.required||">=18",adx.passed?"OK":"FALTA"],["MACD",macd.value,"Compra: "+(macd.buy_passed?"OK":"—")+" · Venta: "+(macd.sell_passed?"OK":"—"),macd.buy_passed||macd.sell_passed?"HAY DIRECCIÓN":"SIN DIRECCIÓN"],["RSI",rsi.value,"Compra: "+(rsi.buy_passed?"OK":"—")+" · Venta: "+(rsi.sell_passed?"OK":"—"),rsi.buy_passed||rsi.sell_passed?"EN RANGO":"FUERA DE RANGO"]];return '<div style="margin:10px 0;padding:10px 12px;border:1px solid var(--line);border-radius:11px"><div style="font-size:10px;letter-spacing:.6px;color:var(--muted);margin-bottom:8px">QUÉ FALTA PARA CONFIRMAR</div>'+rows.map(([n,v,req,status])=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;font-size:12px"><span>'+n+' · '+esc(req)+'</span><strong style="color:'+(status==="OK"||status==="HAY DIRECCIÓN"||status==="EN RANGO"?'var(--green)':'var(--amber)')+'">'+(v===undefined?'—':esc(String(v)))+' · '+status+'</strong></div>').join('')+'</div>';})()}
+
+      <div class="entry-readiness" style="margin:10px 0;padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:#09140d">
+        <div style="font-size:9px;color:var(--muted);letter-spacing:.7px">ESTADO REAL DE LA ENTRADA</div>
+        <strong style="display:block;margin-top:4px;font-size:13px;color:${d.entry_readiness?.ready?"var(--green)":"var(--amber)"}">${esc(d.entry_readiness?.label||"PENDIENTE · Validación no disponible")}</strong>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px;line-height:1.4">${esc(d.entry_readiness?.reason||"La puntuación técnica no garantiza que el precio actual permita entrar.")}</div>
+      </div>
 
       <div class="quality-panel" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0 12px;padding:10px 12px;border:1px solid #28543a;border-radius:11px;background:#09140d">
         <div>
-          <div style="font-size:9px;color:var(--muted);letter-spacing:.7px">CALIDAD DE LA SEÑAL</div>
+          <div style="font-size:9px;color:var(--muted);letter-spacing:.7px">CALIDAD TÉCNICA DE LOS INDICADORES</div>
           <strong style="display:block;margin-top:3px;font-size:15px;color:${first(d,["quality_grade"])==="A+"?"var(--green)":first(d,["quality_grade"])==="A"?"#a6e8bd":"var(--amber)"}">${esc(first(d,["quality_grade"])||"—")} · ${esc(first(d,["quality_label"])||"Sin clasificar")}</strong>
         </div>
         <div style="text-align:right">
           <strong style="font-size:19px;font-variant-numeric:tabular-nums">${fmt(first(d,["quality_score"]),0)}<span style="font-size:10px;color:var(--muted)">/100</span></strong>
           <div style="font-size:9px;color:var(--muted)">Puntuación técnica</div>
-        </div>
-      </div>
-
-      ${shadowPanel}
-
-      <div class="metrics">
-        <div class="metric">
-          <span>RÉGIMEN</span>
-          <strong>${esc(regimeLabel)}</strong>
-        </div>
-        <div class="metric">
-          <span>ESTRUCTURA</span>
-          <strong>${esc(structureLabel)} ${esc(biasLabel(structure.direction==="BUY"?"BULL":structure.direction==="SELL"?"BEAR":"NEUTRAL"))}</strong>
-        </div>
-        <div class="metric">
-          <span>CONFIRMACIÓN MTF</span>
-          <strong>${esc(mtfLabel)}</strong>
         </div>
       </div>
 
@@ -931,7 +908,27 @@ cards.addEventListener("click",async event=>{
 });
 
 async function load(m){
-  return await loadStoredTestAnalysis(m.symbol,document.getElementById("interval").value);
+  const p=new URLSearchParams({
+    symbol:m.symbol,
+    interval:document.getElementById("interval").value
+  });
+
+  const r=await fetch(`${API_BASE}/api/analysis?${p}`,{headers:{"Authorization":"Bearer "+accessToken}});
+
+  let d;
+  try{
+    d=await r.json();
+  }catch{
+    throw Error("La API no devolvió JSON válido");
+  }
+
+  if(!r.ok||d.error){
+    const error=new Error(d.error||`Error HTTP ${r.status}`);
+    error.status=r.status;
+    throw error;
+  }
+
+  return d;
 }
 
 
@@ -968,7 +965,7 @@ function updateOverview(results){
     market:item.m,
     bias:item.err?null:technicalBias(item.d)
   }));
-  const names={FOREX:"FOREX",ORO:"ORO",CRIPTO:"CRIPTO"};
+  const names={ORO:"ORO"};
   trendList.innerHTML=analyzed.map(item=>{
     const name=names[item.market.category]||item.market.category;
     const b=item.bias;
@@ -1019,7 +1016,6 @@ function updateOverview(results){
 }
 
 async function update(){
-  storedResultsPromise=null;
   button.disabled=true;
   statusEl.textContent="Consultando análisis…";
   dot.style.background="var(--amber)";
@@ -1031,7 +1027,22 @@ async function update(){
     </article>
   `).join("");
 
+  let marketState={};
+  try{
+    const marketResponse=await fetch(API_BASE+"/api/market-status");
+    if(marketResponse.ok){
+      const marketData=await marketResponse.json();
+      marketState=marketData.markets||{};
+    }
+  }catch(error){
+    console.warn("No se pudo consultar el horario de mercado",error);
+  }
+
   const out=await Promise.all(markets.map(async m=>{
+    const session=marketState[m.symbol];
+    if(session && !session.open){
+      return {m,marketClosed:true,err:"MERCADO CERRADO · No se generan señales ni alertas fuera de la sesión habitual."};
+    }
     try{
       return {m,d:await load(m)};
     }catch(e){
@@ -1066,33 +1077,33 @@ async function update(){
   ));
 
   if(authExpired){
+    const authFailure=out.find(x=>x.status===401);
     accessToken="";
     sessionStorage.removeItem("gss_access_token");
-    hideAccessGate();
-    accessError.textContent="";
-    statusEl.textContent="Error de autorización del servicio TEST; el panel permanece de acceso libre.";
+    showAccessGate();
+    accessError.textContent=authFailure?.err||"La API rechazó la sesión. Vuelve a introducir el código.";
+    statusEl.textContent="Acceso requerido";
     dot.style.background="var(--amber)";
     button.disabled=false;
     return;
   }
 
   const fails=out.filter(x=>x.err).length;
+  const closed=out.filter(x=>x.marketClosed).length;
+  const active=out.length-fails-closed;
 
   statusEl.textContent=
     fails===0
-      ?"Supabase TEST conectado"
-      :fails===markets.length
-        ?"Error de conexión con Supabase"
+      ?(closed>0
+        ?`Motor conectado · ${active} activos · ${closed} mercados cerrados`
+        :"Motor conectado")
+      :fails===markets.length-closed
+        ?"Error de conexión"
         :"Conexión parcial";
 
-  dot.style.background=fails===0?"var(--green)":"var(--red)";
-  try{
-    const snapshot=await readLatestTestResults();
-    updated.textContent="Último ciclo automático: "+
-      new Date(snapshot.latest_run.started_at).toLocaleTimeString("es-ES");
-  }catch{
-    updated.textContent="No se pudo leer la hora del último ciclo";
-  }
+  dot.style.background=fails===0?"var(--green)": "var(--red)";
+  updated.textContent="Actualizado: "+
+    new Date().toLocaleTimeString("es-ES");
 
   button.disabled=false;
 }
@@ -1106,7 +1117,7 @@ function switchView(name){
   });
   if(name==="history")loadHistory();
   if(name==="performance")loadPerformance();
-  if(name==="analysis")loadTechnicalAnalysis();
+  if(name==="analysis"){}
   if(name==="lab")loadLabStatus();
 }
 viewButtons.forEach(button=>button.addEventListener("click",()=>switchView(button.dataset.view)));
@@ -1125,8 +1136,11 @@ async function loadTechnicalAnalysis(){
   const interval=document.getElementById("analysisTimeframe").value;
   message.textContent="Consultando indicadores…";result.innerHTML="";
   try{
-    storedResultsPromise=null;
-    const data=await loadStoredTestAnalysis(symbol,interval);
+    const params=new URLSearchParams({symbol,interval});
+    const response=await fetch(API_BASE+"/api/analysis?"+params,{headers:authHeaders()});
+    const data=await response.json().catch(()=>({}));
+    if(response.status===401){message.textContent="Sesión caducada. Vuelve a entrar al panel.";showAccessGate();return;}
+    if(!response.ok||data.error)throw new Error(data.error||"No se pudo obtener el análisis.");
     const fields=[
       ["Señal",first(data,["signal","direction","recommendation"])||"—"],
       ["Precio",fmt(first(data,["price","entry"]),8)],
@@ -1152,24 +1166,29 @@ document.getElementById("analysisSymbol").addEventListener("change",loadTechnica
 document.getElementById("analysisTimeframe").addEventListener("change",loadTechnicalAnalysis);
 
 async function loadLabStatus(){
-  const message=document.getElementById("labMessage"),stats=document.getElementById("labStats"),details=document.getElementById("labDetails");
-  message.textContent="Consultando estado de Supabase TEST…";stats.innerHTML="";details.innerHTML="";
+  const message=document.getElementById("labMessage");
+  const stats=document.getElementById("labStats");
+  const details=document.getElementById("labDetails");
+  message.textContent="Consultando almacenamiento y configuración del motor…";
+  stats.innerHTML="";details.innerHTML="";
   try{
-    dashboardPromise=null;
-    const data=await readTestDashboard(),lab=data.lab||{},runs=data.runs||[],latest=data.latest_run;
-    const values=[["Ejecuciones completadas",runs.filter(x=>x.status==="completed").length],["Último ciclo",latest?new Date(latest.started_at).toLocaleTimeString("es-ES"):"—"],["Análisis guardados",data.stats?.total_analyses??0],["Llamadas a proveedores",lab.provider_calls??0],["Notificaciones",lab.notifications_enabled?"Habilitadas":"Deshabilitadas"],["Órdenes al broker",lab.broker_execution?"Habilitadas":"Deshabilitadas"],["Render necesario para analizar",lab.render_dependency?"Sí":"No"],["Modo de datos",data.mode==="mock"?"Simulados":"Desconocido"]];
+    const response=await fetch(API_BASE+"/api/lab-status",{headers:authHeaders()});
+    const data=await response.json().catch(()=>({}));
+    if(response.status===401){message.textContent="Sesión caducada. Vuelve a entrar al panel.";showAccessGate();return;}
+    if(!response.ok)throw new Error(data.error||"No se pudo cargar el diagnóstico.");
+    const records=data.records||{};
+    const values=[
+      ["Señales registradas",records.total_signals??0],
+      ["Pendientes",records.pending_signals??0],
+      ["Cerradas",records.closed_signals??0],
+      ["Dispositivos push",records.push_devices??0],
+      ["Proveedor de datos",data.provider_configured?"Configurado":"No configurado"],
+      ["Almacenamiento",data.storage_configured?"Conectado":"No conectado"]
+    ];
     stats.innerHTML=values.map(([label,value])=>'<div class="stat-box"><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong></div>').join("");
-    const alertEvents=data.alert_events||[],alertStats=data.alert_event_stats||{};
-    const rows=[["Motor",lab.strategy||"—"],["Símbolos",(lab.symbols||[]).join(", ")],["Temporalidades",(lab.timeframes||[]).join(", ")],["Programación Cron",lab.cron_schedule||"—"],["Última ejecución",latest?latest.status+" · "+latest.results_count+" resultados":"Sin ejecución"],["Fuente de datos",lab.provider||"—"],["Alertas de prueba",alertStats.total??0],["PREALERTAS",alertStats.prealerts??0],["ENTRADAS VALIDADAS",alertStats.confirmed_entries??0],["Entrega","Solo vista previa · sin push"],["Llamadas a proveedores",alertStats.provider_calls??0],["Órdenes al broker",alertStats.broker_orders_sent??0]];
-    const alertCards=alertEvents.map(event=>{
-      const payload=event.event_payload||{},isPre=event.event_type==="PREALERTA";
-      const label=isPre?"PREALERTA":"ENTRADA VALIDADA";
-      const levels=isPre?"Sin entrada, SL ni TP":("Entrada "+fmt(payload.entry,8)+" · SL "+fmt(payload.stop_loss,8)+" · TP "+fmt(payload.take_profit,8));
-      const fixture=payload.fixture===true?" · EJEMPLO":"";
-      return '<article class="data-row"><div style="grid-column:1/-1"><span>'+esc(label+fixture)+' · '+esc(event.symbol)+' · '+esc(event.timeframe)+'</span><strong>'+esc(event.side)+' · '+esc(payload.message||"")+'</strong><span>'+esc(levels)+' · '+esc(event.delivery_status||"PREVIEW_ONLY")+'</span></div></article>';
-    }).join("");
-    details.innerHTML='<strong style="font-size:13px">Configuración de TEST</strong><div class="data-list" style="margin-top:10px">'+rows.map(([key,value])=>'<div class="data-row"><div style="grid-column:1/-1"><span>'+esc(key)+'</span><strong>'+esc(value)+'</strong></div></div>').join("")+'</div><strong style="display:block;font-size:13px;margin-top:16px">Vista previa de alertas · no enviadas</strong><div class="data-list" style="margin-top:10px">'+(alertCards||'<div class="empty-state">Todavía no hay eventos de alerta.</div>')+'</div>';
-    message.textContent="Diagnóstico TEST actualizado · alertas en vista previa · producción intacta.";
+    const engine=data.engine||{};
+    details.innerHTML='<strong style="font-size:13px">Configuración activa del motor</strong><div class="data-list" style="margin-top:10px">'+Object.entries(engine).map(([key,value])=>'<div class="data-row"><div style="grid-column:1/-1"><span>'+esc(key.replaceAll("_"," "))+'</span><strong>'+esc(value)+'</strong></div></div>').join("")+'</div>';
+    message.textContent="Diagnóstico actualizado: "+new Date(data.checked_at).toLocaleString("es-ES")+" · "+(data.data_provider||"Proveedor no indicado");
   }catch(error){message.textContent=error.message||"Error al consultar el laboratorio.";}
 }
 document.getElementById("labRefresh").addEventListener("click",loadLabStatus);
@@ -1177,140 +1196,255 @@ document.getElementById("labRefresh").addEventListener("click",loadLabStatus);
 function authHeaders(){return {"Authorization":"Bearer "+accessToken};}
 function statusClass(status){return status==="TP"?"tp":status==="SL"?"sl":"";}
 async function loadHistory(){
-  const message=document.getElementById("historyMessage"),list=document.getElementById("historyList");
-  message.textContent="Consultando ciclos de análisis TEST…";list.innerHTML="";
+  const message=document.getElementById("historyMessage");
+  const list=document.getElementById("historyList");
+  message.textContent="Consultando historial…";list.innerHTML="";
+  const params=new URLSearchParams({limit:"100"});
+  const deepLink=new URLSearchParams(window.location.search);
+  const symbol=deepLink.get("symbol")||document.getElementById("historySymbol").value;
+  const timeframe=deepLink.get("timeframe")||document.getElementById("historyTimeframe").value;
+  const candleTime=deepLink.get("candle_time")||"";
+  const state=document.getElementById("historyStatus").value;
+  if(symbol){params.set("symbol",symbol);document.getElementById("historySymbol").value=symbol;}
+  if(timeframe){params.set("timeframe",timeframe);document.getElementById("historyTimeframe").value=timeframe;}
+  if(candleTime)params.set("candle_time",candleTime);
+  if(state)params.set("status",state);
+  const controller=new AbortController();
+  const timeoutId=setTimeout(()=>controller.abort(),60000);
   try{
-    dashboardPromise=null;
-    const data=await readTestDashboard();
-    const symbol=document.getElementById("historySymbol").value,timeframe=document.getElementById("historyTimeframe").value,state=document.getElementById("historyStatus").value;
-    let rows=data.history||[];
-    if(symbol)rows=rows.filter(x=>x.symbol===symbol);
-    if(timeframe)rows=rows.filter(x=>x.timeframe===timeframe);
-    if(state&&state!=="PENDIENTE")rows=[];
-    message.textContent=rows.length+" análisis simulados encontrados · no son operaciones ni señales históricas reales.";
-    if(!rows.length){list.innerHTML='<div class="empty-state">No hay análisis TEST con estos filtros.</div>';return;}
+    const response=await fetch(API_BASE+"/api/history?"+params,{headers:authHeaders(),signal:controller.signal});
+    const data=await response.json().catch(()=>({}));
+    if(response.status===401){message.textContent="Sesión caducada. Vuelve a entrar al panel.";showAccessGate();return;}
+    if(!response.ok)throw new Error(data.error||"No se pudo cargar el historial.");
+    const rows=data.signals||[];
+    message.textContent=deepLink.has("candle_time")?"Señal de la notificación · "+rows.length+" registro(s) exacto(s).":rows.length+" señal(es) encontrada(s).";
+    if(!rows.length){list.innerHTML='<div class="empty-state">Todavía no hay señales guardadas con estos filtros.<br>Cuando aparezca una nueva señal COMPRA o VENTA, se registrará aquí.</div>';return;}
     list.innerHTML=rows.map(row=>{
-      const date=row.scanned_at?new Date(row.scanned_at).toLocaleString("es-ES"):"—",tf=({"5min":"M5","15min":"M15","30min":"M30"})[row.timeframe]||row.timeframe;
-      const signal=row.pre_signal?"PRESEÑAL "+(row.pre_signal_side||""):(row.signal==="BUY"?"COMPRA":row.signal==="SELL"?"VENTA":"ESPERAR");
-      return '<article class="data-row"><div><span>TEST · '+esc(tf)+'</span><strong>'+esc(row.symbol)+' · '+esc(signal)+'</strong><span>'+esc(date)+'</span></div><div><span>Precio simulado</span><strong>'+fmt(row.price,8)+'</strong><span>Puntuación '+esc(row.score??"—")+'/7</span></div><div><span>Calidad</span><strong>'+esc(row.quality_grade||"—")+'</strong><span class="data-status">'+esc(row.status_code||"SIMULADO")+'</span></div></article>';
+      const date=row.signal_at?new Date(row.signal_at).toLocaleString("es-ES"):"—";
+      const timeframeLabel=({"5min":"M5","15min":"M15","30min":"M30"})[row.timeframe]||row.timeframe;
+      return '<article class="data-row"><div><span>Mercado · '+esc(timeframeLabel)+'</span><strong>'+esc(row.symbol)+' · '+esc(row.direction)+'</strong><span>'+esc(date)+'</span></div><div><span>Entrada</span><strong>'+fmt(row.entry_price,8)+'</strong><span>SL '+fmt(row.stop_loss,8)+'</span></div><div><span>Take profit</span><strong>'+fmt(row.take_profit,8)+'</strong><span class="data-status '+statusClass(row.status)+'">'+esc(row.status)+'</span></div></article>';
     }).join("");
-  }catch(error){message.textContent=error.message||"Error al consultar los ciclos TEST.";}
+  }catch(error){
+    message.textContent=error.name==="AbortError"
+      ?"El servidor tardó demasiado en responder. Pulsa Actualizar para intentarlo de nuevo."
+      :(error.message||"Error al consultar el historial.");
+    list.innerHTML="";
+  }finally{
+    clearTimeout(timeoutId);
+  }
 }
 async function loadPerformance(){
-  const message=document.getElementById("performanceMessage"),stats=document.getElementById("performanceStats"),breakdown=document.getElementById("performanceBreakdown");
-  message.textContent="Calculando métricas de prueba…";stats.innerHTML="";breakdown.innerHTML="";
+  const message=document.getElementById("performanceMessage");
+  const stats=document.getElementById("performanceStats");
+  const breakdown=document.getElementById("performanceBreakdown");
+  message.textContent="Calculando efectividad…";stats.innerHTML="";breakdown.innerHTML="";
   try{
-    dashboardPromise=null;
-    const data=await readTestDashboard(),s=data.stats||{};
-    const values=[["Análisis realizados",s.total_analyses??0],["Señales confirmadas",s.confirmed_signals??0],["Preseñales",s.pre_signals??0],["En espera",s.waiting??0],["Operaciones cerradas",s.closed_trades??0],["Ganadas","No disponible"],["Perdidas","No disponible"],["Porcentaje de acierto","No disponible"]];
+    const response=await fetch(API_BASE+"/api/performance",{headers:authHeaders()});
+    const data=await response.json().catch(()=>({}));
+    if(response.status===401){message.textContent="Sesión caducada. Vuelve a entrar al panel.";showAccessGate();return;}
+    if(!response.ok)throw new Error(data.error||"No se pudieron cargar las estadísticas.");
+    const values=[
+      ["Señales registradas",data.total_signals??0],
+      ["Pendientes",data.pending??0],
+      ["Resultados cerrados",data.closed_trades??0],
+      ["Ganadas (TP)",data.wins??0],
+      ["Perdidas (SL)",data.losses??0],
+      ["Porcentaje de acierto",data.win_rate===null?"—":data.win_rate+"%"],
+      ["Expectativa media",data.expectancy_r===null?"—":data.expectancy_r+" R"],
+      ["Factor de beneficio",data.profit_factor==="inf"?"∞":data.profit_factor??"—"]
+    ];
     stats.innerHTML=values.map(([label,value])=>'<div class="stat-box"><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong></div>').join("");
-    breakdown.innerHTML='<div class="empty-state">'+esc(s.performance_note||"No hay resultados de operaciones cerradas.")+'<br>Los análisis utilizan velas sintéticas; no calculamos rentabilidad ni win rate con estos datos.</div>';
-    message.textContent="Estadísticas de ejecución TEST · "+(data.runs||[]).length+" ciclos almacenados.";
-  }catch(error){message.textContent=error.message||"Error al calcular estadísticas TEST.";}
+    const groups=Object.entries(data.breakdown||{});
+    const groupHtml=groups.length?'<div class="data-panel"><strong style="font-size:12px">Resultados por mercado y temporalidad</strong></div>'+groups.map(([name,item])=>'<article class="data-row"><div><span>Mercado / temporalidad · señales '+item.total+'</span><strong>'+esc(name)+'</strong></div><div><span>Ganadas / perdidas</span><strong>'+item.wins+' / '+item.losses+'</strong></div><div><span>Pendientes</span><strong>'+item.pending+'</strong></div></article>').join(""):'<div class="empty-state">Todavía no hay señales registradas.</div>';
+    const sides=Object.entries(data.direction_breakdown||{});
+    const sideHtml=sides.length?'<div class="data-panel"><strong style="font-size:12px">Efectividad por dirección</strong></div>'+sides.map(([name,item])=>'<article class="data-row"><div><span>Dirección · señales '+item.total+'</span><strong>'+esc(name)+'</strong></div><div><span>Ganadas</span><strong>'+item.wins+'</strong></div><div><span>Perdidas</span><strong>'+item.losses+'</strong></div></article>').join(""):"";
+    breakdown.innerHTML=groupHtml+sideHtml;
+    message.textContent=(data.sample_note?data.sample_note+" ":"")+(data.note||"Resultados simulados del scanner.")+(data.truncated?" Atención: se alcanzó el límite de lectura; la estadística puede estar incompleta.":"");
+  }catch(error){message.textContent=error.message||"Error al calcular rendimiento.";}
 }
 document.getElementById("historyRefresh").addEventListener("click",loadHistory);
 ["historySymbol","historyTimeframe","historyStatus"].forEach(id=>document.getElementById(id).addEventListener("change",loadHistory));
 
 button.addEventListener("click",update);
 document.getElementById("interval").addEventListener("change",update);
-// Keep an open TEST panel synchronized with Supabase scheduled scans.
-setInterval(()=>{if(!document.hidden)update();},5*60*1000);
-hideAccessGate();update();
+if(accessToken){hideAccessGate();update();}else{showAccessGate();statusEl.textContent="Acceso requerido";}
 
-// TEST safety: push subscriptions, test pushes and notification actions are intentionally disabled.
-
-
+const pushStatus=document.getElementById("pushStatus");
+const pushToggleButton=document.getElementById("pushToggle");
+const PUSH_API=API_BASE+"/api/push";
+async function restorePushState(){
+  try{
+    if(!("serviceWorker" in navigator)||!("PushManager" in window)||!("Notification" in window)){
+      pushStatus.textContent="Notificaciones no disponibles en este navegador";
+      pushToggleButton.disabled=true; return;
+    }
+    const registration=await navigator.serviceWorker.ready;
+    const subscription=await registration.pushManager.getSubscription();
+    if(Notification.permission==="denied"){
+      pushStatus.textContent="Notificaciones bloqueadas en los ajustes del dispositivo";
+      pushToggleButton.textContent="🔔 Notificaciones bloqueadas";
+      pushToggleButton.disabled=true; return;
+    }
+    if(subscription){
+      pushStatus.textContent="Notificaciones activadas en este dispositivo";
+      pushToggleButton.textContent="🔕 Desactivar notificaciones";
+    }else{
+      pushStatus.textContent=Notification.permission==="granted"?"Permiso concedido, falta activar la suscripción":"Notificaciones desactivadas";
+      pushToggleButton.textContent="🔔 Activar notificaciones";
+    }
+    pushToggleButton.disabled=false;
+  }catch(error){
+    pushStatus.textContent="No se pudo comprobar el estado de las notificaciones";
+    pushToggleButton.textContent="🔔 Activar notificaciones";
+    pushToggleButton.disabled=false;
+  }
+}
+restorePushState();
+function urlBase64ToUint8Array(value){
+  const padding="=".repeat((4-value.length%4)%4);
+  const base64=(value+padding).replace(/-/g,"+").replace(/_/g,"/");
+  const raw=atob(base64);
+  return Uint8Array.from([...raw].map(char=>char.charCodeAt(0)));
+}
+pushToggleButton.addEventListener("click",async()=>{
+  pushToggleButton.disabled=true;
+  try{
+    if(!accessToken)throw new Error("Primero debes entrar al scanner.");
+    if(!("serviceWorker" in navigator)||!("PushManager" in window)||!("Notification" in window))throw new Error("Este navegador no admite notificaciones push.");
+    const registration=await navigator.serviceWorker.ready;
+    let subscription=await registration.pushManager.getSubscription();
+    if(subscription){
+      pushStatus.textContent="Desactivando notificaciones…";
+      const response=await fetch(PUSH_API+"/unsubscribe",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+accessToken},body:JSON.stringify({endpoint:subscription.endpoint})});
+      const result=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(result.error||"No se pudo eliminar la suscripción del servidor.");
+      await subscription.unsubscribe();
+      pushStatus.textContent="Notificaciones desactivadas en este dispositivo.";
+    }else{
+      pushStatus.textContent="Preparando notificaciones…";
+      const permission=await Notification.requestPermission();
+      if(permission!=="granted")throw new Error("No se concedió permiso para notificaciones.");
+      const keyResponse=await fetch(PUSH_API+"/public-key");
+      const keyData=await keyResponse.json().catch(()=>({}));
+      if(!keyResponse.ok||!keyData.public_key)throw new Error(keyData.error||"No se pudo obtener la clave pública.");
+      subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(keyData.public_key)});
+      const response=await fetch(PUSH_API+"/subscribe",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+accessToken},body:JSON.stringify({subscription:subscription.toJSON()})});
+      const result=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(result.error||"No se pudo guardar la suscripción.");
+      pushStatus.textContent="Notificaciones activadas en este dispositivo";
+    }
+  }catch(error){pushStatus.textContent=error.message||"No se pudo cambiar el estado de las notificaciones.";}
+  finally{await restorePushState();}
+});
 </script>
 
 <script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js").catch(err =>
-      console.warn("No se pudo registrar el modo app:", err)
-    );
+    navigator.serviceWorker.register("./service-worker.js", { updateViaCache: "none" })
+      .then(registration => registration.update().catch(err =>
+        console.warn("No se pudo comprobar una actualización del modo app:", err)
+      ))
+      .catch(err => console.warn("No se pudo registrar el modo app:", err));
   });
 }
 </script>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
-/* BiQuote SignalR live feed — isolated to the TEST panel. */
+/* Gold macro calendar and broker session schedule. */
 (()=>{
-  const symbols={XAUUSD:{price:"bqPriceXAU",meta:"bqMetaXAU",digits:2},EURUSD:{price:"bqPriceEUR",meta:"bqMetaEUR",digits:5},BTCUSD:{price:"bqPriceBTC",meta:"bqMetaBTC",digits:2}};
-  const statusEl=document.getElementById("bqLiveStatus"),dot=document.getElementById("bqLiveDot");
-  if(!statusEl||!dot)return;
-  const setStatus=(message,state="")=>{statusEl.textContent=message;dot.className="live-feed-dot"+(state?" "+state:"");};
-  const fmt=(value,digits)=>Number(value).toLocaleString("en-US",{minimumFractionDigits:digits,maximumFractionDigits:digits});
-  const renderTick=tick=>{
-    if(!tick||!symbols[tick.symbol])return;
-    const cfg=symbols[tick.symbol],bid=Number(tick.bid),ask=Number(tick.ask);
-    if(!Number.isFinite(bid)||!Number.isFinite(ask)||bid<=0||ask<bid)return;
-    const mid=Number.isFinite(Number(tick.mid))&&Number(tick.mid)>0?Number(tick.mid):(bid+ask)/2;
-    const stamp=tick.timestamp?new Date(tick.timestamp):new Date();
-    if(Number.isNaN(stamp.getTime()))return;
-    const age=(Date.now()-stamp.getTime())/1000;
-    if(age < -5 || age > 90)return;
-    document.getElementById(cfg.price).textContent=fmt(mid,cfg.digits);
-    document.getElementById(cfg.meta).textContent="Bid "+fmt(bid,cfg.digits)+" · Ask "+fmt(ask,cfg.digits)+" · Spread "+fmt(ask-bid,cfg.digits)+"\nTick "+stamp.toLocaleTimeString("es-ES");
-  };
-  const start=async()=>{
-    if(!window.signalR){setStatus("No se pudo cargar el cliente SignalR","error");return;}
-    const connection=new signalR.HubConnectionBuilder()
-      .withUrl("https://biquote.io/hubs/tick")
-      .withAutomaticReconnect([0,2000,5000,10000,20000])
-      .configureLogging(signalR.LogLevel.Warning)
-      .build();
-    connection.on("ReceiveTick",renderTick);
-    connection.onreconnecting(()=>setStatus("Reconectando al flujo…"));
-    connection.onreconnected(async()=>{try{await connection.invoke("Subscribe",["XAUUSD","EURUSD","BTCUSD"]);setStatus("Streaming conectado · reconectado","connected");}catch(e){setStatus("Conectado, pero falta suscribir símbolos","error");}});
-    connection.onclose(()=>setStatus("Conexión interrumpida · recarga para reintentar","error"));
+  const status=document.getElementById("goldNewsStatus");
+  const session=document.getElementById("goldSessionStatus");
+  const events=document.getElementById("goldNewsEvents");
+  if(!status||!session||!events)return;
+  const fmt=stamp=>new Date(stamp).toLocaleString("es-ES",{timeZone:"Europe/Madrid",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false});
+  async function update(){
     try{
-      setStatus("Abriendo conexión segura…");
-      await connection.start();
-      await connection.invoke("Subscribe",["XAUUSD","EURUSD","BTCUSD"]);
-      setStatus("Streaming conectado · esperando ticks","connected");
-      window.__gssBiquoteSignalR=connection;
-    }catch(error){console.warn("BiQuote SignalR TEST:",error);setStatus("No se pudo conectar · "+(error.message||"error de red"),"error");}
-  };
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start,{once:true});else start();
-})();
-</script>
-
-<script>
-/* On-demand BiQuote OHLC research viewer. No polling and no signal-engine calls. */
-(()=>{
-  const button=document.getElementById("bqOhlcLoad");
-  const symbolSelect=document.getElementById("bqOhlcSymbol");
-  const intervalSelect=document.getElementById("bqOhlcInterval");
-  const status=document.getElementById("bqOhlcStatus");
-  const rows=document.getElementById("bqOhlcRows");
-  if(!button||!symbolSelect||!intervalSelect||!status||!rows)return;
-  const fmt=value=>Number(value).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:5});
-  const escapeText=value=>String(value).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
-  button.addEventListener("click",async()=>{
-    const symbol=symbolSelect.value,interval=intervalSelect.value;
-    button.disabled=true;
-    status.textContent="Consultando BiQuote…";
-    rows.innerHTML='<tr><td colspan="5" style="text-align:left">Cargando velas cerradas…</td></tr>';
-    try{
-      const url=API_BASE+"/api/research/biquote/ohlc?symbol="+encodeURIComponent(symbol)+"&interval="+encodeURIComponent(interval);
-      const response=await fetch(url,{method:"GET",cache:"no-store",headers:{"Accept":"application/json"}});
-      const data=await response.json().catch(()=>({}));
-      if(!response.ok)throw new Error(data.error||"No se pudieron consultar las velas.");
-      if(!data.research_only||data.signals_activated!==false||!Array.isArray(data.bars))throw new Error("Respuesta no válida para el modo de investigación.");
-      const bars=data.bars.slice(-8).reverse();
-      rows.innerHTML=bars.map(bar=>{
-        const stamp=new Date(bar.time);
-        const time=Number.isNaN(stamp.getTime())?"—":stamp.toLocaleString("es-ES",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
-        return "<tr><td>"+escapeText(time)+"</td><td>"+fmt(bar.open)+"</td><td>"+fmt(bar.high)+"</td><td>"+fmt(bar.low)+"</td><td>"+fmt(bar.close)+"</td></tr>";
-      }).join("");
-      const age=Number(data.last_closed_age_minutes);
-      status.textContent=symbol+" · "+interval.toUpperCase()+" · "+data.closed_bars+" velas cerradas · último cierre hace "+(Number.isFinite(age)?age.toFixed(1):"—")+" min · "+(data.cache?.hit?"caché":"consulta nueva");
-    }catch(error){
-      rows.innerHTML='<tr><td colspan="5" style="text-align:left">No hay datos disponibles para mostrar.</td></tr>';
-      status.textContent=error.message||"Error al consultar BiQuote.";
-    }finally{button.disabled=false;}
+      const response=await fetch(API_BASE+"/api/gold/context",{cache:"no-store"});
+      if(!response.ok)throw Error("No se pudo consultar el calendario");
+      const data=await response.json();
+      const news=data.news||{};
+      status.textContent=!news.verified?"CALENDARIO SIN VERIFICAR · INFORMACIÓN NO CONFIRMADA":
+        news.high_impact_window?"ALTO IMPACTO · ENTRADAS BLOQUEADAS":"Calendario macro verificado · sin evento de alto impacto inmediato";
+      const clock=data.session||{};
+      const next=clock.next_transition;
+      session.textContent="XAU/USD "+(clock.current?.open?"ABIERTO":"CERRADO")+
+        (next?" · Próximo "+(next.event==="OPEN"?"abre":"cierra")+": "+fmt(next.at_spain)+" (hora peninsular española)":" · Horario no disponible");
+      events.textContent=(news.upcoming_events||[]).slice(0,3).map(x=>fmt(x.at_utc)+" · "+x.title).join("\n")||"Sin próximos eventos verificados";
+      const liquidity=document.getElementById("goldLiquiditySessions");
+      if(liquidity)liquidity.textContent=(clock.liquidity_sessions||[]).map(s=>
+        s.name+" "+(s.active?"● ACTIVA":"○ INACTIVA")+" · "+new Date(s.local_time).toLocaleTimeString("es-ES",{timeZone:s.timezone,hour:"2-digit",minute:"2-digit"})+" local · franja "+s.activity_window
+      ).join(" | ");
+    }catch(error){status.textContent="NOTICIAS NO DISPONIBLES · SOLO CONTEXTO";session.textContent="Horario no disponible";events.textContent="";}
+  }
+  const refresh=document.getElementById("goldNewsRefresh");
+  if(refresh)refresh.addEventListener("click",()=>{
+    refresh.disabled=true;
+    refresh.textContent="Actualizando…";
+    update().finally(()=>{
+      refresh.disabled=false;
+      refresh.textContent="↻ Actualizar noticias";
+    });
   });
+  update();
+  setInterval(()=>{if(!document.hidden)update();},60000);
+})();
+
+/* BiQuote ticks are streamed into the production backend; this panel reads only our API. */
+(()=>{
+  const instruments={
+    XAUUSD:{symbol:"XAU/USD",price:"bqPriceXAU",meta:"bqMetaXAU",digits:2}
+  };
+  const status=document.getElementById("bqLiveStatus");
+  const dot=document.getElementById("bqLiveDot");
+  if(!status||!dot)return;
+  let timer=null, busy=false;
+  const setStatus=(message,state="")=>{status.textContent=message;dot.className="live-feed-dot"+(state?" "+state:"");};
+  const fmt=(v,d)=>Number(v).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+  const update=async()=>{
+    if(busy||!accessToken)return;
+    busy=true;
+    try{
+      const response=await fetch(API_BASE+"/api/stream/ticks",{headers:authHeaders(),cache:"no-store"});
+      const data=await response.json().catch(()=>({}));
+      if(response.status===401){setStatus("Sesión caducada · vuelve a entrar","error");return;}
+      if(!response.ok)throw new Error(data.error||"Streaming de servidor desactivado o no disponible");
+      const ticks=data.ticks||{};
+      let count=0;
+      for(const cfg of Object.values(instruments)){
+        const tick=ticks[cfg.symbol];
+        if(!tick)continue;
+        const bid=Number(tick.bid),ask=Number(tick.ask),mid=Number(tick.mid);
+        if(!Number.isFinite(bid)||!Number.isFinite(ask)||!Number.isFinite(mid)||bid<=0||ask<bid)continue;
+        const stamp=new Date(tick.timestamp);
+        if(Number.isNaN(stamp.getTime()))continue;
+        document.getElementById(cfg.price).textContent=fmt(mid,cfg.digits);
+        document.getElementById(cfg.meta).textContent="Bid "+fmt(bid,cfg.digits)+" · Ask "+fmt(ask,cfg.digits)+" · Spread "+fmt(ask-bid,cfg.digits)+"\nTick "+stamp.toLocaleTimeString("es-ES");
+        const cardQuote=document.querySelector('[data-live-quote="'+cfg.symbol+'"]');
+        if(cardQuote){
+          const midNode=cardQuote.querySelector("[data-live-mid]");
+          const detailNode=cardQuote.querySelector("[data-live-detail]");
+          if(midNode)midNode.textContent=fmt(mid,cfg.digits);
+          if(detailNode)detailNode.textContent="Bid "+fmt(bid,cfg.digits)+" · Ask "+fmt(ask,cfg.digits)+" · Spread "+fmt(ask-bid,cfg.digits)+" · "+stamp.toLocaleTimeString("es-ES");
+        }
+        count++;
+      }
+      if(count)setStatus("Servidor conectado · "+count+" activos con cotización reciente","connected");
+      else setStatus(data.stream?.connected?"Conectado · esperando ticks del mercado":"Conectando con BiQuote desde servidor…");
+    }catch(error){setStatus(error.message||"Error de streaming","error");}
+    finally{busy=false;}
+  };
+  const POLL_INTERVAL_MS=2000;
+  const stop=()=>{if(timer){clearInterval(timer);timer=null;}};
+  const begin=()=>{
+    stop();
+    if(document.hidden)return;
+    update();
+    timer=setInterval(update,POLL_INTERVAL_MS);
+  };
+  if(accessToken)begin();
+  document.addEventListener("gss-access-ready",begin);
+  document.addEventListener("visibilitychange",()=>{if(document.hidden)stop();else if(accessToken)begin();});
 })();
 </script>
 

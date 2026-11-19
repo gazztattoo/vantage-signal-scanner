@@ -650,8 +650,8 @@ select,button{border-radius:9px}
 
 <section class="live-feed" id="biquoteLiveFeed" aria-label="Cotizaciones BiQuote en tiempo real">
   <div class="live-feed-head">
-    <div class="live-feed-title">BIQUOTE · COTIZACIONES EN TIEMPO REAL</div>
-    <div class="live-feed-status"><span class="live-feed-dot" id="bqLiveDot"></span><span id="bqLiveStatus">Preparando conexión…</span></div>
+    <div class="live-feed-title">ORO EN VIVO <span style="color:var(--muted);font-weight:600">· XAU/USD</span></div>
+    <div class="live-feed-status"><span class="live-feed-dot" id="bqLiveDot"></span><span id="bqLiveStatus">Conectando…</span></div>
   </div>
   <div class="live-feed-grid">
     <article class="live-feed-card"><div class="live-feed-symbol">ORO · XAU/USD</div><div class="live-feed-price" id="bqPriceXAU">—</div><div class="live-feed-meta" id="bqMetaXAU">Esperando primer tick</div></article>
@@ -1220,7 +1220,7 @@ function updateOverview(results){
     :"Esperando EMA 20, EMA 50 y RSI 14 válidos para calcular el resumen.";
 }
 
-async function update(){
+async async function update(){
   button.disabled=true;
   statusEl.textContent="Consultando análisis…";
   dot.style.background="var(--amber)";

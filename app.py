@@ -1719,7 +1719,7 @@ def push_scan():
 
     # El escáner programado procesa una combinación por petición para respetar
     # el límite HTTP de la plataforma. El runner solo invoca las combinaciones
-    # EUR/USD y XAU/USD que vencen en cada ciclo; cada petición puede reintentarse.
+    # Combinaciones exclusivas de XAU/USD; cada petición puede reintentarse.
     requested_symbol = request.args.get("symbol")
     requested_interval = request.args.get("interval")
     if requested_symbol and requested_symbol not in symbols:

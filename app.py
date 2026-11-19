@@ -13,6 +13,7 @@ import hashlib
 import logging
 import threading
 
+from gold_news import gold_news_context
 from biquote_quota import BiquoteQuotaError, reserve_biquote_request, get_biquote_usage
 from biquote_stream import (
     SYMBOLS as BIQUOTE_STREAM_SYMBOLS, start_stream,
@@ -193,6 +194,56 @@ def market_session(symbol, now=None):
         "server_time": server_time_label,
         "server_utc_offset": f"UTC+{server_offset}",
     }
+
+
+def gold_session_clock(now=None):
+    now = now or datetime.now(timezone.utc)
+    current = market_session("XAU/USD", now)
+    # Scan coarse boundaries then refine to exact minute. This is the configured
+    # indicative broker schedule, NOT a verified live broker trading calendar.
+    previous = current["open"]
+    cursor = now.replace(second=0, microsecond=0) + timedelta(minutes=1)
+    transition = None
+    for index in range(8 * 24 * 12):
+        probe = cursor + timedelta(minutes=index * 5)
+        state = market_session("XAU/USD", probe)["open"]
+        if state != previous:
+            for minute in range(5):
+                exact = probe - timedelta(minutes=4 - minute)
+                if exact > now and market_session("XAU/USD", exact)["open"] != previous:
+                    transition = exact
+                    break
+            if transition is None:
+                transition = probe
+            break
+        previous = state
+    return {"market": "XAU/USD", "current": current,
+            "next_transition": ({"at_utc": transition.isoformat(),
+                                 "at_spain": transition.astimezone(ZoneInfo("Europe/Madrid")).isoformat(),
+                                 "event": "OPEN" if not current["open"] else "CLOSE"} if transition else None),
+            "timezone": "Europe/Madrid",
+            "schedule_basis": "indicative_Vantage_server_not_broker_verified",
+            "note": "Horarios del bróker sujetos a festivos y cambios de sesión."}
+
+
+@app.route("/api/gold/context", methods=["GET"])
+def gold_context():
+    return jsonify({"symbol": "XAU/USD", "news": gold_news_context(),
+                    "session": gold_session_clock(), "checked_at": datetime.now(timezone.utc).isoformat()})
+
+
+def apply_gold_news_guard(payload):
+    context = gold_news_context()
+    result = dict(payload)
+    result["gold_news"] = context
+    if context["block_new_entries"]:
+        result["signal"] = "ESPERAR"
+        result["pre_signal"] = False
+        result["pre_signal_side"] = None
+        result["entry_readiness"] = {"ready": False, "status": context["block_reason"]}
+        result["news_guard_reason"] = ("Calendario no verificable; no se habilitan entradas." if not context["verified"]
+                                       else "Evento macro de alto impacto cercano; entrada bloqueada.")
+    return result
 
 
 @app.route("/api/market-status", methods=["GET"])
@@ -929,7 +980,7 @@ def analysis():
         payload["cache"] = {"hit": True, "age_seconds": int(cache_age)}
         payload = apply_live_entry_validation(payload, symbol)
         if not cached_analysis_requires_reanalysis(payload):
-            return jsonify(payload)
+            return jsonify(apply_gold_news_guard(payload))
         # A fresh BiQuote tick has moved beyond the cached candle's safe entry
         # band. Do not just leave the old setup in ESPERAR: bypass the analysis
         # cache once and rebuild indicators from fresh OHLC candles. The normal
@@ -1065,7 +1116,7 @@ def analysis():
             "payload": payload,
         }
         payload = apply_live_entry_validation(payload, symbol)
-        return jsonify(payload)
+        return jsonify(apply_gold_news_guard(payload))
 
     except BiquoteQuotaError as exc:
         return jsonify({

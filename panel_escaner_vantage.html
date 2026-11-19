@@ -1030,15 +1030,15 @@ function render(m,d,err,marketClosed=false){
       </div>
 
       <div class="live-card-price" data-live-quote="${m.symbol}" style="margin:12px 0;padding:10px 12px;border:1px solid #28543a;border-radius:10px;background:#07130c">
-        <div style="font-size:9px;letter-spacing:.8px;color:var(--muted)">COTIZACIÓN EN DIRECTO · BIQUOTE</div>
-        <strong data-live-mid style="display:block;font-size:22px;font-variant-numeric:tabular-nums">Esperando tick…</strong>
-        <div data-live-detail style="font-size:10px;color:var(--muted);margin-top:3px">Bid — · Ask — · Spread —</div>
+        <div style="font-size:9px;letter-spacing:.8px;color:var(--muted)">ESTADO DEL FEED · BIQUOTE</div>
+        <strong data-live-mid style="display:block;font-size:22px;font-variant-numeric:tabular-nums">No conectado en TEST</strong>
+        <div data-live-detail style="font-size:10px;color:var(--muted);margin-top:3px">Sin cotización en tiempo real; no usar como precio de entrada</div>
       </div>
       <div class="price">${fmt(first(d,["price"]),8)}</div>
       <div class="priceLabel">CIERRE DE LA VELA ANALIZADA · REFERENCIA HISTÓRICA, NO PRECIO EN DIRECTO</div>
       <p class="reason">${esc(safeReason)}</p>
 
-      ${(()=>{const x=d.indicator_diagnostics||{};const adx=x.adx||{};const macd=x.macd||{};const rsi=x.rsi||{};const rows=[["ADX",adx.value,adx.required||">=18",adx.passed?"OK":"FALTA"],["MACD",macd.value,"Compra: "+(macd.buy_passed?"OK":"—")+" · Venta: "+(macd.sell_passed?"OK":"—"),macd.buy_passed||macd.sell_passed?"HAY DIRECCIÓN":"SIN DIRECCIÓN"],["RSI",rsi.value,"Compra: "+(rsi.buy_passed?"OK":"—")+" · Venta: "+(rsi.sell_passed?"OK":"—"),rsi.buy_passed||rsi.sell_passed?"EN RANGO":"FUERA DE RANGO"]];return '<div style="margin:10px 0;padding:10px 12px;border:1px solid var(--line);border-radius:11px"><div style="font-size:10px;letter-spacing:.6px;color:var(--muted);margin-bottom:8px">QUÉ FALTA PARA CONFIRMAR</div>'+rows.map(([n,v,req,status])=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;font-size:12px"><span>'+n+' · '+esc(req)+'</span><strong style="color:'+(status==="OK"||status==="HAY DIRECCIÓN"||status==="EN RANGO"?'var(--green)':'var(--amber)')+'">'+(v===undefined?'—':esc(String(v)))+' · '+status+'</strong></div>').join('')+'</div>';})()}
+      ${(()=>{const x=d.indicator_diagnostics||{};const adx=x.adx||{};const macd=x.macd||{};const rsi=x.rsi||{};const rows=[["ADX",adx.value,adx.required||"referencia >=18",adx.passed?"APORTA FUERZA":"FUERZA BAJA"],["MACD",macd.value,"Compra: "+(macd.buy_passed?"OK":"—")+" · Venta: "+(macd.sell_passed?"OK":"—"),macd.buy_passed||macd.sell_passed?"IMPULSO A FAVOR":"IMPULSO CONTRARIO/NEUTRO"],["RSI",rsi.value,"Compra: "+(rsi.buy_passed?"OK":"—")+" · Venta: "+(rsi.sell_passed?"OK":"—"),rsi.buy_passed||rsi.sell_passed?"IMPULSO MODERADO":"IMPULSO EXTENDIDO/NEUTRO"]];return '<div style="margin:10px 0;padding:10px 12px;border:1px solid var(--line);border-radius:11px"><div style="font-size:10px;letter-spacing:.6px;color:var(--muted);margin-bottom:8px">LECTURA DE INDICADORES · APORTAN CONTEXTO</div>'+rows.map(([n,v,req,status])=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;font-size:12px"><span>'+n+' · '+esc(req)+'</span><strong style="color:'+(status==="OK"||status==="HAY DIRECCIÓN"||status==="EN RANGO"?'var(--green)':'var(--amber)')+'">'+(v===undefined?'—':esc(String(v)))+' · '+status+'</strong></div>').join('')+'</div>';})()}
 
       <div class="entry-readiness" style="margin:10px 0;padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:#09140d">
         <div style="font-size:9px;color:var(--muted);letter-spacing:.7px">ESTADO REAL DE LA ENTRADA</div>

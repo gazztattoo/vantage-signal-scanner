@@ -58,16 +58,19 @@ body{
   z-index:2;
   display:inline-flex;
   align-items:center;
-  max-width:calc(100% - 24px);
+  max-width:48%;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
   border:1px solid rgba(143,166,154,.28);
   background:rgba(13,23,17,.88);
-  padding:8px 12px;
+  padding:5px 8px;
   border-radius:99px;
-  font-size:clamp(10px,2.8vw,13px);
+  font-size:9px;
   color:var(--muted);
   backdrop-filter:blur(8px)
 }
-.dot{display:inline-block;width:8px;height:8px;background:var(--amber);border-radius:50%;margin-right:7px}
+.dot{display:inline-block;width:6px;height:6px;flex:0 0 6px;background:var(--amber);border-radius:50%;margin-right:5px}
 .intro{color:var(--muted);font-size:14px;line-height:1.5;margin:16px 0}
 .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:17px}
 label,.hint{font-size:12px;color:var(--muted)}
@@ -331,7 +334,7 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
   .toolbar button{flex:1}
   .top{border-radius:12px}
   .brand-banner{transform:scale(1.22)}
-  .status{top:8px;right:8px;padding:7px 9px;font-size:10px;z-index:2}
+  .status{top:7px;right:7px;padding:5px 7px;font-size:9px;max-width:48%;z-index:2}
 }
 
 /* Vista operativa: prioriza decisión y niveles sin alterar el análisis */
@@ -484,11 +487,11 @@ body{
   transform:none!important;max-height:none!important;
 }
 .status{
-  top:9px;right:9px;padding:7px 10px;border:1px solid #334452;
-  background:rgba(7,14,19,.92);font-size:10px;font-weight:750;
+  top:7px;right:7px;padding:5px 8px;max-width:48%;border:1px solid #334452;
+  background:rgba(7,14,19,.92);font-size:9px;font-weight:750;
   letter-spacing:.2px;backdrop-filter:blur(10px)
 }
-.dot{width:7px;height:7px}
+.dot{width:6px;height:6px;flex-basis:6px}
 .app-view{animation:terminalIn .22s ease-out}
 @keyframes terminalIn{from{opacity:.72;transform:translateY(4px)}to{opacity:1;transform:none}}
 #viewScanner:before{

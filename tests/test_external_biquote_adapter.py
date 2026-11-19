@@ -45,6 +45,21 @@ class BiQuoteAdapterTests(unittest.TestCase):
                 )
                 self.assertTrue(result["accepted"], (symbol, interval, result))
 
+    def test_hourly_intervals_use_real_candle_duration_for_freshness(self):
+        for interval, minutes in (("1h", 60), ("4h", 240)):
+            bars = [{
+                "openTime": (NOW - timedelta(minutes=minutes)).isoformat(),
+                "open": 2650.0, "high": 2652.0, "low": 2649.0,
+                "close": 2651.0, "isOpen": False,
+            }]
+            result = normalize_biquote_ohlc(
+                make_payload(interval=interval, bars=bars),
+                symbol="XAU/USD", interval=interval, now=NOW,
+                max_last_closed_age_minutes=2,
+            )
+            self.assertTrue(result["accepted"], (interval, result))
+            self.assertEqual(result["last_closed_close_time"], NOW.isoformat())
+
     def test_rejects_wrong_symbol_or_interval(self):
         self.assertFalse(normalize_biquote_ohlc(
             make_payload(), symbol="EUR/USD", interval="5m", now=NOW

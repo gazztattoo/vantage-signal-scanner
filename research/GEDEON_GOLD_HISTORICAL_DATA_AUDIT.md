@@ -50,24 +50,50 @@ Calculado por vela M1 como `Ask Open - Bid Open`, en unidades de precio del arch
 | P99 | 1,99 |
 | Máximo | 14,96 |
 
-El spread es variable. No se debe sustituir por un coste fijo inventado ni asumir que coincide con el contrato actual de Vantage. La ejecución del backtest tendrá que usar el Ask para compras, Bid para ventas y reglas explícitas para stops/targets.
+El spread es variable. No se debe sustituir por un coste fijo inventado ni asumir que coincide con el contrato actual de Vantage.
 
-## Interpretación para el motor nuevo
+## Primera prueba del motor sweep → BOS → retest
 
-El histórico sí existe y tiene cobertura de casi todo 2026. El límite del análisis anterior provenía de exigir segmentos continuos demasiado largos al motor antiguo, no de que no hubiera archivos. La nueva investigación debe:
+Se implementó un prototipo aislado con estas reglas:
 
-1. Mantener el historial de indicadores entre sesiones cuando sea metodológicamente válido, sin crear velas en cierres de mercado.
-2. Invalidar cualquier operación cuyo recorrido de evaluación cruce un hueco de datos no negociable o sin precios observados.
-3. Calcular entradas y salidas con Bid/Ask, no solo con cierres Bid.
-4. Usar pivotes confirmados únicamente después de las velas derechas necesarias; evitar look-ahead.
-5. Probar M5 y M15 por separado. M30 se mantiene como lectura manual/contextual, no como señal automática.
-6. Comparar liquidez/sweep + estructura + retest contra un baseline, con costes y validación cronológica.
+1. Barrido de un swing previamente confirmado.
+2. Cambio de estructura por cierre más allá de un pivote confirmado antes de esa vela.
+3. Retesteo del nivel roto dentro de una ventana limitada.
+4. Entrada en la apertura de la vela siguiente al retesteo, nunca en el cierre que confirma.
+5. EMA50/EMA200 como filtro de régimen; ATR14 para amortiguación del stop.
+6. Bid para entradas/salidas cortas y salidas largas; Ask para entradas largas y salidas cortas.
+7. Deslizamiento de investigación de 0,10 unidades de precio por lado.
+8. Si stop y objetivo se tocan en la misma vela, se contabiliza primero el stop. Una discontinuidad invalida setup/posición; no se inventa un precio.
 
-**No se han calculado todavía métricas de rentabilidad ni se aprueba ninguna señal.** Este documento solo certifica recuperación, calidad básica, agregación y spread observado del archivo histórico.
+**Resultados de esta primera versión (no optimizada):**
+
+| Métrica | M5 | M15 |
+|---|---:|---:|
+| Velas completas | 60.495 | 20.153 |
+| Operaciones | 139 | 37 |
+| Acierto | 32,37 % | 27,03 % |
+| Profit factor | 0,85 | 0,56 |
+| Expectativa por operación (unidades de precio) | -1,31 | -5,87 |
+| Resultado neto (unidades de precio) | -182,02 | -217,11 |
+| Operaciones invalidadas por huecos | 11 | 18 |
+
+División cronológica 60/20/20, sin ajustar parámetros:
+
+| Periodo | M5 operaciones / PF / neto | M15 operaciones / PF / neto |
+|---|---|---|
+| Entrenamiento 60 % | 87 / 0,78 / -198,47 | 25 / 0,47 / -200,33 |
+| Validación 20 % | 27 / 1,22 / +36,78 | 6 / 0,47 / -36,54 |
+| Holdout final 20 % | 25 / 0,88 / -20,32 | 6 / 1,45 / +19,76 |
+
+Los tamaños de muestra de validación y holdout son pequeños, especialmente en M15. Los resultados están expresados en unidades de precio, no en euros/dólares de cuenta, pips ni rentabilidad porcentual. No se incluyen comisiones ni se ha calibrado el deslizamiento contra fills reales del broker. Por tanto, esto no es una validación de rentabilidad.
+
+**Conclusión:** esta primera regla no supera el filtro de investigación y NO debe conectarse al escáner ni utilizarse para operar. No se maquillan los resultados ni se optimiza mirando el holdout.
 
 ## Implementación de investigación añadida
 
 - `research/gold_liquidity_research.py`: lector gzip, validación OHLC Bid/Ask, agregación estricta, EMA, pivotes confirmados y detector básico de barridos.
-- `tests/test_gold_liquidity_research.py`: cinco pruebas unitarias de agregación, warmup EMA, confirmación de pivotes y barridos.
+- `research/gold_strategy_backtest.py`: prototipo offline de sweep/BOS/retest, ejecución Bid/Ask, deslizamiento configurable, invalidación por huecos y división cronológica.
+- `tests/test_gold_liquidity_research.py`: pruebas de primitivas.
+- `tests/test_gold_strategy_backtest.py`: pruebas del prototipo de backtest.
 
-Las pruebas locales de estos cinco casos terminaron correctamente. La implementación permanece en la rama `gedeon-2.0-research`, separada de producción.
+Los archivos permanecen en la rama `gedeon-2.0-research`, separada de producción. La validación automática de GitHub Actions debe confirmarse antes de considerar esta fase cerrada.

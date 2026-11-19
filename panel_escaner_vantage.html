@@ -1609,14 +1609,42 @@ if ("serviceWorker" in navigator) {
   setInterval(()=>{if(!document.hidden)update();},60000);
 })();
 
-/* TEST: no tick endpoint exists here; never present a fake live quote. */
+/* TEST BiQuote quote monitor: reference-only, never used by signal generation. */
 (()=>{
   const status=document.getElementById("bqLiveStatus");
   const dot=document.getElementById("bqLiveDot");
+  const price=document.getElementById("bqPriceXAU");
   const meta=document.getElementById("bqMetaXAU");
-  if(status)status.textContent="Streaming de ticks no conectado en TEST";
-  if(dot)dot.className="live-feed-dot error";
-  if(meta)meta.textContent="Sin cotización en tiempo real";
+  if(!status||!dot||!price||!meta)return;
+
+  const fmt=value=>Number(value).toLocaleString("es-ES",{minimumFractionDigits:3,maximumFractionDigits:3});
+  const stamp=value=>new Date(value).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
+  let busy=false;
+
+  async function refreshBiQuote(){
+    if(busy||document.hidden)return;
+    busy=true;
+    try{
+      const response=await fetch(window.API_BASE+"/api/research/biquote/tick?symbol="+encodeURIComponent("XAU/USD"),{cache:"no-store"});
+      const data=await response.json();
+      if(!response.ok||data.accepted!==true||data.research_only!==true||data.execution_price!==false) {
+        throw new Error(data.error||"Cotización no disponible");
+      }
+      price.textContent=fmt(data.mid);
+      meta.textContent="Bid "+fmt(data.bid)+" · Ask "+fmt(data.ask)+"\\nSpread "+fmt(data.spread)+" · "+stamp(data.timestamp)+"\\nReferencia BiQuote; no usar como precio de entrada";
+      status.textContent="BiQuote conectado · referencia";
+      dot.className="live-feed-dot connected";
+    }catch(error){
+      price.textContent="—";
+      meta.textContent="Sin cotización válida; no usar como precio de entrada";
+      status.textContent="BiQuote desconectado";
+      dot.className="live-feed-dot error";
+    }finally{busy=false;}
+  }
+
+  refreshBiQuote();
+  setInterval(refreshBiQuote,10000);
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)refreshBiQuote();});
 })();
 </script>
 

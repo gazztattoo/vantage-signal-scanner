@@ -267,14 +267,15 @@ def _wait(code: str, reason: str) -> dict:
     }
 
 
-def analyze(candles: list[dict], timeframe: str, symbol: str = "") -> dict:
+def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timeframes: dict[str, list[dict]] | None = None) -> dict:
     """Return confirmed signal, pre-signal, market regime and MTF evidence."""
     if timeframe not in TIMEFRAME_MINUTES:
         raise ValueError("Unsupported timeframe")
     bars = _normalise(candles)
     base_minutes = TIMEFRAME_MINUTES[timeframe]
     htf1, htf2 = MTF_MAP[timeframe]
-    minimum = max(120, (60 * htf2) // base_minutes + 2)
+    # Direct provider higher-timeframe series avoid synthetic aggregation limits.
+    minimum = 120 if higher_timeframes is not None else max(120, (60 * htf2) // base_minutes + 2)
     if len(bars) < minimum:
         return _wait(
             "HISTORIAL_INSUFICIENTE",
@@ -295,8 +296,12 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "") -> dict:
             "Faltan datos válidos para calcular indicadores; no se genera señal.",
         )
 
-    htf_bars_1 = aggregate_candles(candles, base_minutes, htf1)
-    htf_bars_2 = aggregate_candles(candles, base_minutes, htf2)
+    if higher_timeframes is not None:
+        htf_bars_1 = higher_timeframes.get(f"{htf1}min", [])
+        htf_bars_2 = higher_timeframes.get(f"{htf2}min", [])
+    else:
+        htf_bars_1 = aggregate_candles(candles, base_minutes, htf1)
+        htf_bars_2 = aggregate_candles(candles, base_minutes, htf2)
     bias1, bias2 = _latest_bias(htf_bars_1), _latest_bias(htf_bars_2)
     primary = (
         "BULL" if e20 > e50 and closes[-1] > e20

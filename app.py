@@ -25,7 +25,6 @@ CORS(app, resources={
 
 # Esta rama es exclusivamente de pruebas: no consulta proveedores de mercado.
 DATA_MODE = "mock"
-API_KEY = None
 # MT5 ingestion is a separate shadow feed; it never changes DATA_MODE or signal inputs.
 MT5_INGEST_TOKEN = os.environ.get("MT5_INGEST_TOKEN", "")
 MT5_TEST_SUPABASE_URL = "https://viiraygjdqwiuawnzyrc.supabase.co"
@@ -127,7 +126,6 @@ def access_configuration_status():
 
 
 # TEST ACCESS DISABLED TEMPORARILY: this branch is intentionally open for testing only.
-TWELVE_DATA_URL = "https://api.twelvedata.com"
 
 ALLOWED_SYMBOLS = {"EUR/USD", "XAU/USD", "BTC/USD"}
 ALLOWED_INTERVALS = {"5min", "15min", "30min"}
@@ -523,121 +521,12 @@ def biquote_research_ohlc():
 
 
 def fetch_candles(symbol, interval):
-    if DATA_MODE == "mock":
-        return generate_mock_candles(symbol, interval)
-
-    if not API_KEY:
+    """TEST fail-closed: synthetic candles only; never call external market providers."""
+    if DATA_MODE != "mock":
         raise RuntimeError(
-            "Falta configurar TWELVE_DATA_API_KEY en Render"
+            "TEST está bloqueado para proveedores externos; solo se permiten datos sintéticos."
         )
-
-    response = requests.get(
-        f"{TWELVE_DATA_URL}/time_series",
-        params={
-            "symbol": symbol,
-            "interval": interval,
-            "outputsize": 100,
-            "apikey": API_KEY,
-            "order": "ASC",
-            "timezone": "Atlantic/Canary",
-        },
-        timeout=20,
-    )
-
-    try:
-        data = response.json()
-    except ValueError as exc:
-        raise RuntimeError(
-            "Twelve Data devolvió una respuesta no válida"
-        ) from exc
-
-    if response.status_code != 200 or "values" not in data:
-        message = (
-            data.get("message")
-            or data.get("code")
-            or "No se pudieron obtener velas históricas"
-        )
-        raise RuntimeError(str(message))
-
-    values = data["values"]
-
-    if not values:
-        raise RuntimeError(
-            "Twelve Data no devolvió velas"
-        )
-
-    # Orden cronológico por fecha de apertura.
-    values = sorted(
-        values,
-        key=lambda item: item.get("datetime", "")
-    )
-
-    candles = []
-    valid_times = []
-
-    for item in values:
-        try:
-            candle = {
-                key: float(item[key])
-                for key in ("open", "high", "low", "close")
-            }
-            candle_time = parse_candle_time(item["datetime"])
-        except (KeyError, TypeError, ValueError):
-            continue
-
-        candle["time"] = candle_time.astimezone(CANARY_TZ).isoformat()
-        candles.append(candle)
-        valid_times.append(candle_time)
-
-    # Excluir siempre la vela que todavía está formándose.
-    # Twelve Data entrega datetime como hora de apertura de cada vela.
-    now = datetime.now(timezone.utc)
-    interval_seconds = INTERVAL_MINUTES[interval] * 60
-    closed = [
-        (candle, candle_time)
-        for candle, candle_time in zip(candles, valid_times)
-        if candle_time.astimezone(timezone.utc).timestamp() + interval_seconds <= now.timestamp()
-    ]
-    if len(closed) < 55:
-        raise RuntimeError(
-            "Datos insuficientes después de excluir la vela en curso "
-            f"({len(closed)} velas cerradas)"
-        )
-    candles = [item[0] for item in closed]
-    valid_times = [item[1] for item in closed]
-
-    latest_time = valid_times[-1]
-
-    age_seconds = (
-        now - latest_time.astimezone(timezone.utc)
-    ).total_seconds()
-
-    if age_seconds < -120:
-        raise RuntimeError(
-            "La fecha de la última vela está en el futuro. "
-            "Comprueba la zona horaria del proveedor."
-        )
-
-    # Tolerancia para la vela en curso y retrasos del proveedor.
-    # Si la vela supera este límite, no se genera una señal.
-    max_age_seconds = (
-        INTERVAL_MINUTES[interval] * 60 * 2 + 90
-    )
-
-    if age_seconds > max_age_seconds:
-        age_minutes = int(age_seconds // 60)
-        raise RuntimeError(
-            f"Datos desactualizados: la última vela comenzó "
-            f"hace aproximadamente {age_minutes} minutos. "
-            "No se genera una señal con estos datos. "
-            "Inténtalo más tarde."
-        )
-
-    return (
-        candles,
-        latest_time.astimezone(CANARY_TZ).isoformat(),
-        round(max(age_seconds, 0) / 60, 2),
-    )
+    return generate_mock_candles(symbol, interval)
 
 
 @app.route("/")
@@ -725,56 +614,23 @@ def ingest_mt5_candles():
 @app.route("/api/price")
 def price():
     symbol = get_symbol(request.args.get("symbol"))
-
     if not symbol:
         return jsonify({
             "error": "Símbolo no permitido",
             "allowed_symbols": sorted(ALLOWED_SYMBOLS),
         }), 400
-
-    if DATA_MODE == "mock":
-        candles, _, _ = generate_mock_candles(symbol, "5min")
+    if DATA_MODE != "mock":
         return jsonify({
-            "symbol": symbol,
-            "price": candles[-1]["close"],
-            "data_mode": "mock",
-            "warning": "PRECIO SIMULADO: solo para pruebas, no operar.",
-        })
-
-    if not API_KEY:
-        return jsonify({
-            "error": "Falta configurar la clave de Twelve Data"
+            "error": "TEST está bloqueado para proveedores externos.",
+            "data_mode": DATA_MODE,
         }), 503
-
-    try:
-        response = requests.get(
-            f"{TWELVE_DATA_URL}/price",
-            params={
-                "symbol": symbol,
-                "apikey": API_KEY,
-            },
-            timeout=15,
-        )
-
-        data = response.json()
-
-        if response.status_code != 200 or "price" not in data:
-            return jsonify({
-                "error": data.get(
-                    "message",
-                    "No se pudo obtener el precio",
-                )
-            }), 502
-
-        return jsonify({
-            "symbol": symbol,
-            "price": float(data["price"]),
-        })
-
-    except (requests.RequestException, ValueError):
-        return jsonify({
-            "error": "No se pudo consultar el proveedor de precios"
-        }), 502
+    candles, _, _ = generate_mock_candles(symbol, "5min")
+    return jsonify({
+        "symbol": symbol,
+        "price": candles[-1]["close"],
+        "data_mode": "mock",
+        "warning": "PRECIO SIMULADO: solo para pruebas, no operar.",
+    })
 
 
 @app.route("/api/analysis")
@@ -931,10 +787,8 @@ def analysis():
         return jsonify(response_payload)
     except requests.RequestException:
         return jsonify({
-            "error": (
-                "No se pudo conectar con Twelve Data. "
-                "Inténtalo más tarde."
-            )
+            "error": "La solicitud de datos de prueba no pudo completarse.",
+            "data_mode": DATA_MODE,
         }), 502
 
     except RuntimeError as exc:
@@ -1132,8 +986,9 @@ def lab_status():
         subscriptions = exact_count("/rest/v1/push_subscriptions")
         return jsonify({
             "checked_at": datetime.now(timezone.utc).isoformat(),
-            "data_provider": "Twelve Data",
-            "provider_configured": bool(API_KEY),
+            "data_provider": "synthetic_mock",
+            "provider_configured": False,
+            "data_mode": DATA_MODE,
             "storage_configured": bool(SUPABASE_URL and SUPABASE_SECRET_KEY),
             "engine": {
                 "trend": "EMA 20 / EMA 50",

@@ -48,8 +48,8 @@ def gold_news_context(now=None):
     upcoming = [event for event in events if datetime.fromisoformat(event["at_utc"]) >= now][:8]
     return {"verified": verified, "source": URL, "source_type": "third_party_calendar",
             "impact_interpretation": "schedule_only_no_direction_prediction",
-            "error": error, "high_impact_window": bool(near),
-            "block_new_entries": not verified or bool(near),
+            "error": error, "high_impact_window": bool(verified and near),
+            "block_new_entries": bool(verified and near),
             "block_reason": ("CALENDAR_UNAVAILABLE" if not verified else
                              "HIGH_IMPACT_NEWS_WINDOW" if near else None),
             "near_events": near, "upcoming_events": upcoming,

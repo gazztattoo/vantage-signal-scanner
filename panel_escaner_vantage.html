@@ -434,6 +434,14 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
   </section>
 </section>
 
+<section class="overview-panel" aria-label="Noticias y horarios del oro" style="margin:12px 0;padding:16px">
+  <div class="overview-heading">◷ ORO · NOTICIAS MACRO Y HORARIOS</div>
+  <div id="goldNewsStatus" class="hint">Consultando calendario de alto impacto…</div>
+  <div id="goldSessionStatus" class="hint" style="margin-top:8px">Calculando próxima apertura o cierre…</div>
+  <div id="goldNewsEvents" class="hint" style="margin-top:8px"></div>
+  <div class="hint" style="margin-top:8px">Horarios Vantage orientativos, no verificados con el bróker. Noticias: calendario externo, no predicción direccional.</div>
+</section>
+
 <section class="toolbar">
   <label for="interval">Temporalidad</label>
   <select id="interval">
@@ -1297,6 +1305,31 @@ if ("serviceWorker" in navigator) {
 </script>
 
 <script>
+/* Gold macro calendar and broker session schedule. */
+(()=>{
+  const status=document.getElementById("goldNewsStatus");
+  const session=document.getElementById("goldSessionStatus");
+  const events=document.getElementById("goldNewsEvents");
+  if(!status||!session||!events)return;
+  const fmt=stamp=>new Date(stamp).toLocaleString("es-ES",{timeZone:"Europe/Madrid",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false});
+  async function update(){
+    try{
+      const response=await fetch(API_BASE+"/api/gold/context",{cache:"no-store"});
+      if(!response.ok)throw Error("No se pudo consultar el calendario");
+      const data=await response.json();
+      const news=data.news||{};
+      status.textContent=!news.verified?"NOTICIAS SIN VERIFICAR · ENTRADAS BLOQUEADAS":
+        news.high_impact_window?"ALTO IMPACTO · ENTRADAS BLOQUEADAS":"Calendario macro verificado · sin evento de alto impacto inmediato";
+      const clock=data.session||{};
+      const next=clock.next_transition;
+      session.textContent="XAU/USD "+(clock.current?.open?"ABIERTO":"CERRADO")+
+        (next?" · Próximo "+(next.event==="OPEN"?"abre":"cierra")+": "+fmt(next.at_spain)+" (hora peninsular española)":" · Horario no disponible");
+      events.textContent=(news.upcoming_events||[]).slice(0,3).map(x=>fmt(x.at_utc)+" · "+x.title).join(" | ")||"Sin próximos eventos verificados";
+    }catch(error){status.textContent="NOTICIAS NO DISPONIBLES · ENTRADAS BLOQUEADAS";session.textContent="Horario no disponible";events.textContent="";}
+  }
+  update();setInterval(()=>{if(!document.hidden)update();},60000);
+})();
+
 /* BiQuote ticks are streamed into the production backend; this panel reads only our API. */
 (()=>{
   const instruments={

@@ -37,6 +37,9 @@ _state: dict[str, Any] = {
     "started_at": None, "connected_at": None, "last_tick_at": None,
     "last_error": None, "retry_attempt": 0, "retry_in_seconds": 0,
     "subscription_state": "not_started",
+    "tick_events_received": 0, "tick_events_accepted": 0,
+    "tick_events_rejected": 0, "last_tick_event_at": None,
+    "last_tick_event_shape": None,
 }
 _thread: threading.Thread | None = None
 
@@ -266,8 +269,20 @@ async def _run_client() -> None:
         LOGGER.warning("biquote_stream protocol_error=%s", str(error)[:240])
 
     async def on_tick(message: Any) -> None:
-        if not publish_tick(message):
-            LOGGER.debug("biquote_stream ignored invalid tick")
+        accepted = publish_tick(message)
+        with _lock:
+            _state["tick_events_received"] = int(_state.get("tick_events_received", 0)) + 1
+            key = "tick_events_accepted" if accepted else "tick_events_rejected"
+            _state[key] = int(_state.get(key, 0)) + 1
+            _state["last_tick_event_at"] = _utc_now()
+            # Record only the envelope shape, never the raw market payload.
+            _state["last_tick_event_shape"] = (
+                "list:" + type(message[0]).__name__ if isinstance(message, list) and message
+                else "empty_list" if isinstance(message, list)
+                else type(message).__name__
+            )
+        if not accepted:
+            LOGGER.warning("biquote_stream received an unrecognized or stale tick event")
 
     async def on_subscription_state(message: Any) -> None:
         # BiQuote emits this hub event after Subscribe. Register it explicitly

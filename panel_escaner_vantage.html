@@ -648,7 +648,7 @@ select,button{border-radius:9px}
   >
   <div class="status">
     <span class="dot" id="dot"></span>
-    <span id="status">Esperando conexión</span>
+    <span id="status">Motor desconectado</span>
   </div>
 </header>
 
@@ -1297,8 +1297,6 @@ async function update(){
   if(button.disabled)return;
   button.disabled=true;
   button.textContent="Consultando…";
-  statusEl.textContent="Consultando análisis de XAU/USD…";
-  dot.style.background="var(--amber)";
   updated.textContent="Solicitud en curso…";
   const interval=document.getElementById("interval").value;
   const controller=new AbortController();
@@ -1313,15 +1311,15 @@ async function update(){
     if(!response.ok||data.error)throw new Error(data.error||("Error HTTP "+response.status));
     cards.innerHTML=render(markets[0],data,null,false);
     updateOverview([{m:markets[0],d:data}]);
-    statusEl.textContent="Motor TEST respondió · datos simulados";
-    dot.style.background="var(--amber)";
+    statusEl.textContent="Motor conectado";
+    dot.style.background="var(--green)";
     updated.textContent="Prueba simulada · "+new Date().toLocaleTimeString("es-ES");
   }catch(error){
     const message=error.name==="AbortError"
       ?"Tiempo de espera agotado: la API TEST no respondió en 25 segundos."
       :(error.message||"No se pudo completar el análisis TEST.");
     cards.innerHTML='<article class="card"><div class="cardhead"><div class="symbol">XAU/USD · ORO</div><span class="pill sell">SIN RESPUESTA</span></div><p class="reason">'+esc(message)+'</p><div class="foot">No se ha generado ninguna señal. Producción permanece pausada.</div></article>';
-    statusEl.textContent="Error en el motor TEST";
+    statusEl.textContent="Motor desconectado";
     dot.style.background="var(--red)";
     updated.textContent="Último intento: "+new Date().toLocaleTimeString("es-ES");
   }finally{

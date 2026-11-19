@@ -27,13 +27,13 @@ class PrecisionEngineV2Tests(unittest.TestCase):
     def test_m30_m15_conflict_waits(self):
         m15 = frame(900, ema20=98, ema50=99, rsi=40, macd=-0.2)
         result = evaluate_multitimeframe_setup(
-            symbol="EUR/USD", m30=self.m30, m15=m15, m5=self.m5)
+            symbol="XAU/USD", m30=self.m30, m15=m15, m5=self.m5)
         self.assertEqual(result["signal"], "ESPERAR")
 
     def test_stale_frame_blocks_signal(self):
         m5 = {**self.m5, "candle_age_seconds": 500}
         result = evaluate_multitimeframe_setup(
-            symbol="BTC/USD", m30=self.m30, m15=self.m15, m5=m5)
+            symbol="XAU/USD", m30=self.m30, m15=self.m15, m5=m5)
         self.assertEqual(result["signal"], "ESPERAR")
         self.assertIn("antigua", result["reason"])
 

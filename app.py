@@ -507,7 +507,7 @@ def twelve_data_get(endpoint, params=None, timeout=20):
 
 def fetch_candles(symbol, interval):
     """Usa velas locales formadas por ticks; OHLC BiQuote solo para bootstrap/recuperación."""
-    provider_symbol = {"EUR/USD": "EURUSD", "XAU/USD": "XAUUSD"}[symbol]
+    provider_symbol = "XAUUSD"
     provider_interval = {"5min": "5m", "15min": "15m", "30min": "30m"}[interval]
     now = datetime.now(timezone.utc)
     interval_seconds = INTERVAL_MINUTES[interval] * 60
@@ -636,7 +636,7 @@ def biquote_stream_health():
         "tick_events_rejected": stream.get("tick_events_rejected", 0),
         "last_tick_event_at": stream.get("last_tick_event_at"),
         "last_tick_event_shape": stream.get("last_tick_event_shape"),
-        "expected_symbols": [{"EURUSD": "EUR/USD", "XAUUSD": "XAU/USD"}[s] for s in BIQUOTE_STREAM_SYMBOLS],
+        "expected_symbols": ["XAU/USD" for _ in BIQUOTE_STREAM_SYMBOLS],
         "is_vantage_quote": False,
     })
 
@@ -657,7 +657,7 @@ def biquote_stream_ticks():
             fresh_ticks[symbol] = tick
     data["ticks"] = fresh_ticks
     data["fresh_symbols"] = sorted(fresh_ticks)
-    data["expected_symbols"] = [ {"EURUSD": "EUR/USD", "XAUUSD": "XAU/USD"}[symbol] for symbol in BIQUOTE_STREAM_SYMBOLS ]
+    data["expected_symbols"] = ["XAU/USD" for _ in BIQUOTE_STREAM_SYMBOLS]
     data["stream"]["enabled"] = True
     return jsonify(data), 200
 
@@ -1980,7 +1980,7 @@ def push_scan():
                             })
                         else:
                             subscriptions = subs_response.json()
-                            price_digits = 5 if symbol == "EUR/USD" else 2
+                            price_digits = 2
 
                             def display_price(value):
                                 return f"{float(value):,.{price_digits}f}" if value is not None else "—"

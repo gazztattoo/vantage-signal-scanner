@@ -64,7 +64,9 @@ def _extract_tick(message: Any) -> dict[str, Any] | None:
         return None
     if bid <= 0 or ask < bid or mid <= 0:
         return None
-    raw_time = tick.get("time") or tick.get("timestamp") or tick.get("lastQuoteAt")
+    # BiQuote documents `time` as MetaTrader-native text, which may not parse as ISO.
+    # Prefer the normalized ISO `timestamp`; use `time` only as a last-resort ISO value.
+    raw_time = tick.get("timestamp") or tick.get("lastQuoteAt") or tick.get("time")
     # Never manufacture a current timestamp: an undated payload cannot be proven fresh.
     if not raw_time:
         return None

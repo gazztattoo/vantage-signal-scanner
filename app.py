@@ -544,6 +544,102 @@ def biquote_research_tick():
     return jsonify(result)
 
 
+def cached_biquote_research_ohlc(symbol, interval):
+    key = (symbol, interval)
+    now_mono = time.monotonic()
+    cached = BIQUOTE_RESEARCH_CACHE.get(key)
+    if cached and now_mono - cached["stored_at"] < BIQUOTE_RESEARCH_CACHE_TTL[interval]:
+        return dict(cached["payload"])
+    result = fetch_biquote_research_ohlc(symbol, interval)
+    result.update({
+        "research_only": True,
+        "signals_activated": False,
+        "data_mode": DATA_MODE,
+        "cache": {"hit": False, "ttl_seconds": BIQUOTE_RESEARCH_CACHE_TTL[interval]},
+    })
+    BIQUOTE_RESEARCH_CACHE[key] = {"stored_at": now_mono, "payload": result}
+    return result
+
+
+@app.route("/api/research/biquote/analysis", methods=["GET"])
+def biquote_research_analysis():
+    """Shadow-only MTF analysis using direct BiQuote candles; never feeds live signals."""
+    if not BIQUOTE_RESEARCH_ENABLED:
+        return jsonify({"enabled": False, "research_only": True, "signals_activated": False}), 503
+    symbol = get_symbol(request.args.get("symbol"))
+    interval = (request.args.get("interval") or "5min").strip()
+    frames = {
+        "5min": ("5m", "15m", "30m"),
+        "15min": ("15m", "30m", "1h"),
+        "30min": ("30m", "1h", "4h"),
+    }
+    if not symbol:
+        return jsonify({"error": "Símbolo no permitido."}), 400
+    if interval not in frames:
+        return jsonify({"error": "Temporalidad no permitida.", "allowed_intervals": list(frames)}), 400
+    try:
+        base_interval, htf_interval_1, htf_interval_2 = frames[interval]
+        base = cached_biquote_research_ohlc(symbol, base_interval)
+        higher_1 = cached_biquote_research_ohlc(symbol, htf_interval_1)
+        higher_2 = cached_biquote_research_ohlc(symbol, htf_interval_2)
+        if base["closed_bars"] < 120 or higher_1["closed_bars"] < 60 or higher_2["closed_bars"] < 60:
+            raise RuntimeError("Historial insuficiente en una o más temporalidades; análisis bloqueado.")
+        htf_minutes_1 = BIQUOTE_INTERVAL_MINUTES[htf_interval_1]
+        htf_minutes_2 = BIQUOTE_INTERVAL_MINUTES[htf_interval_2]
+        strategy = analyze_strategy(
+            base["bars"],
+            interval,
+            symbol,
+            higher_timeframes={
+                f"{htf_minutes_1}min": higher_1["bars"],
+                f"{htf_minutes_2}min": higher_2["bars"],
+            },
+        )
+        return jsonify({
+            "symbol": symbol,
+            "interval": interval,
+            "research_only": True,
+            "signals_activated": False,
+            "execution_price": False,
+            "data_mode": DATA_MODE,
+            "provider": "biquote",
+            "price_basis": "provider_feed_not_verified_as_VANTAGE",
+            "signal_research": strategy.get("signal", "WAIT"),
+            "pre_signal": strategy.get("pre_signal", False),
+            "pre_signal_side": strategy.get("pre_signal_side"),
+            "primary_bias": strategy.get("primary_bias"),
+            "mtf": strategy.get("mtf"),
+            "regime": strategy.get("regime"),
+            "structure": strategy.get("structure"),
+            "score": strategy.get("score"),
+            "score_max": strategy.get("score_max"),
+            "quality_grade": strategy.get("quality_grade"),
+            "reason": strategy.get("reason"),
+            "entry": None,
+            "stop_loss": None,
+            "take_profit": None,
+            "candles": {
+                base_interval: base["closed_bars"],
+                htf_interval_1: higher_1["closed_bars"],
+                htf_interval_2: higher_2["closed_bars"],
+            },
+            "last_closed": {
+                base_interval: base["last_closed_close_time"],
+                htf_interval_1: higher_1["last_closed_close_time"],
+                htf_interval_2: higher_2["last_closed_close_time"],
+            },
+            "warning": "Análisis sombra con velas BiQuote. No es señal operativa ni precio de ejecución Vantage.",
+        })
+    except (requests.RequestException, ValueError, TypeError, KeyError, RuntimeError) as exc:
+        app.logger.warning("BiQuote shadow analysis rejected symbol=%s interval=%s reason=%s", symbol, interval, str(exc)[:160])
+        return jsonify({
+            "error": "No se pudo completar el análisis multitemporal BiQuote.",
+            "research_only": True,
+            "signals_activated": False,
+            "detail": str(exc)[:180],
+        }), 503
+
+
 @app.route("/api/research/biquote/ohlc", methods=["GET"])
 def biquote_research_ohlc():
     """On-demand BiQuote OHLC endpoint; never feeds signal generation."""

@@ -54,40 +54,40 @@ El spread es variable. No se debe sustituir por un coste fijo inventado ni asumi
 
 ## Primera prueba del motor sweep → BOS → retest
 
-Se implementó un prototipo aislado con estas reglas:
+Prototipo aislado con estas reglas:
 
 1. Barrido de un swing previamente confirmado.
 2. Cambio de estructura por cierre más allá de un pivote confirmado antes de esa vela.
 3. Retesteo del nivel roto dentro de una ventana limitada.
-4. Entrada en la apertura de la vela siguiente al retesteo, nunca en el cierre que confirma.
+4. Entrada en la apertura de la vela siguiente al retesteo.
 5. EMA50/EMA200 como filtro de régimen; ATR14 para amortiguación del stop.
-6. Bid para entradas/salidas cortas y salidas largas; Ask para entradas largas y salidas cortas.
+6. Bid/Ask en entradas y salidas según el lado ejecutable.
 7. Deslizamiento de investigación de 0,10 unidades de precio por lado.
 8. Si stop y objetivo se tocan en la misma vela, se contabiliza primero el stop. Una discontinuidad invalida setup/posición; no se inventa un precio.
 
-**Resultados de esta primera versión (no optimizada):**
+**Resultados de la versión registrada en el repositorio:**
 
 | Métrica | M5 | M15 |
 |---|---:|---:|
 | Velas completas | 60.495 | 20.153 |
-| Operaciones | 139 | 37 |
-| Acierto | 32,37 % | 27,03 % |
-| Profit factor | 0,85 | 0,56 |
-| Expectativa por operación (unidades de precio) | -1,31 | -5,87 |
-| Resultado neto (unidades de precio) | -182,02 | -217,11 |
-| Operaciones invalidadas por huecos | 11 | 18 |
+| Operaciones | 174 | 55 |
+| Acierto | 31,61 % | 34,55 % |
+| Profit factor | 0,75 | 1,06 |
+| Expectativa por operación (unidades de precio) | -2,15 | +0,81 |
+| Resultado neto (unidades de precio) | -373,27 | +44,52 |
+| Operaciones invalidadas por huecos | 15 | 18 |
 
 División cronológica 60/20/20, sin ajustar parámetros:
 
 | Periodo | M5 operaciones / PF / neto | M15 operaciones / PF / neto |
 |---|---|---|
-| Entrenamiento 60 % | 87 / 0,78 / -198,47 | 25 / 0,47 / -200,33 |
-| Validación 20 % | 27 / 1,22 / +36,78 | 6 / 0,47 / -36,54 |
-| Holdout final 20 % | 25 / 0,88 / -20,32 | 6 / 1,45 / +19,76 |
+| Entrenamiento 60 % | 105 / 0,70 / -317,87 | 35 / 0,89 / -57,95 |
+| Validación 20 % | 34 / 0,92 / -16,99 | 13 / 2,18 / +110,98 |
+| Holdout final 20 % | 35 / 0,83 / -38,41 | 7 / 0,88 / -8,52 |
 
-Los tamaños de muestra de validación y holdout son pequeños, especialmente en M15. Los resultados están expresados en unidades de precio, no en euros/dólares de cuenta, pips ni rentabilidad porcentual. No se incluyen comisiones ni se ha calibrado el deslizamiento contra fills reales del broker. Por tanto, esto no es una validación de rentabilidad.
+M5 falla en los tres periodos. M15 queda ligeramente por encima de 1 en el agregado, pero falla entrenamiento y holdout; además, el holdout solo contiene siete operaciones. No hay evidencia suficiente para afirmar ventaja estadística o rentabilidad. Los importes son unidades de precio, no euros/dólares de cuenta, pips ni rentabilidad porcentual. El spread está incorporado mediante Bid/Ask, pero la comisión real de Vantage y el deslizamiento real no están calibrados.
 
-**Conclusión:** esta primera regla no supera el filtro de investigación y NO debe conectarse al escáner ni utilizarse para operar. No se maquillan los resultados ni se optimiza mirando el holdout.
+**Conclusión:** esta primera regla no supera el filtro de investigación y NO debe conectarse al escáner ni utilizarse para operar. No se optimiza mirando el holdout.
 
 ## Implementación de investigación añadida
 
@@ -96,4 +96,4 @@ Los tamaños de muestra de validación y holdout son pequeños, especialmente en
 - `tests/test_gold_liquidity_research.py`: pruebas de primitivas.
 - `tests/test_gold_strategy_backtest.py`: pruebas del prototipo de backtest.
 
-Los archivos permanecen en la rama `gedeon-2.0-research`, separada de producción. La validación automática de GitHub Actions debe confirmarse antes de considerar esta fase cerrada.
+Los archivos permanecen en la rama `gedeon-2.0-research`, separada de producción. El PR de borrador #34 solicita validación automática; los estados de GitHub Actions todavía no aparecen disponibles en la consulta realizada.

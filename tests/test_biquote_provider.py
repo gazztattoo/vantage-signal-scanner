@@ -42,13 +42,13 @@ class BiQuoteProviderTests(unittest.TestCase):
         response.status_code = 200
         response.json.return_value = {"bars": self._bars()}
         with patch("app.requests.get", return_value=response) as get:
-            candles, candle_time, age = fetch_candles("EUR/USD", "5min")
+            candles, candle_time, age = fetch_candles("XAU/USD", "5min")
         self.assertEqual(len(candles), 60)
         parsed_time = datetime.fromisoformat(candle_time)
         self.assertIsNotNone(parsed_time.tzinfo)
         self.assertEqual(parsed_time.utcoffset(), timedelta(0))
         self.assertGreaterEqual(age, 0)
-        self.assertIn("biquote.io/api/EURUSD/ohlc", get.call_args.args[0])
+        self.assertIn("biquote.io/api/XAUUSD/ohlc", get.call_args.args[0])
         self.assertEqual(get.call_args.kwargs["params"]["interval"], "5m")
 
     def test_fetch_candles_rejects_insufficient_or_bad_provider_data(self):

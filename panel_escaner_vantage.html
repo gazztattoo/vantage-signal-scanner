@@ -819,6 +819,7 @@ select,button{border-radius:9px}
 
 <script>
 const API_BASE="https://global-signal-push-test.onrender.com";
+window.API_BASE=API_BASE;
 const accessToken="";
 
 const markets=[
@@ -1543,7 +1544,7 @@ if ("serviceWorker" in navigator) {
   const fmt=stamp=>new Date(stamp).toLocaleString("es-ES",{timeZone:"Europe/Madrid",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false});
   async function update(){
     try{
-      const response=await fetch(API_BASE+"/api/gold/context",{cache:"no-store"});
+      const response=await fetch(window.API_BASE+"/api/gold/context",{cache:"no-store"});
       if(!response.ok)throw Error("No se pudo consultar el calendario");
       const data=await response.json();
       const news=data.news||{};
@@ -1588,7 +1589,7 @@ if ("serviceWorker" in navigator) {
     if(busy)return;
     busy=true;
     try{
-      const response=await fetch(API_BASE+"/api/stream/ticks",{cache:"no-store"});
+      const response=await fetch(window.API_BASE+"/api/stream/ticks",{cache:"no-store"});
       const data=await response.json().catch(()=>({}));
       if(response.status===401){setStatus("Sesión caducada · vuelve a entrar","error");return;}
       if(!response.ok)throw new Error(data.error||"Streaming de servidor desactivado o no disponible");

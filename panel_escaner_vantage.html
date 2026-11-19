@@ -1577,21 +1577,15 @@ if ("serviceWorker" in navigator) {
   const fmt=stamp=>new Date(stamp).toLocaleString("es-ES",{timeZone:"Europe/Madrid",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false});
   async function update(){
     try{
-      const response=await fetch(window.API_BASE+"/api/gold/context",{cache:"no-store"});
+      const response=await fetch(window.API_BASE+"/api/market-status",{cache:"no-store"});
       if(!response.ok)throw Error("No se pudo consultar el calendario");
       const data=await response.json();
-      const news=data.news||{};
-      status.textContent=!news.verified?"CALENDARIO SIN VERIFICAR · INFORMACIÓN NO CONFIRMADA":
-        news.high_impact_window?"ALTO IMPACTO · ENTRADAS BLOQUEADAS":"Calendario macro verificado · sin evento de alto impacto inmediato";
-      const clock=data.session||{};
-      const next=clock.next_transition;
-      session.textContent="XAU/USD "+(clock.current?.open?"ABIERTO":"CERRADO")+
-        (next?" · Próximo "+(next.event==="OPEN"?"abre":"cierra")+": "+fmt(next.at_spain)+" (hora peninsular española)":" · Horario no disponible");
-      events.textContent=(news.upcoming_events||[]).slice(0,3).map(x=>fmt(x.at_utc)+" · "+x.title).join("\n")||"Sin próximos eventos verificados";
+      const gold=data.markets?.["XAU/USD"]||{};
+      status.textContent="CALENDARIO ECONÓMICO NO CONECTADO EN TEST · SIN EVENTOS VERIFICADOS";
+      session.textContent="XAU/USD · "+(gold.status||"ESTADO NO DISPONIBLE")+" · "+(gold.reason||"Datos de prueba; no representa el horario real del mercado.");
+      events.textContent="La agenda macroeconómica no está conectada en este entorno de pruebas.";
       const liquidity=document.getElementById("goldLiquiditySessions");
-      if(liquidity)liquidity.textContent=(clock.liquidity_sessions||[]).map(s=>
-        s.name+" "+(s.active?"● ACTIVA":"○ INACTIVA")+" · "+new Date(s.local_time).toLocaleTimeString("es-ES",{timeZone:s.timezone,hour:"2-digit",minute:"2-digit"})+" local · franja "+s.activity_window
-      ).join(" | ");
+      if(liquidity)liquidity.textContent="Sesiones reales no disponibles en TEST.";
     }catch(error){status.textContent="NOTICIAS NO DISPONIBLES · SOLO CONTEXTO";session.textContent="Horario no disponible";events.textContent="";}
   }
   const refresh=document.getElementById("goldNewsRefresh");
@@ -1607,60 +1601,14 @@ if ("serviceWorker" in navigator) {
   setInterval(()=>{if(!document.hidden)update();},60000);
 })();
 
-/* BiQuote ticks are streamed into the production backend; this panel reads only our API. */
+/* TEST: no tick endpoint exists here; never present a fake live quote. */
 (()=>{
-  const instruments={
-    XAUUSD:{symbol:"XAU/USD",price:"bqPriceXAU",meta:"bqMetaXAU",digits:2}
-  };
   const status=document.getElementById("bqLiveStatus");
   const dot=document.getElementById("bqLiveDot");
-  if(!status||!dot)return;
-  let timer=null, busy=false;
-  const setStatus=(message,state="")=>{status.textContent=message;dot.className="live-feed-dot"+(state?" "+state:"");};
-  const fmt=(v,d)=>Number(v).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
-  const update=async()=>{
-    if(busy)return;
-    busy=true;
-    try{
-      const response=await fetch(window.API_BASE+"/api/stream/ticks",{cache:"no-store"});
-      const data=await response.json().catch(()=>({}));
-      if(response.status===401){setStatus("Sesión caducada · vuelve a entrar","error");return;}
-      if(!response.ok)throw new Error(data.error||"Streaming de servidor desactivado o no disponible");
-      const ticks=data.ticks||{};
-      let count=0;
-      for(const cfg of Object.values(instruments)){
-        const tick=ticks[cfg.symbol];
-        if(!tick)continue;
-        const bid=Number(tick.bid),ask=Number(tick.ask),mid=Number(tick.mid);
-        if(!Number.isFinite(bid)||!Number.isFinite(ask)||!Number.isFinite(mid)||bid<=0||ask<bid)continue;
-        const stamp=new Date(tick.timestamp);
-        if(Number.isNaN(stamp.getTime()))continue;
-        document.getElementById(cfg.price).textContent=fmt(mid,cfg.digits);
-        document.getElementById(cfg.meta).textContent="Bid "+fmt(bid,cfg.digits)+" · Ask "+fmt(ask,cfg.digits)+" · Spread "+fmt(ask-bid,cfg.digits)+"\nTick "+stamp.toLocaleTimeString("es-ES");
-        const cardQuote=document.querySelector('[data-live-quote="'+cfg.symbol+'"]');
-        if(cardQuote){
-          const midNode=cardQuote.querySelector("[data-live-mid]");
-          const detailNode=cardQuote.querySelector("[data-live-detail]");
-          if(midNode)midNode.textContent=fmt(mid,cfg.digits);
-          if(detailNode)detailNode.textContent="Bid "+fmt(bid,cfg.digits)+" · Ask "+fmt(ask,cfg.digits)+" · Spread "+fmt(ask-bid,cfg.digits)+" · "+stamp.toLocaleTimeString("es-ES");
-        }
-        count++;
-      }
-      if(count)setStatus("Servidor conectado · "+count+" activos con cotización reciente","connected");
-      else setStatus(data.stream?.connected?"Conectado · esperando ticks del mercado":"Conectando con BiQuote desde servidor…");
-    }catch(error){setStatus(error.message||"Error de streaming","error");}
-    finally{busy=false;}
-  };
-  const POLL_INTERVAL_MS=2000;
-  const stop=()=>{if(timer){clearInterval(timer);timer=null;}};
-  const begin=()=>{
-    stop();
-    if(document.hidden)return;
-    update();
-    timer=setInterval(update,POLL_INTERVAL_MS);
-  };
-  begin();
-  document.addEventListener("visibilitychange",()=>{if(document.hidden)stop();else begin();});
+  const meta=document.getElementById("bqMetaXAU");
+  if(status)status.textContent="Streaming de ticks no conectado en TEST";
+  if(dot)dot.className="live-feed-dot error";
+  if(meta)meta.textContent="Sin cotización en tiempo real";
 })();
 </script>
 

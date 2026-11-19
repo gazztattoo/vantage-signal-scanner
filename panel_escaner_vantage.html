@@ -368,6 +368,27 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 @media(max-width:560px){.live-feed-grid{gap:6px}.live-feed-card{padding:8px}.live-feed-price{font-size:clamp(15px,4.4vw,21px)}}
 
  
+/* BiQuote compact header: conserva cotización y estado sin ocupar media pantalla. */
+.live-feed{padding:9px 11px;margin:0 0 10px;border-radius:12px}
+.live-feed-head{margin-bottom:6px;gap:6px}
+.live-feed-title{font-size:10px;letter-spacing:.2px}
+.live-feed-status{font-size:9px;gap:5px}
+.live-feed-dot{width:7px;height:7px}
+.live-feed-grid{display:block}
+.live-feed-card{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:2px 10px;padding:7px 9px;border-radius:9px}
+.live-feed-symbol{grid-column:1;font-size:9px}
+.live-feed-price{grid-column:1;font-size:19px;line-height:1.15;margin:2px 0 0}
+.live-feed-meta{grid-column:2;grid-row:1 / span 2;text-align:right;font-size:9px;line-height:1.35}
+@media(max-width:560px){
+  .live-feed{padding:8px 9px;margin-bottom:9px}
+  .live-feed-head{align-items:flex-start}
+  .live-feed-title{font-size:9px}
+  .live-feed-status{font-size:8px;white-space:nowrap}
+  .live-feed-card{padding:6px 8px}
+  .live-feed-price{font-size:18px}
+  .live-feed-meta{font-size:8px}
+}
+
 /* GEDEÓN 2.0 — visual refresh for mobile-first news and navigation */
 .brand-banner{transform:none!important;max-height:190px;object-fit:contain}
 @media(max-width:760px){.brand-banner{transform:none!important;max-height:none;object-fit:contain}}

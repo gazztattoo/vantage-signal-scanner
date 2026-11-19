@@ -19,7 +19,7 @@ class BiQuoteStreamTests(unittest.TestCase):
 
     def make_tick(self, **overrides):
         tick = {
-            "symbol": "EURUSD",
+            "symbol": "XAUUSD",
             "bid": 1.10000,
             "ask": 1.10010,
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -30,7 +30,7 @@ class BiQuoteStreamTests(unittest.TestCase):
 
     def test_normalizes_tick_and_calculates_mid(self):
         tick = _extract_tick([self.make_tick()])
-        self.assertEqual(tick["symbol"], "EUR/USD")
+        self.assertEqual(tick["symbol"], "XAU/USD")
         self.assertAlmostEqual(tick["mid"], 1.10005, places=7)
         self.assertAlmostEqual(tick["spread"], 0.0001, places=7)
         self.assertFalse(tick["is_vantage_quote"])

@@ -145,6 +145,63 @@ class BiQuoteResearchEndpointTests(unittest.TestCase):
         self.assertEqual(result.status_code, 400)
         get.assert_not_called()
 
+    def _research_bars(self, count, step_minutes):
+        now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+        rows = []
+        for i in range(count):
+            stamp = now - timedelta(minutes=step_minutes * (count - i))
+            price = 2650.0 + i * 0.05
+            rows.append({
+                "time": stamp.isoformat(),
+                "open": price,
+                "high": price + 0.2,
+                "low": price - 0.2,
+                "close": price + 0.05,
+            })
+        return rows
+
+    def test_shadow_analysis_uses_direct_mtf_series_and_never_activates_signals(self):
+        datasets = {
+            "5m": {"bars": self._research_bars(120, 5), "closed_bars": 120, "last_closed_close_time": "2026-11-19T20:00:00+00:00"},
+            "15m": {"bars": self._research_bars(60, 15), "closed_bars": 60, "last_closed_close_time": "2026-11-19T20:00:00+00:00"},
+            "30m": {"bars": self._research_bars(60, 30), "closed_bars": 60, "last_closed_close_time": "2026-11-19T20:00:00+00:00"},
+        }
+        strategy = {
+            "signal": "WAIT", "pre_signal": False, "primary_bias": "BULL",
+            "mtf": {"timeframe_1": "M15", "bias_1": "BULL", "timeframe_2": "M30", "bias_2": "BULL"},
+            "regime": "TREND", "structure": {"type": "NONE"}, "score": 5,
+            "score_max": 7, "quality_grade": "B", "reason": "research only",
+        }
+        with patch.object(app, "BIQUOTE_RESEARCH_ENABLED", True), patch(
+            "app.cached_biquote_research_ohlc",
+            side_effect=lambda symbol, interval: datasets[interval],
+        ), patch("app.analyze_strategy", return_value=strategy) as analyze:
+            response = self.client.get("/api/research/biquote/analysis?symbol=XAU/USD&interval=5min")
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertTrue(data["research_only"])
+        self.assertFalse(data["signals_activated"])
+        self.assertFalse(data["execution_price"])
+        self.assertEqual(data["candles"], {"5m": 120, "15m": 60, "30m": 60})
+        kwargs = analyze.call_args.kwargs
+        self.assertEqual(len(kwargs["higher_timeframes"]["15min"]), 60)
+        self.assertEqual(len(kwargs["higher_timeframes"]["30min"]), 60)
+
+    def test_shadow_analysis_rejects_insufficient_higher_timeframe_history(self):
+        datasets = {
+            "5m": {"bars": self._research_bars(120, 5), "closed_bars": 120, "last_closed_close_time": "2026-11-19T20:00:00+00:00"},
+            "15m": {"bars": self._research_bars(59, 15), "closed_bars": 59, "last_closed_close_time": "2026-11-19T20:00:00+00:00"},
+            "30m": {"bars": self._research_bars(60, 30), "closed_bars": 60, "last_closed_close_time": "2026-11-19T20:00:00+00:00"},
+        }
+        with patch.object(app, "BIQUOTE_RESEARCH_ENABLED", True), patch(
+            "app.cached_biquote_research_ohlc",
+            side_effect=lambda symbol, interval: datasets[interval],
+        ), patch("app.analyze_strategy") as analyze:
+            response = self.client.get("/api/research/biquote/analysis?symbol=XAU/USD&interval=5min")
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(response.get_json()["signals_activated"])
+        analyze.assert_not_called()
+
     def test_endpoint_can_be_disabled(self):
         with patch.object(app, "BIQUOTE_RESEARCH_ENABLED", False), patch(
             "app.requests.get"

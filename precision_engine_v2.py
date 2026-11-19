@@ -46,6 +46,9 @@ def evaluate_multitimeframe_setup(*, symbol: str, m30: dict, m15: dict, m5: dict
     previous_high and previous_low. All prices must share the same quote basis.
     """
     cfg = config or PrecisionConfig()
+    if symbol != "XAU/USD":
+        return {"signal": "ESPERAR", "quality": "INSUFICIENTE",
+                "reason": "Este motor está reservado exclusivamente para XAU/USD."}
     required = ("ema20", "ema50", "adx", "rsi", "macd_hist", "close",
                 "atr", "candle_age_seconds", "timeframe_seconds")
     if not symbol or not all(_valid_frame(f, required) for f in (m30, m15, m5)):
@@ -138,6 +141,9 @@ def evaluate_m15_m5_setup(*, symbol: str, m15: dict, m5: dict,
     places orders, or treats a candle close as a live Bid/Ask execution quote.
     """
     cfg = config or PrecisionConfig()
+    if symbol != "XAU/USD":
+        return {"signal": "ESPERAR", "quality": "INSUFICIENTE",
+                "reason": "Este motor está reservado exclusivamente para XAU/USD."}
     required = ("ema20", "ema50", "adx", "rsi", "macd_hist", "close",
                 "atr", "candle_age_seconds", "timeframe_seconds")
     frames = (("M15", m15, cfg.min_m15_adx), ("M5", m5, cfg.min_m5_adx))

@@ -122,7 +122,8 @@ class MultiTimeframeEngineTests(unittest.TestCase):
         self.assertEqual(result["setup_grade"], "C")
         self.assertEqual(result["quality_grade"], "C")
         self.assertIn(result["confluence_grade"], ("A", "B", "C"))
-        self.assertEqual(result["score"], result["score_max"] if result["score"] == 7 else result["score"])
+        expected_confluence = "A" if result["score"] >= 6 else "B" if result["score"] >= 5 else "C"
+        self.assertEqual(result["confluence_grade"], expected_confluence)
 
     def test_pre_signal_never_contains_entry_or_risk_levels(self):
         result = analyze(pre_signal_bars(), "5min", "TEST")

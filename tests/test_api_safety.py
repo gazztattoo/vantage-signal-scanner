@@ -46,7 +46,7 @@ class ProductionApiSafetyTests(unittest.TestCase):
         self.assertEqual(set(payload["markets"]), scanner.ALLOWED_SYMBOLS)
 
     def test_analysis_requires_access_token(self):
-        response = self.client.get("/api/analysis?symbol=EUR/USD&interval=15min")
+        response = self.client.get("/api/analysis?symbol=XAU/USD&interval=15min")
         self.assertEqual(response.status_code, 401)
 
     def test_analysis_rejects_unknown_symbol_after_authentication(self):
@@ -58,7 +58,7 @@ class ProductionApiSafetyTests(unittest.TestCase):
 
     def test_analysis_rejects_unknown_interval_after_authentication(self):
         response = self.client.get(
-            "/api/analysis?symbol=EUR/USD&interval=1min",
+            "/api/analysis?symbol=XAU/USD&interval=1min",
             headers=self.auth(),
         )
         self.assertEqual(response.status_code, 400)

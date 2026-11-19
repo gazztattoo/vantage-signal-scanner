@@ -429,6 +429,183 @@ body{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
  .news-footer span+span{margin-top:4px}
 }
 
+
+/* GEDEÓN 2.0 — professional trading terminal visual system */
+:root{
+  --bg:#070b10;
+  --panel:#0d141c;
+  --line:#1d2b37;
+  --text:#e9f1f6;
+  --muted:#8193a1;
+  --green:#35e6a0;
+  --red:#ff6677;
+  --amber:#e9b85c;
+}
+body{
+  background:
+    radial-gradient(ellipse at 50% -12%,rgba(30,112,83,.20),transparent 42%),
+    linear-gradient(180deg,#080e14 0%,#070b10 55%,#080d12 100%);
+  letter-spacing:.01em;
+}
+.wrap{max-width:920px;padding:14px 13px calc(112px + env(safe-area-inset-bottom))}
+.top{
+  margin-bottom:11px;border:1px solid #243642;border-radius:15px;
+  background:#070c11;box-shadow:0 12px 34px rgba(0,0,0,.32);
+}
+.brand-banner{
+  height:112px;width:100%;object-fit:cover;object-position:center;
+  transform:none!important;max-height:none!important;
+}
+.status{
+  top:9px;right:9px;padding:7px 10px;border:1px solid #334452;
+  background:rgba(7,14,19,.92);font-size:10px;font-weight:750;
+  letter-spacing:.2px;backdrop-filter:blur(10px)
+}
+.dot{width:7px;height:7px}
+.app-view{animation:terminalIn .22s ease-out}
+@keyframes terminalIn{from{opacity:.72;transform:translateY(4px)}to{opacity:1;transform:none}}
+#viewScanner:before{
+  content:"GOLD DESK  /  XAUUSD";
+  display:block;margin:2px 2px 10px;color:#a9bac5;
+  font-size:10px;font-weight:900;letter-spacing:1.7px;
+}
+.market-overview{
+  display:grid!important;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);
+  gap:9px;margin:0 0 10px;
+}
+.overview-panel{
+  border:1px solid #243541;border-radius:13px;
+  background:linear-gradient(145deg,#111c25,#0b1219);
+  box-shadow:inset 0 1px rgba(255,255,255,.025),0 8px 22px rgba(0,0,0,.16)
+}
+.overview-heading{
+  padding:9px 10px;border-bottom:1px solid #1d2b36;
+  color:#b8c8d2;font-size:9px;letter-spacing:.7px
+}
+.overview-icon{color:var(--amber)}
+.trend-card,.sentiment-content{
+  background:rgba(4,10,15,.55);border-color:#1c2b36
+}
+.trend-name{color:#93a7b4}
+.trend-value{color:#f1f6f8}
+.trend-note,.overview-foot{color:#8295a2}
+.sentiment-label strong{color:#e8f2f5}
+.ring:before{background:#0b141b}
+.toolbar{
+  display:flex;align-items:center;gap:8px;padding:10px;
+  margin:0 0 9px;border:1px solid #223440;border-radius:13px;
+  background:linear-gradient(135deg,#101a23,#0b1219);
+}
+.toolbar label{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase}
+.toolbar select{
+  min-width:104px;padding:10px 11px;border-radius:9px;
+  border:1px solid #30434f;background:#0a1118;font-size:12px;font-weight:750
+}
+.toolbar button,#pushToggle{
+  padding:10px 13px;border-radius:9px;border:1px solid #2d9f78;
+  background:linear-gradient(135deg,#39e5a0,#20bd83);
+  color:#04130e;font-size:12px;font-weight:900;
+  box-shadow:0 5px 16px rgba(31,213,145,.12)
+}
+#updated{width:100%;font-size:9px;color:#81939f}
+.toolbar[aria-label="Notificaciones"]{
+  justify-content:space-between;padding:8px 10px;background:#0c141b;
+}
+#pushToggle{
+  background:#13271f;color:#6ce8b1;border-color:#245d46;
+  box-shadow:none;font-size:10px;padding:9px 11px
+}
+#pushStatus{font-size:10px;text-align:right}
+.live-feed{
+  padding:8px 10px;margin:0 0 10px;border:1px solid #273944;
+  border-radius:12px;background:linear-gradient(120deg,#111d25,#0b131a);
+  box-shadow:0 8px 20px rgba(0,0,0,.18)
+}
+.live-feed-title{font-size:9px;letter-spacing:1px;color:#b6c6cf}
+.live-feed-status{font-size:9px}
+.live-feed-card{
+  border-color:#243641;background:#070e14;
+}
+.live-feed-symbol{color:#a9bbc5;letter-spacing:.6px}
+.live-feed-price{color:#f3f7f8;font-variant-numeric:tabular-nums}
+.live-feed-meta{color:#8195a2}
+#cards{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+#cards .card{
+  padding:15px;border:1px solid #2a3e49;border-radius:16px;
+  background:
+    radial-gradient(ellipse at 100% 0%,rgba(41,191,133,.09),transparent 45%),
+    linear-gradient(155deg,#121e27,#0b1219 75%);
+  box-shadow:0 12px 30px rgba(0,0,0,.24),inset 0 1px rgba(255,255,255,.025)
+}
+#cards .cardhead{align-items:center}
+#cards .symbol{font-size:16px;letter-spacing:.2px}
+#cards .market{color:#91a4b0;font-size:10px}
+#cards .price{
+  margin:14px 0 3px;color:#f2f7f8;
+  font-size:clamp(30px,8vw,42px);font-weight:850;
+  letter-spacing:-1.2px;font-variant-numeric:tabular-nums
+}
+#cards .priceLabel{font-size:8px;letter-spacing:1px;color:#8296a3}
+#cards .reason{
+  min-height:0;margin:10px 0;padding:10px 11px;
+  border-left:2px solid #b38b45;border-radius:0 8px 8px 0;
+  background:rgba(220,173,86,.055);color:#aebdc6;font-size:11px
+}
+#cards .levels{gap:7px}
+#cards .level{
+  border:1px solid #263945;background:#091119;border-radius:10px;padding:10px
+}
+#cards .level span,#cards .metric span{color:#8ea2af}
+#cards .level strong{color:#edf5f7;font-size:14px;font-variant-numeric:tabular-nums}
+#cards .metric{background:#0a131a;border-color:#243541}
+#cards .pill{border:1px solid rgba(233,184,92,.2);letter-spacing:.7px}
+#cards .pill.buy{background:rgba(42,214,143,.12);border-color:rgba(53,230,160,.28);color:#4be5a5}
+#cards .pill.sell{background:rgba(255,102,119,.12);border-color:rgba(255,102,119,.25);color:#ff7887}
+#cards .foot{color:#80939f}
+.bottom{display:none}
+.data-panel,.news-card,.news-intro{
+  border-color:#253743;background:linear-gradient(150deg,#111c25,#0a1219);
+  box-shadow:0 10px 26px rgba(0,0,0,.18)
+}
+.data-panel h2,.news-card h2{color:#e9f1f5}
+.data-row,.stat-box{
+  background:#091119;border-color:#243641;border-radius:11px
+}
+.data-row strong,.stat-box strong{color:#eaf2f5;font-variant-numeric:tabular-nums}
+.data-row span,.stat-box span{color:#8da1ad}
+select,button{border-radius:9px}
+.app-nav{
+  background:rgba(7,14,20,.96);border:1px solid #2b3e49;
+  box-shadow:0 14px 40px rgba(0,0,0,.68),0 0 20px rgba(35,213,146,.05)
+}
+.app-nav button{color:#8295a1}
+.app-nav button.active{
+  color:#53e5a8;background:rgba(35,173,118,.16);
+  border-color:rgba(53,230,160,.24)
+}
+.app-nav .nav-icon svg{stroke-width:1.9}
+@media(max-width:560px){
+  .wrap{padding:10px 10px calc(105px + env(safe-area-inset-bottom))}
+  .brand-banner{height:96px;object-fit:cover}
+  .market-overview{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7px}
+  .overview-heading{white-space:normal;min-height:34px}
+  .toolbar{gap:7px;padding:8px}
+  .toolbar label{width:100%}
+  .toolbar select{flex:1;min-width:0}
+  .toolbar button{flex:1}
+  .toolbar[aria-label="Notificaciones"]{flex-wrap:nowrap}
+  #pushToggle{max-width:56%;white-space:normal;line-height:1.2}
+  #pushStatus{max-width:44%;line-height:1.35}
+  #cards .card{padding:13px;border-radius:14px}
+  #cards .levels{grid-template-columns:1fr}
+  #cards .level{padding:10px}
+  #cards .level strong{font-size:15px}
+  .app-nav{bottom:calc(8px + env(safe-area-inset-bottom));width:calc(100% - 18px)}
+}
+@media(min-width:700px){
+  #cards{grid-template-columns:minmax(0,1fr)}
+}
+
 </style>
 </head>
 

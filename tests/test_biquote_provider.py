@@ -89,7 +89,7 @@ class BiQuoteProviderTests(unittest.TestCase):
         self.assertEqual(result.status_code, 503)
 
     def test_price_requires_authentication(self):
-        result = self.client.get("/api/price?symbol=EUR/USD")
+        result = self.client.get("/api/price?symbol=XAU/USD")
         self.assertEqual(result.status_code, 401)
 
 
@@ -129,7 +129,7 @@ class BiQuoteProviderTests(unittest.TestCase):
             "pre_signal_side": "COMPRA", "pre_signal_reason": "confluencia parcial",
         }
         with patch("app.biquote_stream_snapshot", return_value={"ticks": {}}):
-            result = apply_live_entry_validation(payload, "EUR/USD")
+            result = apply_live_entry_validation(payload, "XAU/USD")
         self.assertFalse(result["pre_signal"])
         self.assertIsNone(result["pre_signal_side"])
         self.assertEqual(result["live_quote_validation"]["status"], "NO_LIVE_TICK")
@@ -145,8 +145,8 @@ class BiQuoteProviderTests(unittest.TestCase):
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "stale": True, "market_state": "open",
         }
-        with patch("app.biquote_stream_snapshot", return_value={"ticks": {"EUR/USD": tick}}):
-            result = apply_live_entry_validation(payload, "EUR/USD")
+        with patch("app.biquote_stream_snapshot", return_value={"ticks": {"XAU/USD": tick}}):
+            result = apply_live_entry_validation(payload, "XAU/USD")
         self.assertFalse(result["pre_signal"])
         self.assertEqual(result["live_quote_validation"]["status"], "STALE_TICK")
         self.assertEqual(result["entry_readiness"]["status"], "STALE_TICK")
@@ -160,8 +160,8 @@ class BiQuoteProviderTests(unittest.TestCase):
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "stale": False, "market_state": "open",
         }
-        with patch("app.biquote_stream_snapshot", return_value={"ticks": {"EUR/USD": tick}}):
-            result = apply_live_entry_validation(payload, "EUR/USD")
+        with patch("app.biquote_stream_snapshot", return_value={"ticks": {"XAU/USD": tick}}):
+            result = apply_live_entry_validation(payload, "XAU/USD")
         self.assertEqual(result["signal"], "COMPRA")
         self.assertAlmostEqual(result["entry"], 1.08010)
         self.assertAlmostEqual(result["stop_loss"], 1.07860)
@@ -176,8 +176,8 @@ class BiQuoteProviderTests(unittest.TestCase):
             "pre_signal_side": "VENTA", "pre_signal_reason": "confluencia parcial",
         }
         tick = {"bid": 1.08, "ask": 1.0802, "timestamp": stale_stamp}
-        with patch("app.biquote_stream_snapshot", return_value={"ticks": {"EUR/USD": tick}}):
-            result = apply_live_entry_validation(payload, "EUR/USD")
+        with patch("app.biquote_stream_snapshot", return_value={"ticks": {"XAU/USD": tick}}):
+            result = apply_live_entry_validation(payload, "XAU/USD")
         self.assertFalse(result["pre_signal"])
         self.assertIsNone(result["pre_signal_side"])
         self.assertEqual(result["live_quote_validation"]["status"], "STALE_TICK")
@@ -210,8 +210,8 @@ class BiQuoteProviderTests(unittest.TestCase):
             "bid": 1.0810, "ask": 1.0812,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
-        with patch("app.biquote_stream_snapshot", return_value={"ticks": {"EUR/USD": tick}}):
-            result = apply_live_entry_validation(payload, "EUR/USD")
+        with patch("app.biquote_stream_snapshot", return_value={"ticks": {"XAU/USD": tick}}):
+            result = apply_live_entry_validation(payload, "XAU/USD")
         self.assertFalse(result["pre_signal"])
         self.assertIsNone(result["pre_signal_side"])
         self.assertEqual(result["live_quote_validation"]["status"], "PRICE_MOVED")
@@ -228,8 +228,8 @@ class BiQuoteProviderTests(unittest.TestCase):
             "bid": 1.08005, "ask": 1.08010,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
-        with patch("app.biquote_stream_snapshot", return_value={"ticks": {"EUR/USD": tick}}):
-            result = apply_live_entry_validation(payload, "EUR/USD")
+        with patch("app.biquote_stream_snapshot", return_value={"ticks": {"XAU/USD": tick}}):
+            result = apply_live_entry_validation(payload, "XAU/USD")
         self.assertTrue(result["pre_signal"])
         self.assertEqual(result["pre_signal_side"], "COMPRA")
         self.assertTrue(result["live_quote_validation"]["valid"])

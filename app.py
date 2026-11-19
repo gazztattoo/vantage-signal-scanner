@@ -253,8 +253,7 @@ def apply_gold_news_guard(payload):
         result["pre_signal"] = False
         result["pre_signal_side"] = None
         result["entry_readiness"] = {"ready": False, "status": context["block_reason"]}
-        result["news_guard_reason"] = ("Calendario no verificable; no se habilitan entradas." if not context["verified"]
-                                       else "Evento macro de alto impacto cercano; entrada bloqueada.")
+        result["news_guard_reason"] = "Evento macro de alto impacto cercano; entrada bloqueada."
     return result
 
 

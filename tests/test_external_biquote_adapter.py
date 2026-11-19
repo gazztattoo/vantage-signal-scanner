@@ -33,7 +33,7 @@ class BiquoteAdapterTests(unittest.TestCase):
 
     def test_rejects_wrong_instrument_or_interval(self):
         self.assertFalse(normalize_biquote_ohlc(
-            candle_payload(), symbol="XAU/USD", interval="5m", now=NOW)["accepted"])
+            candle_payload(), symbol="EUR/USD", interval="5m", now=NOW)["accepted"])
         self.assertFalse(normalize_biquote_ohlc(
             candle_payload(), symbol="XAU/USD", interval="30m", now=NOW)["accepted"])
 
@@ -65,16 +65,16 @@ class BiquoteAdapterTests(unittest.TestCase):
         tick = {"symbol": "XAUUSD", "bid": 2650.0, "ask": 2650.1,
                 "timestamp": (NOW - timedelta(seconds=2)).isoformat(),
                 "marketState": "open", "stale": False}
-        result = normalize_biquote_tick(tick, symbol="EUR/USD", now=NOW)
+        result = normalize_biquote_tick(tick, symbol="XAU/USD", now=NOW)
         self.assertTrue(result["accepted"])
         self.assertAlmostEqual(result["spread"], 0.1)
 
     def test_rejects_stale_or_closed_quote(self):
-        tick = {"symbol": "EURUSD", "bid": 1.08, "ask": 1.0801,
+        tick = {"symbol": "XAUUSD", "bid": 2650.0, "ask": 2650.1,
                 "timestamp": (NOW - timedelta(minutes=10)).isoformat(),
                 "marketState": "closed", "stale": True}
         self.assertFalse(normalize_biquote_tick(
-            tick, symbol="EUR/USD", now=NOW)["accepted"])
+            tick, symbol="XAU/USD", now=NOW)["accepted"])
 
 
 if __name__ == "__main__":

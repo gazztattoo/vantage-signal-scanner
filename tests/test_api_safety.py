@@ -49,6 +49,21 @@ class ProductionApiSafetyTests(unittest.TestCase):
         response = self.client.get("/api/analysis?symbol=XAU/USD&interval=15min")
         self.assertEqual(response.status_code, 401)
 
+    def test_scanner_is_exclusively_gold(self):
+        self.assertEqual(scanner.ALLOWED_SYMBOLS, {"XAU/USD"})
+        response = self.client.get(
+            "/api/analysis?symbol=EUR/USD&interval=15min",
+            headers=self.auth(),
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_push_scan_rejects_eurusd(self):
+        response = self.client.post(
+            "/api/push/scan?symbol=EUR/USD&interval=5min",
+            headers={"X-Scanner-Cron-Secret": "test-only-cron-secret"},
+        )
+        self.assertEqual(response.status_code, 400)
+
     def test_analysis_rejects_unknown_symbol_after_authentication(self):
         response = self.client.get(
             "/api/analysis?symbol=INVALID&interval=15min",

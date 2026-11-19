@@ -11,8 +11,6 @@ from typing import Any
 SOURCE = "siftingio"
 SUPPORTED = {
     "XAU/USD": ("commodities", "XAUUSD"),
-    "EUR/USD": ("forex", "EURUSD"),
-    "BTC/USD": ("crypto", "BTCUSD"),
 }
 INTERVALS = {"5m", "15m", "30m"}
 

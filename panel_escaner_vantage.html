@@ -815,6 +815,73 @@ select,button{border-radius:9px}
   </div>
 </section>
 
+
+<script>
+/* Gedeon TEST navigation guard: independent of the scanner's analysis script. */
+(()=>{
+  const map={scanner:"viewScanner",analysis:"viewAnalysis",performance:"viewPerformance",history:"viewHistory",lab:"viewLab"};
+  const nav=[...document.querySelectorAll(".app-nav [data-view]")];
+  const show=name=>{
+    const id=map[name];
+    if(!id)return;
+    Object.values(map).forEach(viewId=>{
+      const panel=document.getElementById(viewId);
+      if(panel)panel.hidden=viewId!==id;
+    });
+    nav.forEach(button=>{
+      const active=button.dataset.view===name;
+      button.classList.toggle("active",active);
+      if(active)button.setAttribute("aria-current","page");
+      else button.removeAttribute("aria-current");
+    });
+    if(name==="history")loadHistorySafe();
+    if(name==="performance")loadPerformanceSafe();
+    if(name==="lab")loadLabSafe();
+    if(name==="analysis")loadNewsSafe();
+  };
+  const set=(id,value)=>{const node=document.getElementById(id);if(node)node.textContent=value;};
+  const get=async(path)=>{const response=await fetch(window.API_BASE+path,{cache:"no-store"});const data=await response.json().catch(()=>({}));if(!response.ok)throw Error(data.error||"HTTP "+response.status);return data;};
+  async function loadHistorySafe(){
+    set("historyMessage","Consultando historial de TEST…");
+    try{const data=await get("/api/history?limit=100&symbol=XAU%2FUSD");const rows=data.signals||[];set("historyMessage",rows.length+" registro(s) encontrados.");}
+    catch(e){set("historyMessage","Historial no disponible: "+e.message);}
+  }
+  async function loadPerformanceSafe(){
+    set("performanceMessage","Calculando estadísticas de TEST…");
+    try{const d=await get("/api/performance");set("performanceMessage",(d.note||"Estadísticas recibidas.")+" · "+(d.total_signals??0)+" señales.");}
+    catch(e){set("performanceMessage","Rendimiento no disponible: "+e.message);}
+  }
+  async function loadLabSafe(){
+    set("labMessage","Consultando diagnóstico del motor TEST…");
+    try{const d=await get("/api/lab-status");set("labMessage","Diagnóstico recibido · proveedor "+(d.data_provider||"no indicado")+".");}
+    catch(e){set("labMessage","Lab no disponible: "+e.message);}
+  }
+  async function loadNewsSafe(){
+    set("goldNewsStatus","Consultando contexto del oro…");
+    try{const d=await get("/api/market-status");set("goldNewsStatus",d.message||d.status||"Estado del mercado recibido.");}
+    catch(e){set("goldNewsStatus","Noticias/calendario no disponible en TEST: "+e.message);}
+  }
+  nav.forEach(button=>button.addEventListener("click",event=>{
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    show(button.dataset.view);
+  },true));
+  const newsRefresh=document.getElementById("goldNewsRefresh");
+  if(newsRefresh)newsRefresh.addEventListener("click",event=>{
+    event.preventDefault();event.stopImmediatePropagation();loadNewsSafe();
+  },true);
+  const labRefresh=document.getElementById("labRefresh");
+  if(labRefresh)labRefresh.addEventListener("click",event=>{
+    event.preventDefault();event.stopImmediatePropagation();loadLabSafe();
+  },true);
+  const historyRefresh=document.getElementById("historyRefresh");
+  if(historyRefresh)historyRefresh.addEventListener("click",event=>{
+    event.preventDefault();event.stopImmediatePropagation();loadHistorySafe();
+  },true);
+  show("scanner");
+})();
+</script>
+
 </main>
 
 <script>

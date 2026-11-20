@@ -1619,6 +1619,8 @@ if ("serviceWorker" in navigator) {
   const dot=document.getElementById("bqLiveDot");
   const price=document.getElementById("bqPriceXAU");
   const meta=document.getElementById("bqMetaXAU");
+  const cardMid=document.querySelector("[data-live-mid]");
+  const cardDetail=document.querySelector("[data-live-detail]");
   if(!status||!dot||!price||!meta)return;
   const fmt=value=>Number(value).toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:3});
   const stamp=value=>new Date(value).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
@@ -1645,6 +1647,8 @@ if ("serviceWorker" in navigator) {
       if(!lastGoodAt||Date.now()-lastGoodAt>15000){
         price.textContent="—";
         meta.textContent="Sin cotización fresca · no usar como precio de entrada";
+        if(cardMid)cardMid.textContent="No conectado en TEST";
+        if(cardDetail)cardDetail.textContent="Sin cotización en tiempo real; no usar como precio de entrada";
         setState("Feed BiQuote sin respuesta · reintentando",false);
       }else{
         setState("Última cotización recibida · verificando",false);

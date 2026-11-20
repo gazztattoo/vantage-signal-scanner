@@ -618,6 +618,8 @@ def biquote_research_analysis():
             "confluence_grade": strategy.get("confluence_grade"),
             "setup_grade": strategy.get("setup_grade", strategy.get("quality_grade")),
             "quality_grade": strategy.get("quality_grade"),
+            "setup_status": strategy.get("setup_status", "WAIT"),
+            "confirmation_missing": strategy.get("confirmation_missing", []),
             "reason": strategy.get("reason"),
             "entry": None,
             "stop_loss": None,

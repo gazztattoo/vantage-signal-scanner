@@ -1082,36 +1082,6 @@ function render(m,d,err,marketClosed=false){
 
       </div>
 
-      <div class="metrics">
-        <div class="metric">
-          <span>EMA 20</span>
-          <strong>${fmt(first(d,["ema20","ema_20"]),6)}</strong>
-        </div>
-        <div class="metric">
-          <span>EMA 50</span>
-          <strong>${fmt(first(d,["ema50","ema_50"]),6)}</strong>
-        </div>
-        <div class="metric">
-          <span>RSI 14</span>
-          <strong>${fmt(first(d,["rsi14","rsi_14","rsi"]),2)}</strong>
-        </div>
-      </div>
-
-      <div class="metrics">
-        <div class="metric">
-          <span>ATR 14</span>
-          <strong>${fmt(first(d,["atr14","atr_14","atr"]),6)}</strong>
-        </div>
-        <div class="metric">
-          <span>Vela analizada</span>
-          <strong>${esc(first(d,["candle_time","timestamp","time"])||"—")}</strong>
-        </div>
-        <div class="metric">
-          <span>Método</span>
-          <strong>${esc(first(d,["method"])||"Vantage")}</strong>
-        </div>
-      </div>
-
       <div class="foot">
         ${esc(first(d,["warning"])||
           "Señal experimental; confirma los niveles antes de operar.")}

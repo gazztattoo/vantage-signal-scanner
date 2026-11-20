@@ -752,6 +752,21 @@ select,button{border-radius:9px}
   </article>
 </section>
 
+<section class="panel" id="vantageCalibration" style="margin-top:14px;padding:16px;border:1px solid #263b49;border-radius:16px;background:#0c151d">
+  <div style="font-size:13px;font-weight:800;letter-spacing:1px;color:#e8eef2">CALIBRACIÓN DE FEED · VANTAGE / BIQUOTE</div>
+  <p style="font-size:12px;color:#91a4b1;line-height:1.5;margin:8px 0 12px">Introduce el Bid y Ask que ves en MT5 y guarda la muestra mientras la cotización BiQuote está fresca. No introduzcas datos de cuenta ni credenciales. Las muestras quedan guardadas solo en este dispositivo.</p>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <label style="font-size:11px;color:#9aabb7">Vantage Bid<input id="vantageBidInput" inputmode="decimal" autocomplete="off" placeholder="Ej. 3584,11" style="display:block;width:100%;box-sizing:border-box;margin-top:5px;padding:12px;border-radius:9px;border:1px solid #344b5b;background:#071018;color:#eef4f7;font-size:16px"></label>
+    <label style="font-size:11px;color:#9aabb7">Vantage Ask<input id="vantageAskInput" inputmode="decimal" autocomplete="off" placeholder="Ej. 3584,28" style="display:block;width:100%;box-sizing:border-box;margin-top:5px;padding:12px;border-radius:9px;border:1px solid #344b5b;background:#071018;color:#eef4f7;font-size:16px"></label>
+  </div>
+  <button id="saveVantageSample" type="button" style="width:100%;margin-top:12px;padding:12px;border:0;border-radius:10px;background:#19c994;color:#06120e;font-weight:800">Guardar comparación simultánea</button>
+  <div id="calibrationMessage" role="status" style="font-size:12px;color:#a8bac5;line-height:1.5;margin-top:10px">Esperando la primera comparación Vantage/BiQuote.</div>
+  <div id="calibrationStats" style="font-size:12px;color:#d4e0e7;line-height:1.7;margin-top:8px">Muestras: 0/10 · Corrección todavía no calculable.</div>
+  <div style="font-size:10px;color:#8295a2;line-height:1.5;margin-top:8px">Modo observación: la corrección estimada NO modifica entradas, SL ni TP. Solo se habilitará una propuesta de ajuste tras suficientes muestras sincronizadas y estables, y nunca se considerará precio ejecutable sin validación.</div>
+  <button id="clearVantageSamples" type="button" style="margin-top:10px;padding:8px 10px;border:1px solid #344b5b;border-radius:8px;background:transparent;color:#a9bac4;font-size:11px">Borrar muestras de este dispositivo</button>
+</section>
+
+
 <div class="bottom">
   <img
     src="./global_signal_scanner_footer.png"
@@ -1493,10 +1508,9 @@ document.getElementById("historyRefresh").addEventListener("click",loadHistory);
 button.addEventListener("click",update);
  // Keep TEST analysis synchronized with the latest closed BiQuote candle.
  update();
- setInterval(()=>{if(!document.hidden)update();},15000);
+ setInterval(()=>{if(!document.hidden)update();},60000);
  document.addEventListener("visibilitychange",()=>{if(!document.hidden)update();});
 document.getElementById("interval").addEventListener("change",update);
-update();
 
 const pushStatus=document.getElementById("pushStatus");
 const pushToggleButton=document.getElementById("pushToggle");
@@ -1638,6 +1652,7 @@ if ("serviceWorker" in navigator) {
       const age=Number(data.quote_age_seconds??0);
       if(!Number.isFinite(bid)||!Number.isFinite(ask)||ask<bid||!Number.isFinite(mid)||!ts||!Number.isFinite(new Date(ts).getTime())||!Number.isFinite(age)||age>60||age< -1)throw new Error("Cotización inválida o antigua");
       lastGoodAt=Date.now();
+      window.__biquoteLatest={bid,ask,mid,timestamp:ts,receivedAt:Date.now()};
       price.textContent=fmt(mid);
       meta.textContent="Bid "+fmt(bid)+" · Ask "+fmt(ask)+"\nSpread "+fmt(ask-bid)+" · "+stamp(ts)+"\nReferencia BiQuote; no es precio Vantage";
       const cardMid=document.querySelector("[data-live-mid]");
@@ -1663,6 +1678,43 @@ if ("serviceWorker" in navigator) {
   start();
   document.addEventListener("visibilitychange",()=>{if(!document.hidden)refresh();});
 })();
+
+/* Conservative manual Vantage/BiQuote calibration: local samples only, shadow mode. */
+(()=>{
+  const bidInput=document.getElementById("vantageBidInput"),askInput=document.getElementById("vantageAskInput");
+  const save=document.getElementById("saveVantageSample"),clear=document.getElementById("clearVantageSamples");
+  const message=document.getElementById("calibrationMessage"),stats=document.getElementById("calibrationStats");
+  if(!bidInput||!askInput||!save||!clear||!message||!stats)return;
+  const KEY="gss_vantage_biquote_calibration_v1";
+  const parse=value=>Number(String(value).trim().replace(/\s/g,"").replace(",","."));
+  const median=values=>{const a=[...values].sort((x,y)=>x-y),m=Math.floor(a.length/2);return a.length%2?a[m]:(a[m-1]+a[m])/2;};
+  const fmt=value=>Number(value).toFixed(3);
+  const read=()=>{try{const v=JSON.parse(localStorage.getItem(KEY)||"[]");return Array.isArray(v)?v.filter(x=>Number.isFinite(x.delta)&&Number.isFinite(x.at)):[];}catch{return[];}};
+  const write=rows=>localStorage.setItem(KEY,JSON.stringify(rows.slice(-50)));
+  function render(){
+    const rows=read().filter(x=>Date.now()-x.at<86400000);write(rows);
+    if(!rows.length){stats.textContent="Muestras: 0/10 · Corrección todavía no calculable.";return;}
+    const deltas=rows.map(x=>x.delta),spreads=rows.map(x=>x.spreadDelta),offset=median(deltas),mad=median(deltas.map(x=>Math.abs(x-offset)));
+    const span=(Math.max(...rows.map(x=>x.at))-Math.min(...rows.map(x=>x.at)))/60000;
+    stats.textContent="Muestras: "+rows.length+"/10 · Mediana Vantage−BiQuote: "+fmt(offset)+" USD · MAD: "+fmt(mad)+" USD · Diferencia de spread mediana: "+fmt(median(spreads))+" USD · Ventana: "+span.toFixed(1)+" min.";
+    message.textContent=rows.length>=10&&span>=5&&mad<=0.05
+      ?"OFFSET OBSERVADO ESTABLE. Sigue en modo sombra: no se aplica a niveles ni habilita operaciones."
+      :rows.length<10?"Faltan "+(10-rows.length)+" muestras en distintos momentos."
+      :span<5?"Las muestras deben cubrir al menos 5 minutos."
+      :"La diferencia varía demasiado (MAD > 0,05 USD). No se recomienda corregir niveles.";
+  }
+  save.addEventListener("click",()=>{
+    const bid=parse(bidInput.value),ask=parse(askInput.value),q=window.__biquoteLatest;
+    if(!Number.isFinite(bid)||!Number.isFinite(ask)||bid<=0||ask<bid){message.textContent="Bid/Ask Vantage no válidos. Revisa los valores.";return;}
+    if(!q||Date.now()-q.receivedAt>15000||Date.now()-new Date(q.timestamp).getTime()>15000){message.textContent="BiQuote no está suficientemente fresco. Espera al siguiente tick y guarda la muestra.";return;}
+    const mid=(bid+ask)/2,row={at:Date.now(),biquoteAt:q.timestamp,biquoteBid:q.bid,biquoteAsk:q.ask,vantageBid:bid,vantageAsk:ask,delta:mid-q.mid,spreadDelta:(ask-bid)-(q.ask-q.bid)};
+    const rows=read();rows.push(row);write(rows);bidInput.value="";askInput.value="";
+    message.textContent="Comparación guardada. Diferencia de esta muestra: "+fmt(row.delta)+" USD.";render();
+  });
+  clear.addEventListener("click",()=>{if(confirm("¿Borrar las comparaciones guardadas en este dispositivo?")){localStorage.removeItem(KEY);message.textContent="Muestras borradas.";render();}});
+  render();
+})();
+
 </script>
 
 </body>

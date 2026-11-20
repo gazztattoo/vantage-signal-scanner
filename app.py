@@ -23,8 +23,10 @@ CORS(app, resources={
     }
 })
 
-# Esta rama es exclusivamente de pruebas: no consulta proveedores de mercado.
-DATA_MODE = "mock"
+# TEST only: mock remains the safe default; BiQuote activation is explicit per TEST service.
+DATA_MODE = os.environ.get("TEST_DATA_MODE", "mock").strip().lower()
+if DATA_MODE not in ("mock", "biquote"):
+    DATA_MODE = "mock"
 # MT5 ingestion is a separate shadow feed; it never changes DATA_MODE or signal inputs.
 MT5_INGEST_TOKEN = os.environ.get("MT5_INGEST_TOKEN", "")
 MT5_TEST_SUPABASE_URL = "https://viiraygjdqwiuawnzyrc.supabase.co"
@@ -128,7 +130,7 @@ def access_configuration_status():
 
 # TEST ACCESS DISABLED TEMPORARILY: this branch is intentionally open for testing only.
 
-ALLOWED_SYMBOLS = {"EUR/USD", "XAU/USD", "BTC/USD"}
+ALLOWED_SYMBOLS = {"XAU/USD"} if DATA_MODE == "biquote" else {"EUR/USD", "XAU/USD", "BTC/USD"}
 ALLOWED_INTERVALS = {"5min", "15min", "30min"}
 
 CANARY_TZ = ZoneInfo("Atlantic/Canary")
@@ -820,10 +822,50 @@ def analysis():
         }), 400
 
     try:
-        candles, candle_time, candle_age_minutes = fetch_candles(
-            symbol,
-            interval,
-        )
+        live_bundle = None
+        if DATA_MODE == "biquote":
+            if symbol != "XAU/USD":
+                raise RuntimeError("El motor BiQuote TEST está limitado a XAU/USD.")
+            frames = {
+                "5min": ("5m", "15m", "30m"),
+                "15min": ("15m", "30m", "1h"),
+                "30min": ("30m", "1h", "4h"),
+            }
+            base_interval, htf_1, htf_2 = frames[interval]
+            base = cached_biquote_research_ohlc(symbol, base_interval)
+            higher_1 = cached_biquote_research_ohlc(symbol, htf_1)
+            higher_2 = cached_biquote_research_ohlc(symbol, htf_2)
+            if base["closed_bars"] < 120 or higher_1["closed_bars"] < 60 or higher_2["closed_bars"] < 60:
+                raise RuntimeError("Historial BiQuote insuficiente; análisis bloqueado sin datos sintéticos.")
+            candles = base["bars"]
+            candle_time = base["last_closed_open_time"]
+            candle_age_minutes = base["last_closed_age_minutes"]
+            strategy = analyze_strategy(
+                candles, interval, symbol,
+                higher_timeframes={
+                    str(BIQUOTE_INTERVAL_MINUTES[htf_1]) + "min": higher_1["bars"],
+                    str(BIQUOTE_INTERVAL_MINUTES[htf_2]) + "min": higher_2["bars"],
+                },
+            )
+            live_bundle = {
+                "provider": "biquote",
+                "price_basis": "provider_feed_not_verified_as_VANTAGE",
+                "reference_only": True,
+                "execution_price": False,
+                "signals_activated": False,
+                "last_closed": {
+                    base_interval: base["last_closed_close_time"],
+                    htf_1: higher_1["last_closed_close_time"],
+                    htf_2: higher_2["last_closed_close_time"],
+                },
+                "candles_by_timeframe": {
+                    base_interval: base["closed_bars"],
+                    htf_1: higher_1["closed_bars"],
+                    htf_2: higher_2["closed_bars"],
+                },
+            }
+        else:
+            candles, candle_time, candle_age_minutes = fetch_candles(symbol, interval)
 
         closes = [candle["close"] for candle in candles]
         ema20 = ema(closes, 20)
@@ -842,7 +884,8 @@ def analysis():
                 "No hay suficientes datos válidos para calcular los indicadores."
             )
 
-        strategy = analyze_strategy(candles, interval, symbol)
+        if DATA_MODE != "biquote":
+            strategy = analyze_strategy(candles, interval, symbol)
         raw_signal = strategy.get("signal", "WAIT")
         pre_signal = bool(strategy.get("pre_signal"))
         if pre_signal:
@@ -928,7 +971,17 @@ def analysis():
                 "con buffer ATR; TP objetivo 2R."
             ),
             "data_mode": DATA_MODE,
-            "warning": warning,
+            "provider": "biquote" if DATA_MODE == "biquote" else "synthetic_mock",
+            "price_basis": "provider_feed_not_verified_as_VANTAGE" if DATA_MODE == "biquote" else "synthetic",
+            "reference_only": DATA_MODE == "biquote",
+            "execution_price": False,
+            "signals_activated": False,
+            "live_feed": live_bundle,
+            "warning": (
+                "DATOS REALES BiQuote · niveles de referencia, NO son precios de ejecución Vantage. "
+                "Se analiza únicamente con velas cerradas; sin feed fresco no hay análisis."
+                if DATA_MODE == "biquote" else warning
+            ),
             "indicator_diagnostics": {
                 "adx": {
                     "value": round(float(strategy.get("adx14")), 2) if strategy.get("adx14") is not None else None,
@@ -1456,11 +1509,13 @@ def test_alert_preview():
 
 @app.route("/api/push/scan", methods=["POST"])
 def push_scan():
-    if DATA_MODE == "mock":
-        return jsonify({
-            "error": "El escáner automático está desactivado en el panel de pruebas.",
-            "data_mode": "mock",
-        }), 403
+    # TEST BiQuote is analysis-only until broker price basis/spread are validated.
+    return jsonify({
+        "error": "Las alertas automáticas están desactivadas en TEST; BiQuote es solo referencia.",
+        "data_mode": DATA_MODE,
+        "signals_activated": False,
+        "orders_sent": False,
+    }), 403
     supplied = request.headers.get("X-Scanner-Cron-Secret", "")
     if not SIGNAL_CRON_SECRET or not hmac.compare_digest(supplied, SIGNAL_CRON_SECRET):
         return jsonify({"error": "No autorizado."}), 401

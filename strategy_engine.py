@@ -404,7 +404,12 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timefr
             tp = closes[-1] - 2.0 * risk
         if risk <= 0 or risk > 2.5 * atr_now or risk < 0.35 * atr_now:
             return {
-                **common, **_wait(
+                **common,
+                "setup_status": "WAIT",
+                "confirmation_missing": ["ACCEPTABLE_STRUCTURAL_RISK"],
+                "setup_grade": "C",
+                "quality_grade": "C",
+                **_wait(
                     "RIESGO_ESTRUCTURAL",
                     "La estructura exige un stop fuera del rango de riesgo permitido; se descarta la entrada.",
                 ),

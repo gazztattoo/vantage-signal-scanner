@@ -172,7 +172,8 @@ class BiQuoteResearchEndpointTests(unittest.TestCase):
             "mtf": {"timeframe_1": "M15", "bias_1": "BULL", "timeframe_2": "M30", "bias_2": "BULL"},
             "regime": "TREND", "structure": {"type": "NONE"}, "score": 5,
             "score_max": 7, "confluence_grade": "A", "setup_grade": "C",
-            "quality_grade": "C", "reason": "research only",
+            "quality_grade": "C", "setup_status": "WAIT",
+            "confirmation_missing": ["BREAKOUT_OR_RETEST"], "reason": "research only",
         }
         with patch.object(app, "BIQUOTE_RESEARCH_ENABLED", True), patch(
             "app.cached_biquote_research_ohlc",

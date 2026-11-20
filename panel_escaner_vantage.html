@@ -1642,6 +1642,8 @@ if ("serviceWorker" in navigator) {
       lastGoodAt=Date.now();
       price.textContent=fmt(mid);
       meta.textContent="Bid "+fmt(bid)+" · Ask "+fmt(ask)+"\nSpread "+fmt(ask-bid)+" · "+stamp(ts)+"\nReferencia BiQuote; no es precio Vantage";
+      if(cardMid)cardMid.textContent=fmt(mid);
+      if(cardDetail)cardDetail.textContent="BiQuote en vivo · Bid "+fmt(bid)+" · Ask "+fmt(ask)+" · "+stamp(ts)+" · Referencia, no ejecución Vantage";
       setState("BiQuote en vivo · REST TEST",true);
     }catch(error){
       if(!lastGoodAt||Date.now()-lastGoodAt>15000){

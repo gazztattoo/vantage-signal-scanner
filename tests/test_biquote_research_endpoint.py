@@ -187,6 +187,8 @@ class BiQuoteResearchEndpointTests(unittest.TestCase):
         self.assertEqual(data["confluence_grade"], "A")
         self.assertEqual(data["setup_grade"], "C")
         self.assertEqual(data["quality_grade"], "C")
+        self.assertEqual(data["setup_status"], "WAIT")
+        self.assertIn("BREAKOUT_OR_RETEST", data["confirmation_missing"])
         self.assertEqual(data["candles"], {"5m": 120, "15m": 60, "30m": 60})
         kwargs = analyze.call_args.kwargs
         self.assertEqual(len(kwargs["higher_timeframes"]["15min"]), 60)

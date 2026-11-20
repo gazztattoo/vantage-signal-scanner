@@ -121,6 +121,8 @@ class MultiTimeframeEngineTests(unittest.TestCase):
         self.assertIsNone(result["entry"])
         self.assertEqual(result["setup_grade"], "C")
         self.assertEqual(result["quality_grade"], "C")
+        self.assertEqual(result["setup_status"], "WAIT")
+        self.assertIn("BREAKOUT_OR_RETEST", result["confirmation_missing"])
         self.assertIn(result["confluence_grade"], ("A", "B", "C"))
         expected_confluence = "A" if result["score"] >= 6 else "B" if result["score"] >= 5 else "C"
         self.assertEqual(result["confluence_grade"], expected_confluence)

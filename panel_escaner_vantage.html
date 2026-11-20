@@ -1574,6 +1574,7 @@ if ("serviceWorker" in navigator) {
 }
 </script>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
 <script>
 /* Gold macro calendar and broker session schedule. */
 (()=>{
@@ -1608,42 +1609,68 @@ if ("serviceWorker" in navigator) {
   setInterval(()=>{if(!document.hidden)update();},60000);
 })();
 
-/* TEST BiQuote quote monitor: reference-only, never used by signal generation. */
+/* BiQuote SignalR stream: live reference quote only, never a Vantage execution price. */
 (()=>{
   const status=document.getElementById("bqLiveStatus");
   const dot=document.getElementById("bqLiveDot");
   const price=document.getElementById("bqPriceXAU");
   const meta=document.getElementById("bqMetaXAU");
   if(!status||!dot||!price||!meta)return;
-
   const fmt=value=>Number(value).toLocaleString("es-ES",{minimumFractionDigits:3,maximumFractionDigits:3});
   const stamp=value=>new Date(value).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
-  let busy=false;
-
-  async function refreshBiQuote(){
-    if(busy||document.hidden)return;
-    busy=true;
-    try{
-      const response=await fetch(window.API_BASE+"/api/research/biquote/tick?symbol="+encodeURIComponent("XAU/USD"),{cache:"no-store"});
-      const data=await response.json();
-      if(!response.ok||data.accepted!==true||data.research_only!==true||data.execution_price!==false) {
-        throw new Error(data.error||"Cotización no disponible");
-      }
-      price.textContent=fmt(data.mid);
-      meta.textContent="Bid "+fmt(data.bid)+" · Ask "+fmt(data.ask)+"\nSpread "+fmt(data.spread)+" · "+stamp(data.timestamp)+"\nReferencia BiQuote; no usar como precio de entrada";
-      status.textContent="BiQuote conectado · referencia";
-      dot.className="live-feed-dot connected";
-    }catch(error){
-      price.textContent="—";
-      meta.textContent="Sin cotización válida; no usar como precio de entrada";
-      status.textContent="BiQuote desconectado";
-      dot.className="live-feed-dot error";
-    }finally{busy=false;}
+  let connection=null,lastTickAt=0,retryTimer=null;
+  function disconnected(message){
+    status.textContent=message||"BiQuote desconectado";
+    dot.style.background="var(--red)";
+    if(lastTickAt)meta.textContent="Esperando una cotización fresca · referencia BiQuote";
   }
-
-  refreshBiQuote();
-  setInterval(refreshBiQuote,10000);
-  document.addEventListener("visibilitychange",()=>{if(!document.hidden)refreshBiQuote();});
+  async function connect(){
+    if(document.hidden)return;
+    try{
+      if(!window.signalR)throw new Error("SignalR no está cargado");
+      connection=new signalR.HubConnectionBuilder()
+        .withUrl("https://biquote.io/hubs/tick")
+        .withAutomaticReconnect([0,2000,5000,10000,20000])
+        .configureLogging(signalR.LogLevel.Warning)
+        .build();
+      connection.on("ReceiveTick",tick=>{
+        if(!tick||tick.symbol!=="XAUUSD")return;
+        const bid=Number(tick.bid),ask=Number(tick.ask),mid=Number(tick.mid??((bid+ask)/2));
+        const ts=tick.timestamp||tick.time;
+        const age=(Date.now()-new Date(ts).getTime())/1000;
+        if(!Number.isFinite(bid)||!Number.isFinite(ask)||ask<bid||!Number.isFinite(mid)||!Number.isFinite(age)||age>60||age< -2){
+          disconnected("Tick BiQuote inválido o atrasado");return;
+        }
+        lastTickAt=Date.now();
+        price.textContent=fmt(mid);
+        meta.textContent="Bid "+fmt(bid)+" · Ask "+fmt(ask)+"\nSpread "+fmt(ask-bid)+" · "+stamp(ts)+"\nReferencia BiQuote; no es precio Vantage";
+        status.textContent="BiQuote en vivo · referencia";
+        dot.style.background="var(--green)";
+      });
+      connection.onreconnecting(()=>disconnected("Reconectando BiQuote…"));
+      connection.onreconnected(async()=>{
+        await connection.invoke("Subscribe",["XAUUSD"]);
+        status.textContent="BiQuote reconectado · referencia";
+        dot.style.background="var(--yellow)";
+      });
+      connection.onclose(()=>disconnected("BiQuote desconectado"));
+      await connection.start();
+      await connection.invoke("Subscribe",["XAUUSD"]);
+      status.textContent="BiQuote conectado · esperando tick";
+      dot.style.background="var(--yellow)";
+    }catch(error){
+      disconnected("SignalR no disponible · reintentando");
+      if(retryTimer)clearTimeout(retryTimer);
+      retryTimer=setTimeout(connect,10000);
+    }
+  }
+  connect();
+  document.addEventListener("visibilitychange",()=>{
+    if(!document.hidden&&(!connection||connection.state==="Disconnected"))connect();
+  });
+  setInterval(()=>{
+    if(lastTickAt&&Date.now()-lastTickAt>60000)disconnected("Cotización BiQuote atrasada");
+  },5000);
 })();
 </script>
 

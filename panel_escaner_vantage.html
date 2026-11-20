@@ -1314,7 +1314,7 @@ async function update(){
     updateOverview([{m:markets[0],d:data}]);
     statusEl.textContent="Motor conectado";
     dot.style.background="var(--green)";
-    updated.textContent="Prueba simulada · "+new Date().toLocaleTimeString("es-ES");
+    updated.textContent=(data.data_mode==="biquote"?"BiQuote · última vela cerrada · ":"Prueba simulada · ")+new Date().toLocaleTimeString("es-ES");
   }catch(error){
     const message=error.name==="AbortError"
       ?"Tiempo de espera agotado: la API TEST no respondió en 25 segundos."
@@ -1491,6 +1491,10 @@ document.getElementById("historyRefresh").addEventListener("click",loadHistory);
 ["historySymbol","historyTimeframe","historyStatus"].forEach(id=>document.getElementById(id).addEventListener("change",loadHistory));
 
 button.addEventListener("click",update);
+ // Keep TEST analysis synchronized with the latest closed BiQuote candle.
+ update();
+ setInterval(()=>{if(!document.hidden)update();},15000);
+ document.addEventListener("visibilitychange",()=>{if(!document.hidden)update();});
 document.getElementById("interval").addEventListener("change",update);
 update();
 

@@ -355,8 +355,19 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timefr
         grade = "B"
     else:
         grade = "C"
+    confirmation_missing = []
+    if not primary_aligned:
+        confirmation_missing.append("PRIMARY_TREND_ALIGNMENT")
+    if not structure_ok:
+        confirmation_missing.append("BREAKOUT_OR_RETEST")
+    if score < 5:
+        confirmation_missing.append("MINIMUM_CONFLUENCE")
+    setup_status = "READY" if not confirmation_missing else "WAIT"
+
     common = {
         "symbol": symbol, "timeframe": timeframe,
+        "setup_status": setup_status,
+        "confirmation_missing": confirmation_missing,
         "price": closes[-1], "ema20": e20, "ema50": e50, "rsi14": rsi_now,
         "atr14": atr_now, "adx14": adx_now, "plus_di": pdi, "minus_di": mdi,
         "macd_histogram": macd_now, "primary_bias": primary,
@@ -420,6 +431,10 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timefr
     return {
         **common, **_wait(
             "SIN_CONFIRMACION",
-            "Confluencia insuficiente o sin ruptura/retest de estructura. Esperar.",
+            (
+                f"Confluencia {score}/7, pero falta ruptura/retest de estructura. Esperar confirmación."
+                if score >= 5 and primary_aligned and not structure_ok
+                else "Falta alineación de tendencia primaria o confluencia mínima. Esperar."
+            ),
         ),
     }

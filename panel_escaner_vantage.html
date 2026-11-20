@@ -1619,8 +1619,6 @@ if ("serviceWorker" in navigator) {
   const dot=document.getElementById("bqLiveDot");
   const price=document.getElementById("bqPriceXAU");
   const meta=document.getElementById("bqMetaXAU");
-  const cardMid=document.querySelector("[data-live-mid]");
-  const cardDetail=document.querySelector("[data-live-detail]");
   if(!status||!dot||!price||!meta)return;
   const fmt=value=>Number(value).toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:3});
   const stamp=value=>new Date(value).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
@@ -1642,6 +1640,8 @@ if ("serviceWorker" in navigator) {
       lastGoodAt=Date.now();
       price.textContent=fmt(mid);
       meta.textContent="Bid "+fmt(bid)+" · Ask "+fmt(ask)+"\nSpread "+fmt(ask-bid)+" · "+stamp(ts)+"\nReferencia BiQuote; no es precio Vantage";
+      const cardMid=document.querySelector("[data-live-mid]");
+      const cardDetail=document.querySelector("[data-live-detail]");
       if(cardMid)cardMid.textContent=fmt(mid);
       if(cardDetail)cardDetail.textContent="BiQuote en vivo · Bid "+fmt(bid)+" · Ask "+fmt(ask)+" · "+stamp(ts)+" · Referencia, no ejecución Vantage";
       setState("BiQuote en vivo · REST TEST",true);
@@ -1649,6 +1649,8 @@ if ("serviceWorker" in navigator) {
       if(!lastGoodAt||Date.now()-lastGoodAt>15000){
         price.textContent="—";
         meta.textContent="Sin cotización fresca · no usar como precio de entrada";
+        const cardMid=document.querySelector("[data-live-mid]");
+        const cardDetail=document.querySelector("[data-live-detail]");
         if(cardMid)cardMid.textContent="No conectado en TEST";
         if(cardDetail)cardDetail.textContent="Sin cotización en tiempo real; no usar como precio de entrada";
         setState("Feed BiQuote sin respuesta · reintentando",false);
@@ -1657,7 +1659,7 @@ if ("serviceWorker" in navigator) {
       }
     }finally{busy=false;}
   }
-  function start(){refresh();if(timer)clearInterval(timer);timer=setInterval(refresh,5000);}
+  function start(){refresh();if(timer)clearInterval(timer);timer=setInterval(refresh,10000);}
   start();
   document.addEventListener("visibilitychange",()=>{if(!document.hidden)refresh();});
 })();

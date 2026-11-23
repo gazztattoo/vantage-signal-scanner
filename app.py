@@ -1789,6 +1789,37 @@ def close_test_trade():
         return jsonify({"error":"No se pudo detener el seguimiento."}), 502
 
 
+def _evaluate_manual_reversal_candle(side, candles, atr_value, rsi_value, adx_value, hist):
+    """Pure TEST monitor rule: one decisive closed candle is a warning; two confirm."""
+    if side not in ("COMPRA", "VENTA") or len(candles) < 11:
+        return {"qualifies": False, "reason": "insufficient_data"}
+    current = candles[-1]
+    prior = candles[-11:-1]
+    try:
+        close = float(current["close"])
+        open_price = float(current["open"])
+        atr = float(atr_value or 0)
+        rsi = float(rsi_value if rsi_value is not None else 50)
+        adx = float(adx_value or 0)
+        macd_hist = float(hist or 0)
+        if side == "COMPRA":
+            structure_break = close < min(float(c["low"]) for c in prior)
+            momentum = rsi <= 42 and macd_hist < 0 and adx >= 20
+        else:
+            structure_break = close > max(float(c["high"]) for c in prior)
+            momentum = rsi >= 58 and macd_hist > 0 and adx >= 20
+        body = abs(close - open_price)
+        strong_bar = atr > 0 and body >= 0.70 * atr
+        return {
+            "qualifies": bool(structure_break and strong_bar and momentum),
+            "structure_break": bool(structure_break),
+            "strong_bar": bool(strong_bar),
+            "opposite_momentum": bool(momentum),
+        }
+    except (KeyError, TypeError, ValueError):
+        return {"qualifies": False, "reason": "invalid_candle_data"}
+
+
 def monitor_test_manual_trades():
     """Cron-side monitor: two consecutive closed-bar reversal confirmations before push."""
     try:
@@ -1823,21 +1854,11 @@ def monitor_test_manual_trades():
                     continue
                 # Require a decisive close beyond the previous 10-bar swing,
                 # a large opposite candle body, and opposite momentum.
-                current = candles[-1]
-                prior = candles[-11:-1]
-                atr_value = float(data.get("atr14") or 0)
-                body = abs(float(current["close"])-float(current["open"]))
-                rsi_value = float(data.get("rsi14") or 50)
-                adx_value = float(data.get("adx14") or 0)
-                hist = float(data.get("macd_histogram") or 0)
-                if trade["side"] == "COMPRA":
-                    structure_break = float(current["close"]) < min(float(c["low"]) for c in prior)
-                    momentum = rsi_value <= 42 and hist < 0 and adx_value >= 20
-                else:
-                    structure_break = float(current["close"]) > max(float(c["high"]) for c in prior)
-                    momentum = rsi_value >= 58 and hist > 0 and adx_value >= 20
-                strong_bar = atr_value > 0 and body >= 0.70 * atr_value
-                confirmed = bool(structure_break and strong_bar and momentum)
+                reversal_check = _evaluate_manual_reversal_candle(
+                    trade["side"], candles, data.get("atr14"), data.get("rsi14"),
+                    data.get("adx14"), data.get("macd_histogram")
+                )
+                confirmed = reversal_check["qualifies"]
                 count = int(trade.get("reversal_confirmations") or 0)+1 if confirmed else 0
                 update = requests.patch(
                     SUPABASE_URL + "/rest/v1/gss_test_active_trades",

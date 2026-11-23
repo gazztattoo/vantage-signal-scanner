@@ -210,6 +210,58 @@ class BiQuoteResearchEndpointTests(unittest.TestCase):
         self.assertFalse(response.get_json()["signals_activated"])
         analyze.assert_not_called()
 
+    def test_operational_analysis_uses_biquote_closed_bars_for_xau(self):
+        datasets = {
+            "5m": {"bars": self._research_bars(120, 5), "closed_bars": 120,
+                   "last_closed_open_time": "2026-11-23T02:00:00+00:00",
+                   "last_closed_close_time": "2026-11-23T02:05:00+00:00",
+                   "last_closed_age_minutes": 1.0},
+            "15m": {"bars": self._research_bars(60, 15), "closed_bars": 60,
+                    "last_closed_open_time": "2026-11-23T01:45:00+00:00",
+                    "last_closed_close_time": "2026-11-23T02:00:00+00:00",
+                    "last_closed_age_minutes": 2.0},
+            "30m": {"bars": self._research_bars(60, 30), "closed_bars": 60,
+                    "last_closed_open_time": "2026-11-23T01:30:00+00:00",
+                    "last_closed_close_time": "2026-11-23T02:00:00+00:00",
+                    "last_closed_age_minutes": 2.0},
+        }
+        strategy = {
+            "signal": "WAIT", "pre_signal": False, "primary_bias": "BULL",
+            "quality_grade": "C", "quality_score": 20, "reason": "test BiQuote engine",
+            "ema20": 2655.0, "ema50": 2654.0, "rsi14": 55.0, "atr14": 1.0,
+            "macd_histogram": 0.1, "adx14": 22.0,
+        }
+        with patch.object(app, "DATA_MODE", "biquote"), patch(
+            "app.cached_biquote_research_ohlc",
+            side_effect=lambda symbol, interval: datasets[interval],
+        ), patch("app.analyze_strategy", return_value=strategy) as analyze:
+            response = self.client.get(
+                "/api/analysis?symbol=XAU/USD&interval=5min"
+            )
+        self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+        payload = response.get_json()
+        self.assertEqual(payload["data_mode"], "biquote")
+        self.assertEqual(payload["provider"], "biquote")
+        self.assertTrue(payload["reference_only"])
+        self.assertFalse(payload["execution_price"])
+        self.assertFalse(payload["signals_activated"])
+        self.assertEqual(payload["live_feed"]["provider"], "biquote")
+        self.assertEqual(payload["live_feed"]["candles_by_timeframe"],
+                         {"5m": 120, "15m": 60, "30m": 60})
+        self.assertEqual(analyze.call_count, 1)
+        self.assertEqual(len(analyze.call_args.kwargs["higher_timeframes"]["15min"]), 60)
+        self.assertEqual(len(analyze.call_args.kwargs["higher_timeframes"]["30min"]), 60)
+
+    def test_operational_analysis_rejects_non_gold_when_biquote_mode_is_active(self):
+        with patch.object(app, "DATA_MODE", "biquote"), patch.object(
+            app, "ALLOWED_SYMBOLS", {"XAU/USD"}
+        ), patch("app.cached_biquote_research_ohlc") as fetch:
+            response = self.client.get(
+                "/api/analysis?symbol=EUR/USD&interval=5min"
+            )
+        self.assertEqual(response.status_code, 400)
+        fetch.assert_not_called()
+
     def test_endpoint_can_be_disabled(self):
         with patch.object(app, "BIQUOTE_RESEARCH_ENABLED", False), patch(
             "app.requests.get"

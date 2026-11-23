@@ -1340,6 +1340,9 @@ function updateDeskTimeframes(data){
 }
 
 async function update(){
+  // A push deep-link must keep the exact alert snapshot visible until the user
+  // explicitly asks for a fresh live analysis.
+  if(notificationSnapshot && notificationSnapshot.active)return;
   if(button.disabled)return;
   button.disabled=true;
   button.textContent="Consultando…";
@@ -1398,6 +1401,50 @@ const notificationTimeframe=notificationParams.get("timeframe");
 if(["5min","15min","30min"].includes(notificationTimeframe)){
   document.getElementById("interval").value=notificationTimeframe;
 }
+
+const notificationSnapshot=(()=>{
+  const stage=notificationParams.get("alert_stage")||"";
+  const side=notificationParams.get("alert_side")||"";
+  if(!["PREALERTA","ENTRADA_VALIDADA"].includes(stage)||!["COMPRA","VENTA"].includes(side))return {active:false};
+  const entry=notificationParams.get("alert_entry")||"";
+  const stop=notificationParams.get("alert_stop_loss")||"";
+  const target=notificationParams.get("alert_take_profit")||"";
+  const candle=notificationParams.get("alert_candle_time")||"";
+  const title=stage==="PREALERTA"?"PREPARAR MT5":"ENTRADA VALIDADA · REFERENCIA";
+  const detail=stage==="PREALERTA"
+    ?"Esta es la prealerta exacta que recibiste. Todavía no es una entrada."
+    :"Esta es la confirmación técnica exacta que recibiste. BiQuote es referencia; verifica precio y spread en Vantage antes de decidir.";
+  const fmtValue=value=>{
+    const n=Number(value);
+    return value!==""&&Number.isFinite(n)?n.toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2}):"—";
+  };
+  const stamp=candle&&Number.isFinite(new Date(candle).getTime())
+    ?new Date(candle).toLocaleString("es-ES",{dateStyle:"short",timeStyle:"short"})
+    :"No disponible";
+  cards.innerHTML=`
+    <article class="card" style="border:1px solid #c69a4c;background:linear-gradient(155deg,#18232a,#0b1219)">
+      <div class="cardhead">
+        <div class="instrument-copy">
+          <div class="symbol">XAU/USD · ORO</div>
+          <div class="market">DETALLE EXACTO DE LA NOTIFICACIÓN · ${esc(notificationTimeframe==="15min"?"M15":"M5")}</div>
+        </div>
+        <span class="pill ${side==="COMPRA"?"buy":"sell"}">${esc(title)}</span>
+      </div>
+      <div class="priceLabel">DIRECCIÓN NOTIFICADA</div>
+      <div class="price">${esc(side)}</div>
+      <p class="reason">${esc(detail)}</p>
+      <div class="levels">
+        <div class="level"><span>Nivel de referencia</span><strong>${esc(fmtValue(entry))}</strong></div>
+        <div class="level"><span>Stop Loss</span><strong>${esc(fmtValue(stop))}</strong></div>
+        <div class="level"><span>Take Profit</span><strong>${esc(fmtValue(target))}</strong></div>
+      </div>
+      <div class="foot">Vela de señal: ${esc(stamp)} · BiQuote referencia solamente · No es precio de ejecución Vantage.</div>
+    </article>`;
+  const early=document.getElementById("gedeonEarlyWarning");
+  if(early)early.style.display="none";
+  updated.textContent="Notificación recibida · detalle congelado para evitar discrepancias con el análisis actual.";
+  return {active:true,stage,side};
+})();
 
 async function loadTechnicalAnalysis(){
   const message=document.getElementById("analysisMessage");
@@ -1538,7 +1585,15 @@ document.getElementById("historyRefresh").addEventListener("click",loadHistory);
 ["historySymbol","historyTimeframe","historyStatus"].forEach(id=>document.getElementById(id).addEventListener("change",loadHistory));
 
 const scannerInterval=document.getElementById("interval");
-button.addEventListener("click",update);
+button.addEventListener("click",()=>{
+  if(notificationSnapshot.active){
+    notificationSnapshot.active=false;
+    const early=document.getElementById("gedeonEarlyWarning");
+    if(early)early.style.display="";
+    updated.textContent="Consultando estado actual del mercado…";
+  }
+  update();
+});
 // M5/M15 refresh automatically; M30 is queried only after a manual tap.
 if(scannerInterval.value!=="30min") update();
 else updated.textContent="M30 manual · pulsa Actualizar análisis para consultar.";
@@ -1549,6 +1604,11 @@ document.addEventListener("visibilitychange",()=>{
   if(!document.hidden&&scannerInterval.value!=="30min") update();
 });
 scannerInterval.addEventListener("change",()=>{
+  if(notificationSnapshot.active){
+    notificationSnapshot.active=false;
+    const early=document.getElementById("gedeonEarlyWarning");
+    if(early)early.style.display="";
+  }
   if(scannerInterval.value==="30min"){
     updated.textContent="M30 manual · pulsa Actualizar análisis para consultar.";
     updateDeskTimeframes({interval:"30min"});

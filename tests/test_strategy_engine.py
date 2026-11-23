@@ -152,6 +152,13 @@ class MultiTimeframeEngineTests(unittest.TestCase):
         self.assertIsNone(result["entry"])
         self.assertIsNone(result["stop_loss"])
         self.assertIsNone(result["take_profit"])
+        self.assertGreater(result["planned_entry"], result["price"])
+        self.assertLess(result["planned_stop_loss"], result["planned_entry"])
+        self.assertGreater(result["planned_take_profit"], result["planned_entry"])
+        planned_risk = result["planned_entry"] - result["planned_stop_loss"]
+        planned_reward = result["planned_take_profit"] - result["planned_entry"]
+        self.assertAlmostEqual(planned_reward / planned_risk, 2.0, places=8)
+        self.assertEqual(result["planned_entry_type"], "BUY_STOP")
 
     def test_lateral_market_blocks_confirmed_signals(self):
         result = analyze(range_bars(), "5min", "TEST")

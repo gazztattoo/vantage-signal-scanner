@@ -83,13 +83,13 @@ class AggregateCandleTests(unittest.TestCase):
 
 
 class MultiTimeframeEngineTests(unittest.TestCase):
-    def test_confirmed_buy_requires_mtf_and_structure(self):
+    def test_confirmed_buy_uses_relaxed_confluence_and_structure(self):
         result = analyze(trend_bars(), "5min", "TEST")
         self.assertEqual(result["signal"], "BUY")
         self.assertFalse(result["pre_signal"])
         self.assertEqual(result["structure"]["direction"], "BUY")
         self.assertTrue(result["mtf"]["aligned_buy"])
-        self.assertGreaterEqual(result["score"], 6)
+        self.assertGreaterEqual(result["score"], 4)
 
     def test_both_higher_timeframes_opposed_block_a_confirmed_entry(self):
         bars = trend_bars()

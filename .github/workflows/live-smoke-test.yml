@@ -1,0 +1,129 @@
+name: Gedeon TEST live smoke checks
+
+on:
+  push:
+    branches:
+      - push-test
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-smoke:
+    name: Verify deployed TEST services and live feeds
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check live API, BiQuote, economic calendar, and panel
+        env:
+          API_BASE: https://global-signal-push-test.onrender.com
+          PANEL_BASE: https://global-signal-push-test-panel.onrender.com
+        run: |
+          python - <<'PY'
+          import json, os, time, urllib.parse, urllib.request, urllib.error
+
+          api = os.environ["API_BASE"]
+          panel = os.environ["PANEL_BASE"]
+
+          def get_json(url, attempts=12, delay=15):
+              last = None
+              for _ in range(attempts):
+                  try:
+                      req = urllib.request.Request(url, headers={"User-Agent": "Gedeon2-TEST-smoke/1.0"})
+                      with urllib.request.urlopen(req, timeout=35) as response:
+                          if response.status != 200:
+                              raise RuntimeError(f"HTTP {response.status}: {url}")
+                          return json.loads(response.read().decode("utf-8"))
+                  except Exception as exc:
+                      last = exc
+                      time.sleep(delay)
+              raise RuntimeError(f"Endpoint failed after retries: {url}: {last}")
+
+          def require(condition, message):
+              if not condition:
+                  raise RuntimeError(message)
+
+          health = get_json(api + "/api/health")
+          require(health.get("status") == "ok", "API health check did not return status=ok")
+
+          lab = get_json(api + "/api/lab-status")
+          require(lab.get("data_mode") == "biquote", "TEST is not configured for BiQuote; refusing to call it operational")
+          require(lab.get("provider_configured") is True, "BiQuote research provider is not enabled")
+          require(lab.get("signals_activated") is False, "Unexpected signal activation state")
+          print("LAB:", json.dumps({
+              "data_mode": lab.get("data_mode"),
+              "provider_configured": lab.get("provider_configured"),
+              "push_devices": (lab.get("records") or {}).get("push_devices"),
+              "signals_activated": lab.get("signals_activated"),
+          }))
+
+          news = get_json(api + "/api/news/calendar")
+          require(news.get("available") is True, "Economic calendar feed is unavailable")
+          require(isinstance(news.get("events"), list), "Economic calendar events are not a list")
+          require(news.get("server_time"), "Economic calendar server clock missing")
+          print("NEWS:", json.dumps({
+              "available": news.get("available"),
+              "events": len(news.get("events", [])),
+              "next_high_impact": (news.get("next_high_impact") or {}).get("title"),
+              "cache_ttl_seconds": news.get("cache_ttl_seconds"),
+              "server_time": news.get("server_time"),
+          }))
+
+          quote = get_json(api + "/api/research/biquote/tick?symbol=XAU%2FUSD")
+          require(quote.get("accepted") is True, "BiQuote XAU/USD quote was rejected")
+          require(quote.get("quote_age_seconds") is not None and quote["quote_age_seconds"] <= 60,
+                  "BiQuote XAU/USD quote is older than 60 seconds")
+          require(quote.get("execution_price") is False, "BiQuote quote must remain reference-only")
+          print("QUOTE:", json.dumps({
+              "provider": quote.get("provider"),
+              "symbol": quote.get("symbol"),
+              "quote_age_seconds": quote.get("quote_age_seconds"),
+              "price_basis": quote.get("price_basis"),
+          }))
+
+          for interval in ("5min", "15min", "30min"):
+              query = urllib.parse.urlencode({"symbol": "XAU/USD", "interval": interval})
+              data = get_json(api + "/api/analysis?" + query)
+              require(data.get("data_mode") == "biquote", f"{interval}: analysis is not using BiQuote")
+              require(data.get("provider") == "biquote", f"{interval}: provider is not BiQuote")
+              require(data.get("reference_only") is True, f"{interval}: reference-only boundary missing")
+              require(data.get("execution_price") is False, f"{interval}: execution price must remain false")
+              require(data.get("signals_activated") is False, f"{interval}: signal activation must remain false")
+              require(data.get("candles", {}).get({"5min":"5m","15min":"15m","30min":"30m"}[interval], 0) >= 120,
+                      f"{interval}: insufficient base closed candles")
+              require(isinstance(data.get("news_context"), dict) and data["news_context"].get("available") is True,
+                      f"{interval}: news context missing/unavailable")
+              print("ANALYSIS:", json.dumps({
+                  "interval": interval,
+                  "signal": data.get("signal"),
+                  "candle_age_minutes": data.get("candle_age_minutes"),
+                  "candles": data.get("candles"),
+                  "news_available": data["news_context"].get("available"),
+              }))
+
+          panel_url = panel + "/panel_escaner_vantage.html"
+          with urllib.request.urlopen(panel_url, timeout=35) as response:
+              html = response.read().decode("utf-8", "replace")
+              require(response.status == 200, "Panel did not return HTTP 200")
+              require("XAU/USD" in html and "goldNewsEvents" in html, "Panel is missing the gold/news UI")
+          with urllib.request.urlopen(panel + "/service-worker.js", timeout=35) as response:
+              worker = response.read().decode("utf-8", "replace")
+              require("global-signal-scanner-shell-v27" in worker, "PWA cache version v27 is not deployed")
+          print("PANEL: HTTP 200; XAU/USD and news UI present; PWA cache v27 present")
+
+          try:
+              push = get_json(api + "/api/push/public-key", attempts=2, delay=2)
+              require(bool(push.get("public_key")), "Push public key missing")
+              print("PUSH: VAPID public key configured")
+          except Exception as exc:
+              raise RuntimeError(f"Push notifications are not configured: {exc}")
+
+          devices = (lab.get("records") or {}).get("push_devices", 0)
+          if not devices:
+              print("PUSH WARNING: no iPhone/browser subscription is currently registered; enable notifications in the panel.")
+          else:
+              print(f"PUSH: {devices} saved subscription(s); actual device delivery still needs an on-device confirmation.")
+
+          print("LIVE SMOKE CHECKS PASSED")
+          PY

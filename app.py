@@ -1955,6 +1955,7 @@ def push_scan():
                     symbol, interval, data.get("recent_candles", [])
                 )
                 trade_direction = data.get("signal") or "ESPERAR"
+                cross_timeframe_confirmation = False
                 if data.get("pre_signal") is True and data.get("pre_signal_side") in ("BUY", "SELL"):
                     direction = "PREPARAR_" + ("COMPRA" if data["pre_signal_side"] == "BUY" else "VENTA")
                 elif trade_direction in ("COMPRA", "VENTA"):

@@ -1715,6 +1715,53 @@ if ("serviceWorker" in navigator) {
   render();
 })();
 
+/* Gedeón 2.0 · BiQuote early-warning lane (TEST / shadow only). */
+(()=>{
+  const cards=document.getElementById("cards");
+  const interval=document.getElementById("interval");
+  if(!cards||!interval)return;
+  const panel=document.createElement("section");
+  panel.id="gedeonEarlyWarning";
+  panel.style.cssText="margin:14px 0;padding:16px;border:1px solid #31533e;border-radius:14px;background:#0b1510;color:#eef5ef";
+  panel.innerHTML='<div style="font-size:10px;letter-spacing:1px;color:#9eb6a4">GEDEÓN 2.0 · ANTICIPACIÓN BIQUOTE · TEST</div><div id="g2Stage" style="font-size:19px;font-weight:800;margin:8px 0">CONSULTANDO ESTRUCTURA…</div><div id="g2Reason" style="font-size:13px;line-height:1.5;color:#c5d2c8">Análisis de velas cerradas; solo modo sombra.</div><div id="g2Meta" style="font-size:11px;color:#9eb6a4;margin-top:9px">XAU/USD · M5/M15 · sin órdenes</div><div style="font-size:10px;color:#e0b878;margin-top:10px">BiQuote es referencia, no cotización ejecutable de Vantage. Confirma siempre el precio y spread en MT5.</div>';
+  cards.parentNode.insertBefore(panel,cards);
+  const stage=panel.querySelector("#g2Stage"),reason=panel.querySelector("#g2Reason"),meta=panel.querySelector("#g2Meta");
+  let busy=false,lastKey="";
+  const labelBias=v=>v==="BULL"?"ALCISTA":v==="BEAR"?"BAJISTA":"NEUTRAL";
+  async function refreshEarly(){
+    if(busy||document.hidden)return;
+    busy=true;
+    try{
+      const tf=interval.value||"5min";
+      const qs=new URLSearchParams({symbol:"XAU/USD",interval:tf});
+      const res=await fetch(window.API_BASE+"/api/research/biquote/analysis?"+qs.toString(),{cache:"no-store",headers:{Accept:"application/json"}});
+      const d=await res.json().catch(()=>({}));
+      if(!res.ok||d.research_only!==true)throw new Error(d.error||"Análisis BiQuote no disponible");
+      const side=d.pre_signal_side||d.signal_research;
+      let headline="ESPERAR CONFIRMACIÓN";
+      if(d.pre_signal===true&&(side==="BUY"||side==="SELL"))headline="PREPARAR MT5 · "+(side==="BUY"?"COMPRA":"VENTA");
+      else if((d.signal_research==="BUY"||d.signal_research==="SELL")&&d.setup_status==="READY")headline="ESTRUCTURA VALIDADA EN BIQUOTE · "+(d.signal_research==="BUY"?"COMPRA":"VENTA");
+      stage.textContent=headline;
+      reason.textContent=d.reason||"Sin confirmación estructural. No preparar una orden todavía.";
+      const mtf=d.mtf||{};
+      meta.textContent="XAU/USD · "+tf.toUpperCase()+" · Confluencia "+(d.score??"—")+"/"+(d.score_max??7)+" · Sesgo "+labelBias(d.primary_bias)+" · "+(d.provider||"BiQuote")+" · Solo sombra";
+      stage.style.color=d.pre_signal?"#e6bd65":d.setup_status==="READY"?"#83d7a0":"#e9c77e";
+      if(d.pre_signal===true)reason.textContent+=" Espera el disparador; esta preseñal no es una orden.";
+      if(d.setup_status==="READY")reason.textContent+=" La estructura está confirmada en BiQuote, pero falta verificar precio, spread y ejecución en Vantage MT5.";
+      lastKey=headline+"|"+reason.textContent;
+    }catch(e){
+      stage.textContent="ESPERAR · DATOS NO VALIDADOS";
+      reason.textContent=e.message||"No se pudo consultar el análisis BiQuote.";
+      meta.textContent="XAU/USD · TEST · No se generan entradas sin datos válidos.";
+      stage.style.color="#e9c77e";
+    }finally{busy=false;}
+  }
+  refreshEarly();
+  interval.addEventListener("change",refreshEarly);
+  setInterval(refreshEarly,60000);
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)refreshEarly();});
+})();
+
 </script>
 
 </body>

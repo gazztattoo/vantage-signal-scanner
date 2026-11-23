@@ -1673,13 +1673,15 @@ def test_alert_preview():
 
 @app.route("/api/push/scan", methods=["POST"])
 def push_scan():
-    # TEST BiQuote is analysis-only until broker price basis/spread are validated.
-    return jsonify({
-        "error": "Las alertas automáticas están desactivadas en TEST; BiQuote es solo referencia.",
-        "data_mode": DATA_MODE,
-        "signals_activated": False,
-        "orders_sent": False,
-    }), 403
+    # This scanner is enabled only in the dedicated BiQuote TEST service.
+    # BiQuote remains reference-only: no Vantage execution price and no orders.
+    if DATA_MODE != "biquote" or not BIQUOTE_RESEARCH_ENABLED:
+        return jsonify({
+            "error": "El escáner automático requiere BiQuote en TEST.",
+            "data_mode": DATA_MODE,
+            "signals_activated": False,
+            "orders_sent": False,
+        }), 503
     supplied = request.headers.get("X-Scanner-Cron-Secret", "")
     if not SIGNAL_CRON_SECRET or not hmac.compare_digest(supplied, SIGNAL_CRON_SECRET):
         return jsonify({"error": "No autorizado."}), 401
@@ -1687,8 +1689,8 @@ def push_scan():
     results = []
     sent_total = 0
     token = access_serializer().dumps({"access": True})
-    intervals = ["5min", "15min", "30min"]
-    symbols = ["EUR/USD", "XAU/USD", "BTC/USD"]
+    intervals = ["5min", "15min"]
+    symbols = ["XAU/USD"]
 
     # Reutiliza el mismo endpoint de análisis que consume el panel.
     # Pausa entre consultas para no superar de golpe el límite del proveedor.
@@ -1724,20 +1726,41 @@ def push_scan():
                 outcome_result = resolve_pending_signal_outcomes(
                     symbol, interval, data.get("recent_candles", [])
                 )
-                direction = data.get("signal") or "ESPERAR"
+                trade_direction = data.get("signal") or "ESPERAR"
+                if data.get("pre_signal") is True and data.get("pre_signal_side") in ("BUY", "SELL"):
+                    direction = "PREPARAR_" + ("COMPRA" if data["pre_signal_side"] == "BUY" else "VENTA")
+                elif trade_direction in ("COMPRA", "VENTA"):
+                    # Stage 2 requires a fresh BiQuote quote and a confirmed structure trigger.
+                    # It is still reference-only and must never be presented as Vantage execution.
+                    try:
+                        quote_check = fetch_biquote_research_tick(symbol)
+                        quote_fresh = (
+                            quote_check.get("accepted") is True
+                            and quote_check.get("quote_age_seconds") is not None
+                            and float(quote_check["quote_age_seconds"]) <= 60
+                        )
+                    except Exception:
+                        quote_fresh = False
+                    structure_confirmed = data.get("structure_trigger") not in (None, "", "NONE", "PENDING")
+                    direction = (
+                        "ENTRADA_VALIDADA_" + trade_direction
+                        if quote_fresh and structure_confirmed else "ESPERAR"
+                    )
+                else:
+                    direction = "ESPERAR"
 
                 # Asegurar el historial en cada ciclo para señales activas.
                 # La clave única hace esta escritura idempotente: si ya existe,
                 # Supabase ignora el duplicado; si faltaba por un fallo previo,
                 # queda recuperada aunque el estado ya estuviera registrado.
                 candle_time = str(data.get("candle_time") or "")
-                if direction in ("COMPRA", "VENTA"):
-                    signal_key = "|".join([symbol, interval, direction, candle_time])
+                if trade_direction in ("COMPRA", "VENTA"):
+                    signal_key = "|".join([symbol, interval, trade_direction, candle_time])
                     history_payload = {
                         "signal_key": signal_key,
                         "symbol": symbol,
                         "timeframe": interval,
-                        "direction": direction,
+                        "direction": trade_direction,
                         "entry_price": data.get("entry"),
                         "stop_loss": data.get("stop_loss"),
                         "take_profit": data.get("take_profit"),
@@ -1817,7 +1840,7 @@ def push_scan():
                         # permitirá reintentar el siguiente ciclo sin duplicar señales.
                         event_stamp = datetime.now(timezone.utc).isoformat()
                         fingerprint = "|".join([
-                            symbol, interval, direction, candle_time, event_stamp
+                            symbol, interval, direction, candle_time
                         ])
                         insert_response = requests.post(
                             SUPABASE_URL + "/rest/v1/signal_alerts?on_conflict=market,timeframe,fingerprint",
@@ -1854,20 +1877,33 @@ def push_scan():
                             continue
 
                         # Solo se notifica una transición nueva a COMPRA o VENTA.
-                        price_digits = 5 if symbol == "EUR/USD" else 2
+                        price_digits = 2
 
                         def display_price(value):
                             return f"{float(value):,.{price_digits}f}" if value is not None else "—"
 
-                        short_interval = {
-                            "5min": "M5", "15min": "M15", "30min": "M30"
-                        }.get(interval, interval)
-                        alert_body = (
-                            f"{symbol} · {short_interval} | "
-                            f"Entrada {display_price(data.get('entry'))} · "
-                            f"SL {display_price(data.get('stop_loss'))} · "
-                            f"TP {display_price(data.get('take_profit'))}"
-                        )
+                        short_interval = {"5min": "M5", "15min": "M15"}.get(interval, interval)
+                        is_prealert = direction.startswith("PREPARAR_")
+                        signal_side = "COMPRA" if direction.endswith("COMPRA") else "VENTA"
+                        entry_value = data.get("planned_entry") if is_prealert else data.get("entry")
+                        stop_value = data.get("planned_stop_loss") if is_prealert else data.get("stop_loss")
+                        target_value = data.get("planned_take_profit") if is_prealert else data.get("take_profit")
+                        if is_prealert:
+                            alert_title = "PREPARAR MT5 · XAU/USD"
+                            alert_body = (
+                                f"PREALERTA {signal_side} · {short_interval}. "
+                                f"Nivel provisional {display_price(entry_value)} · "
+                                f"SL {display_price(stop_value)} · TP {display_price(target_value)}. "
+                                "Aún NO es entrada. Datos BiQuote de referencia; compara con Vantage."
+                            )
+                        else:
+                            alert_title = "ENTRADA VALIDADA · REFERENCIA"
+                            alert_body = (
+                                f"XAU/USD · {short_interval} · {signal_side}. "
+                                f"Nivel técnico {display_price(entry_value)} · "
+                                f"SL {display_price(stop_value)} · TP {display_price(target_value)}. "
+                                "Confirmación técnica BiQuote, NO precio Vantage. Verifica cotización y spread antes de decidir."
+                            )
 
                         subs_response = requests.get(
                             SUPABASE_URL + "/rest/v1/push_subscriptions?select=subscription",
@@ -1888,16 +1924,19 @@ def push_scan():
                                     continue
                                 try:
                                     send_web_push(subscription, {
-                                        "title": f"GLOBAL SIGNAL · {direction}",
+                                        "title": alert_title,
                                         "body": alert_body,
-                                        "tag": "gss-" + symbol.replace("/", "") + "-" + interval,
+                                        "tag": "gss-" + symbol.replace("/", "") + "-" + interval + "-" + direction,
                                         "url": ("https://global-signal-push-test-panel.onrender.com/panel_escaner_vantage.html?view=scanner&symbol=" + requests.utils.quote(symbol, safe="") + "&timeframe=" + requests.utils.quote(interval, safe="")),
                                         "data": {
                                             "symbol": symbol, "interval": interval,
-                                            "direction": direction,
-                                            "entry": data.get("entry"),
-                                            "stop_loss": data.get("stop_loss"),
-                                            "take_profit": data.get("take_profit"),
+                                            "event_type": "PREALERTA" if is_prealert else "ENTRADA_VALIDADA",
+                                            "direction": signal_side,
+                                            "reference_only": True,
+                                            "execution_price": False,
+                                            "entry": entry_value,
+                                            "stop_loss": stop_value,
+                                            "take_profit": target_value,
                                         },
                                     })
                                     delivered += 1

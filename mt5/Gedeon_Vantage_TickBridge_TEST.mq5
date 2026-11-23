@@ -57,6 +57,9 @@ void OnTimer()
 
    if(tick.bid <= 0 || tick.ask < tick.bid || tick.time <= 0)
       return;
+   // Reject a cached/old quote rather than stamping it as a fresh tick.
+   if((TimeCurrent() - tick.time) > 10)
+      return;
 
    string payload = StringFormat(
       "{\"symbol\":\"%s\",\"broker_symbol\":\"%s\",\"bid\":%.10f,\"ask\":%.10f,\"timestamp_utc\":\"%s\"}",

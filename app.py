@@ -1960,7 +1960,18 @@ def push_scan():
                                         "title": alert_title,
                                         "body": alert_body,
                                         "tag": "gss-" + symbol.replace("/", "") + "-" + interval + "-" + direction,
-                                        "url": ("https://global-signal-push-test-panel.onrender.com/panel_escaner_vantage.html?view=scanner&symbol=" + requests.utils.quote(symbol, safe="") + "&timeframe=" + requests.utils.quote(interval, safe="")),
+                                        "url": (
+                                            "https://global-signal-push-test-panel.onrender.com/panel_escaner_vantage.html?"
+                                            + "view=scanner"
+                                            + "&symbol=" + requests.utils.quote(symbol, safe="")
+                                            + "&timeframe=" + requests.utils.quote(interval, safe="")
+                                            + "&alert_stage=" + requests.utils.quote("PREALERTA" if is_prealert else "ENTRADA_VALIDADA", safe="")
+                                            + "&alert_side=" + requests.utils.quote(signal_side, safe="")
+                                            + "&alert_entry=" + requests.utils.quote("" if entry_value is None else str(entry_value), safe="")
+                                            + "&alert_stop_loss=" + requests.utils.quote("" if stop_value is None else str(stop_value), safe="")
+                                            + "&alert_take_profit=" + requests.utils.quote("" if target_value is None else str(target_value), safe="")
+                                            + "&alert_candle_time=" + requests.utils.quote(candle_time, safe="")
+                                        ),
                                         "data": {
                                             "symbol": symbol, "interval": interval,
                                             "event_type": "PREALERTA" if is_prealert else "ENTRADA_VALIDADA",

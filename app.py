@@ -1690,6 +1690,44 @@ def _test_registered_subscription(endpoint):
     return rows[0].get("subscription") if rows else None
 
 
+@app.route("/api/push/test-reversal", methods=["POST"])
+def push_test_reversal():
+    """Send two staged, clearly labeled TEST pushes only to the requesting device."""
+    payload = request.get_json(silent=True) or {}
+    endpoint = str(payload.get("endpoint") or "").strip()
+    if not endpoint.startswith("https://") or len(endpoint) > 2048:
+        return jsonify({"error":"Suscripción de este dispositivo no válida."}), 400
+    try:
+        subscription = _test_registered_subscription(endpoint)
+        if not subscription:
+            return jsonify({"error":"No hay una suscripción activa para este dispositivo."}), 404
+        base = "https://global-signal-push-test-panel.onrender.com/panel_escaner_vantage.html?view=scanner&test_reversal=1"
+        warning = {
+            "title":"🟡 PRUEBA TEST · POSIBLE GIRO",
+            "body":"Aviso preventivo simulado: una vela cerrada cumple condiciones iniciales. No es una señal de mercado ni requiere operar.",
+            "tag":"gss-reversal-test-warning",
+            "url":base,
+            "data":{"event_type":"TEST_ALERTA_PREVENTIVA_GIRO","orders_sent":False,"simulated":True}
+        }
+        confirmed = {
+            "title":"🔴 PRUEBA TEST · GIRO CONFIRMADO",
+            "body":"Segunda vela simulada confirma el escenario. Esta notificación es una prueba; no es una señal ni una orden.",
+            "tag":"gss-reversal-test-confirmed",
+            "url":base,
+            "data":{"event_type":"TEST_ALERTA_CIERRE","orders_sent":False,"simulated":True}
+        }
+        send_web_push(subscription, warning)
+        send_web_push(subscription, confirmed)
+        return jsonify({"ok":True,"sent":2,"target":"requesting_device_only","simulated":True,"orders_sent":False})
+    except RuntimeError as exc:
+        return jsonify({"error":str(exc)}), 503
+    except Exception as exc:
+        response_obj = getattr(exc, "response", None)
+        status = getattr(response_obj, "status_code", None)
+        app.logger.warning("TEST reversal push failed status=%s detail=%s", status, str(exc)[:240])
+        return jsonify({"error":"No se pudieron enviar las dos notificaciones de prueba.","provider_status":status}), 502
+
+
 @app.route("/api/trades/active", methods=["GET"])
 def get_test_active_trade():
     endpoint = (request.args.get("endpoint") or "").strip()

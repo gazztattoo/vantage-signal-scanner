@@ -129,4 +129,24 @@ jobs:
               print(f"PUSH: {devices} saved subscription(s); actual device delivery still needs an on-device confirmation.")
 
           print("LIVE SMOKE CHECKS PASSED")
+
+      - name: One-time push delivery test to saved devices
+        if: github.event.head_commit.message == 'Send one-time Gedeon push test'
+        env:
+          API_BASE: https://global-signal-push-test.onrender.com
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          req = urllib.request.Request(
+              os.environ["API_BASE"] + "/api/push/test",
+              data=b"{}",
+              headers={"Content-Type": "application/json", "User-Agent": "Gedeon2-TEST-push-check/1.0"},
+              method="POST",
+          )
+          with urllib.request.urlopen(req, timeout=45) as response:
+              payload = json.loads(response.read().decode("utf-8"))
+          if not payload.get("ok") or payload.get("sent", 0) < 1:
+              raise SystemExit("Push delivery test did not send to any saved device: " + json.dumps(payload))
+          print("PUSH DELIVERY TEST:", json.dumps(payload))
+          PY
           PY

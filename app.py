@@ -1839,6 +1839,35 @@ def push_scan():
                             "outcome_errors": outcome_result["errors"]
                         })
                     else:
+                        # Stage 2 must follow a recent Stage 1 for the SAME symbol,
+                        # timeframe and side. A validated M5 setup must never be
+                        # presented as the continuation of an M15 prealert.
+                        if direction.startswith("ENTRADA_VALIDADA_"):
+                            expected_prealert = "PREPARAR_" + direction.removeprefix("ENTRADA_VALIDADA_")
+                            previous_created = previous_rows[0].get("created_at") if previous_rows else None
+                            prealert_is_recent = False
+                            if previous_direction == expected_prealert and previous_created:
+                                try:
+                                    created_dt = datetime.fromisoformat(previous_created.replace("Z", "+00:00"))
+                                    if created_dt.tzinfo is None:
+                                        created_dt = created_dt.replace(tzinfo=timezone.utc)
+                                    max_age_minutes = 45 if interval == "5min" else 90
+                                    prealert_is_recent = (
+                                        0 <= (datetime.now(timezone.utc) - created_dt).total_seconds()
+                                        <= max_age_minutes * 60
+                                    )
+                                except (TypeError, ValueError):
+                                    prealert_is_recent = False
+                            if not prealert_is_recent:
+                                results.append({
+                                    "symbol": symbol, "interval": interval,
+                                    "status": "validated_without_matching_recent_prealert_no_notification",
+                                    "direction": direction,
+                                    "previous_direction": previous_direction,
+                                    "required_previous_direction": expected_prealert,
+                                })
+                                continue
+
                         # El historial ya quedó asegurado arriba antes de leer/guardar el estado.
                         # El estado se guarda solo después de asegurar el historial.
                         # Si falla este paso, la inserción idempotente del historial

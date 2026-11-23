@@ -90,7 +90,10 @@ jobs:
               require(data.get("reference_only") is True, f"{interval}: reference-only boundary missing")
               require(data.get("execution_price") is False, f"{interval}: execution price must remain false")
               require(data.get("signals_activated") is False, f"{interval}: signal activation must remain false")
-              require(data.get("candles", {}).get({"5min":"5m","15min":"15m","30min":"30m"}[interval], 0) >= 120,
+              base_frame = {"5min":"5m","15min":"15m","30min":"30m"}[interval]
+              live_feed = data.get("live_feed") or {}
+              closed_by_frame = live_feed.get("candles_by_timeframe") or {}
+              require(closed_by_frame.get(base_frame, 0) >= 120,
                       f"{interval}: insufficient base closed candles")
               require(isinstance(data.get("news_context"), dict) and data["news_context"].get("available") is True,
                       f"{interval}: news context missing/unavailable")

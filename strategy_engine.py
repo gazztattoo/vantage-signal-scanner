@@ -338,7 +338,8 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timefr
     score = int(best["score"])
     structure_ok = structure["direction"] == best_side and structure["type"] in ("BREAKOUT", "RETEST")
     primary_aligned = primary == ("BULL" if best_side == "BUY" else "BEAR")
-    higher_timeframes_both_opposed = False  # M15/M30 son contexto; no bloquean por sí solos.
+    opposed_bias = "BEAR" if best_side == "BUY" else "BULL"
+    higher_timeframes_both_opposed = bias1 == opposed_bias and bias2 == opposed_bias
     # ADX/RSI/MACD/MTF aportan contexto y puntuación; no son candados individuales.
     # La estructura, la dirección primaria y el riesgo sí protegen la entrada.
     # Confluence grade describes indicator alignment; setup grade also requires
@@ -362,6 +363,8 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timefr
         confirmation_missing.append("BREAKOUT_OR_RETEST")
     if score < 5:
         confirmation_missing.append("MINIMUM_CONFLUENCE")
+    if higher_timeframes_both_opposed:
+        confirmation_missing.append("HIGHER_TIMEFRAME_CONFLICT")
     setup_status = "READY" if not confirmation_missing else "WAIT"
 
     common = {

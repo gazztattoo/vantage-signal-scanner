@@ -1314,6 +1314,7 @@ async function update(){
   button.textContent="Consultando…";
   updated.textContent="Solicitud en curso…";
   const interval=document.getElementById("interval").value;
+  if(interval==="30min"&&typeof window.__refreshGedeonEarly==="function") window.__refreshGedeonEarly();
   const controller=new AbortController();
   const timeoutId=setTimeout(()=>controller.abort(),25000);
   cards.innerHTML='<article class="card"><div class="cardhead"><div class="instrument-copy"><div class="symbol">XAU/USD · ORO</div><div class="market">Gedeón 2.0 · '+esc(interval)+'</div></div><span class="pill">ANALIZANDO</span></div><p class="reason">Esperando respuesta del motor TEST…</p></article>';
@@ -1505,12 +1506,25 @@ async function loadPerformance(){
 document.getElementById("historyRefresh").addEventListener("click",loadHistory);
 ["historySymbol","historyTimeframe","historyStatus"].forEach(id=>document.getElementById(id).addEventListener("change",loadHistory));
 
+const scannerInterval=document.getElementById("interval");
 button.addEventListener("click",update);
- // Keep TEST analysis synchronized with the latest closed BiQuote candle.
- update();
- setInterval(()=>{if(!document.hidden)update();},60000);
- document.addEventListener("visibilitychange",()=>{if(!document.hidden)update();});
-document.getElementById("interval").addEventListener("change",update);
+// M5/M15 refresh automatically; M30 is queried only after a manual tap.
+if(scannerInterval.value!=="30min") update();
+else updated.textContent="M30 manual · pulsa Actualizar análisis para consultar.";
+setInterval(()=>{
+  if(!document.hidden&&scannerInterval.value!=="30min") update();
+},60000);
+document.addEventListener("visibilitychange",()=>{
+  if(!document.hidden&&scannerInterval.value!=="30min") update();
+});
+scannerInterval.addEventListener("change",()=>{
+  if(scannerInterval.value==="30min"){
+    updated.textContent="M30 manual · pulsa Actualizar análisis para consultar.";
+    updateDeskTimeframes({interval:"30min"});
+    return;
+  }
+  update();
+});
 
 const pushStatus=document.getElementById("pushStatus");
 const pushToggleButton=document.getElementById("pushToggle");
@@ -1756,10 +1770,25 @@ if ("serviceWorker" in navigator) {
       stage.style.color="#e9c77e";
     }finally{busy=false;}
   }
-  refreshEarly();
-  interval.addEventListener("change",refreshEarly);
-  setInterval(refreshEarly,60000);
-  document.addEventListener("visibilitychange",()=>{if(!document.hidden)refreshEarly();});
+  window.__refreshGedeonEarly=refreshEarly;
+  function showManualM30(){
+    stage.textContent="M30 MANUAL · ESPERANDO CONSULTA";
+    reason.textContent="Pulsa «Actualizar análisis» para consultar M30. No se actualizará automáticamente.";
+    meta.textContent="XAU/USD · M30 · Consulta manual · Solo referencia BiQuote";
+    stage.style.color="#e9c77e";
+  }
+  if(interval.value==="30min") showManualM30();
+  else refreshEarly();
+  interval.addEventListener("change",()=>{
+    if(interval.value==="30min") showManualM30();
+    else refreshEarly();
+  });
+  setInterval(()=>{
+    if(!document.hidden&&interval.value!=="30min") refreshEarly();
+  },60000);
+  document.addEventListener("visibilitychange",()=>{
+    if(!document.hidden&&interval.value!=="30min") refreshEarly();
+  });
 })();
 
 </script>

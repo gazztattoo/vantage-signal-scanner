@@ -91,6 +91,23 @@ class MultiTimeframeEngineTests(unittest.TestCase):
         self.assertTrue(result["mtf"]["aligned_buy"])
         self.assertGreaterEqual(result["score"], 6)
 
+    def test_both_higher_timeframes_opposed_block_a_confirmed_entry(self):
+        bars = trend_bars()
+        latest = len(bars) - 1
+        with patch("strategy_engine._latest_bias", side_effect=["BEAR", "BEAR"]):
+            with patch("strategy_engine.rsi", return_value=[None] * latest + [60.0]):
+                with patch("strategy_engine.macd_histogram", return_value=[None] * latest + [1.0]):
+                    with patch("strategy_engine.adx_di", return_value=(
+                        [None] * latest + [30.0],
+                        [None] * latest + [20.0],
+                        [None] * latest + [10.0],
+                    )):
+                        result = analyze(bars, "5min", "XAU/USD")
+        self.assertEqual(result["signal"], "WAIT")
+        self.assertFalse(result["pre_signal"])
+        self.assertEqual(result["setup_status"], "WAIT")
+        self.assertIn("HIGHER_TIMEFRAME_CONFLICT", result["confirmation_missing"])
+
     def test_confirmed_sell_is_symmetric(self):
         result = analyze(trend_bars(direction=-1), "5min", "TEST")
         self.assertEqual(result["signal"], "SELL")

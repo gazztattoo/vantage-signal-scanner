@@ -1118,6 +1118,14 @@ function render(m,d,err,marketClosed=false){
 
       </div>
 
+      ${confirmed && d.data_mode==="biquote" ? `
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+        <button type="button" data-track-entry="1" data-side="${side==="BUY"?"COMPRA":"VENTA"}"
+          data-entry="${esc(String(entry))}" data-sl="${esc(String(sl))}" data-tp="${esc(String(tp))}"
+          data-timeframe="${esc(String(d.interval||document.getElementById("interval").value))}"
+          data-candle="${esc(String(d.candle_time||""))}"
+          style="padding:9px 11px;font-size:11px;border-radius:9px">YA TOMÉ LA ENTRADA</button>
+      </div>` : ""}
       <div class="foot">
         ${preparing?"PLAN PREVIO: entrada stop provisional; esperar ruptura y nueva validación. ":""}
         Niveles calculados con velas cerradas BiQuote. Son referencias de análisis, no precios Vantage ni órdenes enviadas. Verifica el precio en MT5 antes de operar.
@@ -1180,6 +1188,37 @@ cards.addEventListener("click",async event=>{
       copyBtn.textContent=originalText;
       copyBtn.title="Copiar "+copyBtn.dataset.copyLabel;
     },2000);
+  }
+});
+
+
+cards.addEventListener("click",async event=>{
+  const trackButton=event.target.closest("[data-track-entry]");
+  if(!trackButton)return;
+  const original=trackButton.textContent;
+  trackButton.disabled=true;trackButton.textContent="Registrando…";
+  try{
+    const registration=await navigator.serviceWorker.ready;
+    const subscription=await registration.pushManager.getSubscription();
+    if(!subscription)throw new Error("Primero activa las notificaciones en este dispositivo.");
+    const response=await fetch(API_BASE+"/api/trades/start",{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        endpoint:subscription.endpoint,symbol:"XAU/USD",
+        timeframe:trackButton.dataset.timeframe,side:trackButton.dataset.side,
+        entry_price:trackButton.dataset.entry,stop_loss:trackButton.dataset.sl,
+        take_profit:trackButton.dataset.tp,candle_time:trackButton.dataset.candle
+      })
+    });
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(data.error||"No se pudo registrar el seguimiento.");
+    trackButton.textContent="OPERACIÓN EN SEGUIMIENTO";
+    trackButton.style.background="#183d2a";trackButton.style.color="#58f29a";
+    trackButton.disabled=true;
+    alert("Operación registrada en TEST. Gedeón vigilará velas cerradas y solo avisará ante un giro fuerte confirmado. No abrirá ni cerrará operaciones.");
+  }catch(error){
+    trackButton.disabled=false;trackButton.textContent=original;
+    alert(error.message||"No se pudo registrar la operación.");
   }
 });
 

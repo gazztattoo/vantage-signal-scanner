@@ -1215,6 +1215,7 @@ cards.addEventListener("click",async event=>{
     trackButton.textContent="OPERACIÓN EN SEGUIMIENTO";
     trackButton.style.background="#183d2a";trackButton.style.color="#58f29a";
     trackButton.disabled=true;
+    updateManualTradeStatus();
     alert("Operación registrada en TEST. Gedeón vigilará velas cerradas y solo avisará ante un giro fuerte confirmado. No abrirá ni cerrará operaciones.");
   }catch(error){
     trackButton.disabled=false;trackButton.textContent=original;

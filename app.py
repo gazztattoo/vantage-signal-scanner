@@ -215,6 +215,93 @@ def market_session(symbol, now=None):
     }
 
 
+NEWS_CALENDAR_CACHE = {"stored_at": 0, "payload": None}
+NEWS_CALENDAR_TTL_SECONDS = 900
+NEWS_CALENDAR_URL = "https://showmytrades.com/api/public/calendar/v1"
+
+
+def economic_news_context():
+    """Free USD macro calendar. Context only: never blocks or changes a signal."""
+    now_mono = time.monotonic()
+    cached = NEWS_CALENDAR_CACHE.get("payload")
+    if cached and now_mono - NEWS_CALENDAR_CACHE["stored_at"] < NEWS_CALENDAR_TTL_SECONDS:
+        return {**cached, "cache_hit": True}
+    try:
+        response = requests.get(
+            NEWS_CALENDAR_URL,
+            params={"currency": "USD", "impact": "high,medium", "days": 7, "format": "json"},
+            headers={"User-Agent": "Gedeon2-TEST/1.0"},
+            timeout=8,
+        )
+        response.raise_for_status()
+        body = response.json()
+        rows = body.get("events", []) if isinstance(body, dict) else body
+        if not isinstance(rows, list):
+            raise ValueError("Formato inesperado del calendario económico")
+        now = datetime.now(timezone.utc)
+        events = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            stamp = row.get("ts")
+            if stamp is None and row.get("time"):
+                stamp = datetime.fromisoformat(str(row["time"]).replace("Z", "+00:00")).timestamp()
+            if stamp is None:
+                continue
+            event_time = datetime.fromtimestamp(float(stamp), timezone.utc)
+            minutes = round((event_time - now).total_seconds() / 60)
+            impact = str(row.get("impact", "")).lower()
+            currency = str(row.get("currency", "")).upper()
+            if currency not in ("USD", "ALL"):
+                continue
+            events.append({
+                "id": str(row.get("id", "")),
+                "time": event_time.isoformat(),
+                "minutes_until": minutes,
+                "currency": currency,
+                "impact": impact,
+                "title": str(row.get("title", row.get("name", "Evento económico")))[:180],
+                "forecast": row.get("forecast"),
+                "previous": row.get("previous"),
+                "actual": row.get("actual"),
+                "status": str(row.get("status", "scheduled")),
+                "confidence": row.get("confidence"),
+            })
+        events.sort(key=lambda x: x["minutes_until"])
+        high_window = [
+            e for e in events
+            if e["impact"] == "high" and -30 <= e["minutes_until"] <= 30
+        ]
+        next_high = next((e for e in events if e["impact"] == "high" and e["minutes_until"] >= 0), None)
+        payload = {
+            "available": True,
+            "provider": "ShowMyTrades economic calendar",
+            "fetched_at": now.isoformat(),
+            "cache_ttl_seconds": NEWS_CALENDAR_TTL_SECONDS,
+            "events": events[:30],
+            "high_impact_window": bool(high_window),
+            "active_high_impact_events": high_window,
+            "next_high_impact": next_high,
+            "signal_policy": "WARNING_ONLY_NO_AUTOMATIC_BLOCK",
+        }
+        NEWS_CALENDAR_CACHE.update({"stored_at": now_mono, "payload": payload})
+        return {**payload, "cache_hit": False}
+    except (requests.RequestException, ValueError, TypeError, KeyError, OverflowError) as exc:
+        app.logger.warning("Economic calendar unavailable: %s", str(exc)[:160])
+        if cached:
+            return {**cached, "stale": True, "cache_hit": True, "warning": "Calendario sin actualizar; se muestra la última copia disponible."}
+        return {
+            "available": False, "provider": "ShowMyTrades economic calendar",
+            "events": [], "high_impact_window": None, "stale": True,
+            "warning": "No se pudo verificar el calendario. No asumir que no hay noticias.",
+        }
+
+
+@app.route("/api/news/calendar", methods=["GET"])
+def economic_news_calendar():
+    return jsonify(economic_news_context())
+
+
 @app.route("/api/market-status", methods=["GET"])
 def market_status():
     now = datetime.now(timezone.utc)
@@ -1068,7 +1155,7 @@ def analysis():
                 },
             },
         }
-        # Shadow-only comparison: the original signal is never modified or activated.
+        response_payload["news_context"] = economic_news_context()\n        # Shadow-only comparison: the original signal is never modified or activated.
         response_payload["experimental_shadow"] = evaluate_shadow_gate(
             symbol=symbol, timeframe=interval, signal=raw_signal, data_mode=DATA_MODE
         )

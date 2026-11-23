@@ -1725,7 +1725,7 @@ def start_test_trade():
         tp = float(payload.get("take_profit")) if payload.get("take_profit") not in (None,"") else None
     except (TypeError, ValueError):
         return jsonify({"error":"Niveles de operación no válidos."}), 400
-    if (symbol != "XAU/USD" or timeframe not in ("5min","15min") or side not in ("COMPRA","VENTA")
+    if (symbol != "XAU/USD" or timeframe not in ("5min","15min","30min") or side not in ("COMPRA","VENTA")
         or not math.isfinite(entry) or entry <= 0
         or (sl is not None and (not math.isfinite(sl) or sl <= 0))
         or (tp is not None and (not math.isfinite(tp) or tp <= 0))):

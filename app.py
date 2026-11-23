@@ -1268,9 +1268,11 @@ def lab_status():
         subscriptions = exact_count("/rest/v1/push_subscriptions")
         return jsonify({
             "checked_at": datetime.now(timezone.utc).isoformat(),
-            "data_provider": "synthetic_mock",
-            "provider_configured": False,
+            "data_provider": "biquote" if DATA_MODE == "biquote" else "synthetic_mock",
+            "provider_configured": DATA_MODE == "biquote" and BIQUOTE_RESEARCH_ENABLED,
             "data_mode": DATA_MODE,
+            "signals_activated": False,
+            "automatic_execution": False,
             "storage_configured": bool(SUPABASE_URL and SUPABASE_SECRET_KEY),
             "engine": {
                 "trend": "EMA 20 / EMA 50",

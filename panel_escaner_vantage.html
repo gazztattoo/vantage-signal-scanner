@@ -876,9 +876,42 @@ select,button{border-radius:9px}
     catch(e){set("labMessage","Lab no disponible: "+e.message);}
   }
   async function loadNewsSafe(){
-    set("goldNewsStatus","Consultando contexto del oro…");
-    try{const d=await get("/api/market-status");set("goldNewsStatus",d.message||d.status||"Estado del mercado recibido.");}
-    catch(e){set("goldNewsStatus","Noticias/calendario no disponible en TEST: "+e.message);}
+    set("goldNewsStatus","Consultando calendario económico USD…");
+    const eventsBox=document.getElementById("goldNewsEvents");
+    try{
+      const [news,market]=await Promise.all([get("/api/news/calendar"),get("/api/market-status")]);
+      if(news.available){
+        if(news.high_impact_window){
+          const titles=(news.active_high_impact_events||[]).map(e=>e.title).join(", ");
+          set("goldNewsStatus","⚠ NOTICIA USD DE ALTO IMPACTO en ventana de ±30 minutos: "+titles+". Riesgo de volatilidad, spread y deslizamiento. La señal no se bloquea automáticamente.");
+        }else{
+          const next=news.next_high_impact;
+          set("goldNewsStatus",next?"Sin noticia USD de alto impacto en la ventana inmediata. Próxima: "+next.title+" · "+new Date(next.time).toLocaleString("es-ES"):"No hay eventos USD de alto impacto próximos en los datos recibidos.");
+        }
+        if(news.stale)set("goldNewsStatus",document.getElementById("goldNewsStatus").textContent+" · AVISO: calendario desactualizado.");
+      }else{
+        set("goldNewsStatus","No se pudo verificar el calendario. No asumir que no hay noticias.");
+      }
+      if(eventsBox){
+        eventsBox.replaceChildren();
+        const rows=(news.events||[]).slice(0,12);
+        if(!rows.length){eventsBox.textContent="No hay eventos USD disponibles.";}
+        rows.forEach(e=>{
+          const row=document.createElement("div");row.className="news-event";
+          const title=document.createElement("strong");title.textContent=e.title;
+          const meta=document.createElement("span");
+          const when=new Date(e.time).toLocaleString("es-ES",{weekday:"short",day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"});
+          meta.textContent=when+" · USD · "+String(e.impact||"").toUpperCase();
+          row.append(title,meta);eventsBox.appendChild(row);
+        });
+      }
+      const xau=market.markets&&market.markets["XAU/USD"];
+      if(xau)set("goldSessionStatus",(xau.status||(xau.open?"Mercado abierto":"Mercado cerrado"))+" · "+(xau.reason||"Horario del instrumento"));
+      else set("goldSessionStatus","Horario del oro no disponible.");
+    }catch(e){
+      set("goldNewsStatus","Noticias/calendario no disponible: "+e.message);
+      if(eventsBox)eventsBox.textContent="No se pudo consultar la agenda económica.";
+    }
   }
   nav.forEach(button=>button.addEventListener("click",event=>{
     event.preventDefault();
@@ -1171,6 +1204,16 @@ async function load(m){
     throw error;
   }
 
+  if(d.news_context){
+    if(d.news_context.high_impact_window){
+      const names=(d.news_context.active_high_impact_events||[]).map(e=>e.title).join(", ");
+      d.reason=(d.reason||"")+" ⚠ NOTICIA USD ALTO IMPACTO (±30 min): "+names+". Valida spread y volatilidad antes de entrar.";
+    }else if(d.news_context.available===false){
+      d.reason=(d.reason||"")+" ⚠ Calendario económico no verificado; revisa noticias manualmente.";
+    }else if(d.news_context.stale){
+      d.reason=(d.reason||"")+" ⚠ Calendario económico desactualizado; revisa noticias manualmente.";
+    }
+  }
   return d;
 }
 

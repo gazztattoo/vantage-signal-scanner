@@ -238,7 +238,9 @@ def economic_news_context():
         rows = body.get("events", []) if isinstance(body, dict) else body
         if not isinstance(rows, list):
             raise ValueError("Formato inesperado del calendario económico")
-        now = datetime.now(timezone.utc)
+        # Prefer the calendar provider clock so event windows do not inherit VPS clock drift.
+        server_time = body.get("server_time") if isinstance(body, dict) else None
+        now = datetime.fromtimestamp(float(server_time), timezone.utc) if server_time is not None else datetime.now(timezone.utc)
         events = []
         for row in rows:
             if not isinstance(row, dict):
@@ -277,6 +279,9 @@ def economic_news_context():
             "available": True,
             "provider": "ShowMyTrades economic calendar",
             "fetched_at": now.isoformat(),
+            "server_time": now.isoformat(),
+            "generated_at": body.get("generated_at") if isinstance(body, dict) else None,
+            "attribution": "https://showmytrades.com/tools/economic-calendar",
             "cache_ttl_seconds": NEWS_CALENDAR_TTL_SECONDS,
             "events": events[:30],
             "high_impact_window": bool(high_window),

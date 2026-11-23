@@ -1477,7 +1477,8 @@ def push_test():
                 status = getattr(response_obj, "status_code", None)
                 detail = getattr(response_obj, "text", "") if response_obj is not None else ""
                 failures.append({"status": status, "detail": str(detail)[:300] or str(exc)[:300]})
-                if status in (404, 410):
+                # A VAPID key rotation makes old subscriptions permanently unusable too.
+                if status in (404, 410) or (status == 400 and "VapidPkHashMismatch" in str(detail)):
                     expired.append(subscription.get("endpoint", ""))
         for endpoint in expired:
             if endpoint:

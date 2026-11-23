@@ -1830,6 +1830,7 @@ if ("serviceWorker" in navigator) {
   panel.style.cssText="margin:14px 0;padding:16px;border:1px solid #31533e;border-radius:14px;background:#0b1510;color:#eef5ef";
   panel.innerHTML='<div style="font-size:10px;letter-spacing:1px;color:#9eb6a4">GEDEÓN 2.0 · ANTICIPACIÓN BIQUOTE · TEST</div><div id="g2Stage" style="font-size:19px;font-weight:800;margin:8px 0">CONSULTANDO ESTRUCTURA…</div><div id="g2Reason" style="font-size:13px;line-height:1.5;color:#c5d2c8">Análisis de velas cerradas; solo modo sombra.</div><div id="g2Meta" style="font-size:11px;color:#9eb6a4;margin-top:9px">XAU/USD · M5/M15 · sin órdenes</div><div style="font-size:10px;color:#e0b878;margin-top:10px">BiQuote es referencia, no cotización ejecutable de Vantage. Confirma siempre el precio y spread en MT5.</div>';
   cards.parentNode.insertBefore(panel,cards);
+  if(typeof notificationSnapshot!=="undefined"&&notificationSnapshot.active)panel.style.display="none";
   const stage=panel.querySelector("#g2Stage"),reason=panel.querySelector("#g2Reason"),meta=panel.querySelector("#g2Meta");
   let busy=false,lastKey="";
   const labelBias=v=>v==="BULL"?"ALCISTA":v==="BEAR"?"BAJISTA":"NEUTRAL";

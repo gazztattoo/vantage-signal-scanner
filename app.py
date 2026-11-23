@@ -780,6 +780,66 @@ def ingest_mt5_candles():
     }), 200
 
 
+
+# TEST-only live tick relay. In-memory shadow cache; never feeds signals or orders.
+MT5_LIVE_TICK = {}
+MT5_LIVE_TICK_LOCK = __import__("threading").Lock()
+
+@app.route("/api/mt5/tick", methods=["POST", "GET"])
+def mt5_live_tick():
+    if DATA_MODE != "mock":
+        return jsonify({"error": "El puente MT5 está limitado al entorno TEST."}), 403
+    if not MT5_INGEST_TOKEN:
+        return jsonify({"error": "La recepción MT5 no está habilitada en TEST."}), 503
+    supplied_token = request.headers.get("X-MT5-Token", "")
+    if not hmac.compare_digest(supplied_token, MT5_INGEST_TOKEN):
+        return jsonify({"error": "Token de ingestión no válido."}), 401
+
+    if request.method == "POST":
+        if not request.is_json:
+            return jsonify({"error": "El contenido debe ser JSON."}), 415
+        payload = request.get_json(silent=True) or {}
+        symbol = str(payload.get("symbol", "")).strip().upper()
+        broker_symbol = str(payload.get("broker_symbol", "")).strip()
+        try:
+            bid, ask = float(payload.get("bid")), float(payload.get("ask"))
+            stamp = datetime.fromisoformat(str(payload.get("timestamp_utc", "")).replace("Z", "+00:00"))
+            if stamp.tzinfo is None:
+                raise ValueError("timestamp sin zona")
+        except (TypeError, ValueError):
+            return jsonify({"error": "Bid/Ask o timestamp no válidos."}), 400
+        if symbol != "XAU/USD" or not broker_symbol or not (math.isfinite(bid) and math.isfinite(ask)) or bid <= 0 or ask < bid:
+            return jsonify({"error": "Solo se acepta XAU/USD con Bid/Ask válidos."}), 400
+        now = datetime.now(timezone.utc)
+        age = (now - stamp.astimezone(timezone.utc)).total_seconds()
+        if age < -10 or age > 30:
+            return jsonify({"error": "Tick fuera de ventana temporal.", "age_seconds": round(age, 3)}), 400
+        row = {
+            "symbol": symbol, "broker_symbol": broker_symbol,
+            "bid": bid, "ask": ask, "mid": (bid + ask) / 2,
+            "spread": ask - bid, "timestamp_utc": stamp.astimezone(timezone.utc).isoformat(),
+            "received_at": now.isoformat(), "age_seconds": round(max(age, 0), 3),
+            "source": "VANTAGE_MT5_TEST", "reference_only": True,
+            "signals_activated": False, "orders_sent": False,
+        }
+        with MT5_LIVE_TICK_LOCK:
+            MT5_LIVE_TICK.clear()
+            MT5_LIVE_TICK.update(row)
+        return jsonify({"ok": True, "accepted": True, "source": row["source"],
+                        "signals_activated": False, "orders_sent": False}), 200
+
+    with MT5_LIVE_TICK_LOCK:
+        row = dict(MT5_LIVE_TICK)
+    if not row:
+        return jsonify({"available": False, "reason": "Todavía no se ha recibido ningún tick MT5."}), 404
+    age = (datetime.now(timezone.utc) - datetime.fromisoformat(row["received_at"])).total_seconds()
+    row["server_age_seconds"] = round(age, 3)
+    row["fresh"] = age <= 15
+    if age > 60:
+        return jsonify({"available": False, "reason": "El último tick MT5 está obsoleto."}), 404
+    return jsonify({"available": True, **row}), 200
+
+
 @app.route("/api/price")
 def price():
     symbol = get_symbol(request.args.get("symbol"))

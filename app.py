@@ -2110,10 +2110,77 @@ def push_scan():
                             })
                             continue
                         if direction == "ESPERAR":
-                            results.append({
-                                "symbol": symbol, "interval": interval,
-                                "status": "state_reset_no_notification"
-                            })
+                            # Notify only when a previously issued PREALERTA is invalidated.
+                            # A normal WAIT state remains silent; this is a transition alert.
+                            if previous_direction in ("PREPARAR_COMPRA", "PREPARAR_VENTA"):
+                                short_interval = {"5min": "M5", "15min": "M15"}.get(interval, interval)
+                                cancelled_side = "COMPRA" if previous_direction.endswith("COMPRA") else "VENTA"
+                                cancel_payload = {
+                                    "title": "PREALERTA CANCELADA · XAU/USD",
+                                    "body": (
+                                        f"La PREALERTA de {cancelled_side} en {short_interval} perdió validez. "
+                                        "El motor pasó a ESPERAR por cambio de condiciones. "
+                                        "No abras una operación basándote en esa señal."
+                                    ),
+                                    "tag": "gss-cancel-XAUUSD-" + interval + "-" + candle_time,
+                                    "url": (
+                                        "https://global-signal-push-test-panel.onrender.com/panel_escaner_vantage.html"
+                                        "?view=scanner&symbol=XAU%2FUSD&timeframe="
+                                        + requests.utils.quote(interval, safe="")
+                                        + "&alert_stage=CANCELADA&alert_side="
+                                        + requests.utils.quote(cancelled_side, safe="")
+                                    ),
+                                    "data": {
+                                        "symbol": symbol, "interval": interval,
+                                        "event_type": "PREALERTA_CANCELADA",
+                                        "cancelled_side": cancelled_side,
+                                        "orders_sent": False,
+                                    },
+                                }
+                                try:
+                                    cancel_subs_response = requests.get(
+                                        SUPABASE_URL + "/rest/v1/push_subscriptions?select=subscription",
+                                        headers=supabase_headers(), timeout=15,
+                                    )
+                                    if cancel_subs_response.status_code != 200:
+                                        raise RuntimeError("No se pudieron consultar los dispositivos registrados.")
+                                    cancel_delivered = 0
+                                    cancel_errors = 0
+                                    for cancel_row in cancel_subs_response.json():
+                                        cancel_subscription = cancel_row.get("subscription")
+                                        if not isinstance(cancel_subscription, dict):
+                                            continue
+                                        try:
+                                            send_web_push(cancel_subscription, cancel_payload)
+                                            cancel_delivered += 1
+                                        except Exception:
+                                            cancel_errors += 1
+                                            app.logger.exception(
+                                                "No se pudo enviar alerta de cancelación symbol=%s interval=%s",
+                                                symbol, interval,
+                                            )
+                                    results.append({
+                                        "symbol": symbol, "interval": interval,
+                                        "status": "prealert_cancelled_notification_sent" if cancel_delivered else "prealert_cancelled_notification_failed",
+                                        "cancelled_side": cancelled_side,
+                                        "push_delivered": cancel_delivered,
+                                        "push_errors": cancel_errors,
+                                    })
+                                except Exception:
+                                    app.logger.exception(
+                                        "Error preparando alerta de cancelación symbol=%s interval=%s",
+                                        symbol, interval,
+                                    )
+                                    results.append({
+                                        "symbol": symbol, "interval": interval,
+                                        "status": "prealert_cancelled_notification_error",
+                                        "cancelled_side": cancelled_side,
+                                    })
+                            else:
+                                results.append({
+                                    "symbol": symbol, "interval": interval,
+                                    "status": "state_reset_no_notification"
+                                })
                             continue
 
                         # Solo se notifica una transición nueva a COMPRA o VENTA.

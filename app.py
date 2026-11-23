@@ -1121,7 +1121,7 @@ def analysis():
             "candle_age_minutes": candle_age_minutes,
             "candles": len(candles),
             "recent_candles": [
-                {"time": candle["time"], "high": candle["high"],
+                {"time": candle["time"], "open": candle["open"], "high": candle["high"],
                  "low": candle["low"], "close": candle["close"]}
                 for candle in candles[-120:]
             ],
@@ -1825,7 +1825,7 @@ def monitor_test_manual_trades():
                 current = candles[-1]
                 prior = candles[-11:-1]
                 atr_value = float(data.get("atr14") or 0)
-                body = abs(float(current["close"])-float(candles[-2]["close"]))
+                body = abs(float(current["close"])-float(current["open"]))
                 rsi_value = float(data.get("rsi14") or 50)
                 adx_value = float(data.get("adx14") or 0)
                 hist = float(data.get("macd_histogram") or 0)

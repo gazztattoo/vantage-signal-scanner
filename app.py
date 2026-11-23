@@ -1155,7 +1155,8 @@ def analysis():
                 },
             },
         }
-        response_payload["news_context"] = economic_news_context()\n        # Shadow-only comparison: the original signal is never modified or activated.
+        response_payload["news_context"] = economic_news_context()
+        # Shadow-only comparison: the original signal is never modified or activated.
         response_payload["experimental_shadow"] = evaluate_shadow_gate(
             symbol=symbol, timeframe=interval, signal=raw_signal, data_mode=DATA_MODE
         )

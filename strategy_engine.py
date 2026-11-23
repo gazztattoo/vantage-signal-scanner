@@ -338,6 +338,7 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timefr
     score = int(best["score"])
     structure_ok = structure["direction"] == best_side and structure["type"] in ("BREAKOUT", "RETEST")
     primary_aligned = primary == ("BULL" if best_side == "BUY" else "BEAR")
+    primary_not_opposed = primary in (("BULL", "NEUTRAL") if best_side == "BUY" else ("BEAR", "NEUTRAL"))
     opposed_bias = "BEAR" if best_side == "BUY" else "BULL"
     higher_timeframes_both_opposed = bias1 == opposed_bias and bias2 == opposed_bias
     # ADX/RSI/MACD/MTF aportan contexto y puntuación; no son candados individuales.
@@ -350,19 +351,19 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timefr
         confluence_grade = "B"
     else:
         confluence_grade = "C"
-    if structure_ok and primary_aligned and not higher_timeframes_both_opposed and score >= 6 and adx_now >= 25:
+    if structure_ok and primary_not_opposed and not higher_timeframes_both_opposed and score >= 6 and adx_now >= 25:
         grade = "A"
-    elif structure_ok and primary_aligned and not higher_timeframes_both_opposed and score >= 5:
+    elif structure_ok and primary_not_opposed and not higher_timeframes_both_opposed and score >= 4:
         grade = "B"
     else:
         grade = "C"
     confirmation_missing = []
-    if not primary_aligned:
-        confirmation_missing.append("PRIMARY_TREND_ALIGNMENT")
+    if not primary_not_opposed:
+        confirmation_missing.append("PRIMARY_TREND_OPPOSED")
     if not structure_ok:
         confirmation_missing.append("BREAKOUT_OR_RETEST")
-    if score < 5:
-        confirmation_missing.append("MINIMUM_CONFLUENCE")
+    if score < 4:
+        confirmation_missing.append("MINIMUM_CONFLUENCE_4_OF_7")
     if higher_timeframes_both_opposed:
         confirmation_missing.append("HIGHER_TIMEFRAME_CONFLICT")
     setup_status = "READY" if not confirmation_missing else "WAIT"
@@ -394,7 +395,7 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timefr
         "data_warning": "Evaluación técnica; la puntuación no representa probabilidad de acierto.",
     }
 
-    if structure_ok and primary_aligned and not higher_timeframes_both_opposed and score >= 5:
+    if structure_ok and primary_not_opposed and not higher_timeframes_both_opposed and score >= 4:
         level = float(structure["level"])
         # Stop anchored to the broken/retested structure with an ATR buffer.
         if best_side == "BUY":
@@ -426,7 +427,7 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timefr
             "structure_trigger": structure["type"],
         }
 
-    if regime != "RANGE" and primary_aligned and not higher_timeframes_both_opposed and score >= 4 and structure["near_direction"] == best_side:
+    if regime != "RANGE" and primary_not_opposed and not higher_timeframes_both_opposed and score >= 3 and structure["near_direction"] == best_side:
         # Provisional breakout plan for early preparation only. It is NOT a
         # confirmed entry: the stop order is placed beyond the nearby range
         # boundary, with an ATR-buffered invalidation and a 2R target.
@@ -453,8 +454,8 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timefr
             "SIN_CONFIRMACION",
             (
                 f"Confluencia {score}/7, pero falta ruptura/retest de estructura. Esperar confirmación."
-                if score >= 5 and primary_aligned and not structure_ok
-                else "Falta alineación de tendencia primaria o confluencia mínima. Esperar."
+                if score >= 4 and primary_not_opposed and not structure_ok
+                else "Tendencia primaria en contra o confluencia insuficiente. Esperar."
             ),
         ),
     }

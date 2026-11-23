@@ -427,12 +427,24 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timefr
         }
 
     if regime != "RANGE" and primary_aligned and not higher_timeframes_both_opposed and score >= 4 and structure["near_direction"] == best_side:
+        # Provisional breakout plan for early preparation only. It is NOT a
+        # confirmed entry: the stop order is placed beyond the nearby range
+        # boundary, with an ATR-buffered invalidation and a 2R target.
+        level = float(structure["range_high"] if best_side == "BUY" else structure["range_low"])
+        planned_entry = level + 0.05 * atr_now if best_side == "BUY" else level - 0.05 * atr_now
+        planned_sl = level - 0.50 * atr_now if best_side == "BUY" else level + 0.50 * atr_now
+        planned_risk = abs(planned_entry - planned_sl)
+        planned_tp = planned_entry + 2.0 * planned_risk if best_side == "BUY" else planned_entry - 2.0 * planned_risk
         return {
             **common,
             "signal": "WAIT", "pre_signal": True, "pre_signal_side": best_side,
             "entry": None, "stop_loss": None, "take_profit": None,
+            "planned_entry": planned_entry, "planned_stop_loss": planned_sl,
+            "planned_take_profit": planned_tp, "planned_risk_distance": planned_risk,
+            "planned_risk_reward": 2.0,
+            "planned_entry_type": "BUY_STOP" if best_side == "BUY" else "SELL_STOP",
             "risk_distance": None, "risk_reward": None,
-            "reason": f"Preseñal {best_side}: estructura cercana y confluencia {score}/7. Preparar MT5; esperar activación del precio.",
+            "reason": f"Preseñal {best_side}: estructura cercana y confluencia {score}/7. Niveles provisionales; esperar ruptura del nivel antes de validar la entrada.",
             "structure_trigger": "PENDING",
         }
 

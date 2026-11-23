@@ -1371,6 +1371,9 @@ def lab_status():
             "provider_configured": DATA_MODE == "biquote" and BIQUOTE_RESEARCH_ENABLED,
             "data_mode": DATA_MODE,
             "signals_activated": False,
+            "automatic_push_scan_enabled": DATA_MODE == "biquote" and BIQUOTE_RESEARCH_ENABLED and bool(SIGNAL_CRON_SECRET),
+            "automatic_push_timeframes": ["5min", "15min"] if DATA_MODE == "biquote" else [],
+            "automatic_push_symbols": ["XAU/USD"] if DATA_MODE == "biquote" else [],
             "automatic_execution": False,
             "storage_configured": bool(SUPABASE_URL and SUPABASE_SECRET_KEY),
             "engine": {
@@ -1754,7 +1757,7 @@ def push_scan():
                 # Supabase ignora el duplicado; si faltaba por un fallo previo,
                 # queda recuperada aunque el estado ya estuviera registrado.
                 candle_time = str(data.get("candle_time") or "")
-                if trade_direction in ("COMPRA", "VENTA"):
+                if direction.startswith("ENTRADA_VALIDADA_"):
                     signal_key = "|".join([symbol, interval, trade_direction, candle_time])
                     history_payload = {
                         "signal_key": signal_key,
@@ -1768,6 +1771,8 @@ def push_scan():
                         "candle_time": data.get("candle_time"),
                         "status": "PENDIENTE",
                         "indicators": {
+                            "data_provider": "biquote_reference_only",
+                            "execution_price": False,
                             "ema20": data.get("ema20"),
                             "ema50": data.get("ema50"),
                             "rsi14": data.get("rsi14"),
@@ -1838,7 +1843,6 @@ def push_scan():
                         # El estado se guarda solo después de asegurar el historial.
                         # Si falla este paso, la inserción idempotente del historial
                         # permitirá reintentar el siguiente ciclo sin duplicar señales.
-                        event_stamp = datetime.now(timezone.utc).isoformat()
                         fingerprint = "|".join([
                             symbol, interval, direction, candle_time
                         ])

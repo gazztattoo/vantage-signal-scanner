@@ -1674,6 +1674,212 @@ def test_alert_preview():
     })
 
 
+
+def _test_registered_subscription(endpoint):
+    if not isinstance(endpoint, str) or not endpoint.startswith("https://"):
+        return None
+    response = requests.get(
+        SUPABASE_URL + "/rest/v1/push_subscriptions",
+        params={"select":"subscription", "endpoint":"eq." + endpoint, "limit":"1"},
+        headers=supabase_headers(), timeout=12,
+    )
+    if response.status_code != 200:
+        raise RuntimeError("No se pudo verificar el dispositivo.")
+    rows = response.json()
+    return rows[0].get("subscription") if rows else None
+
+
+@app.route("/api/trades/active", methods=["GET"])
+def get_test_active_trade():
+    endpoint = (request.args.get("endpoint") or "").strip()
+    try:
+        if not _test_registered_subscription(endpoint):
+            return jsonify({"error":"Activa las notificaciones en este dispositivo antes de registrar una operación."}), 403
+        response = requests.get(
+            SUPABASE_URL + "/rest/v1/gss_test_active_trades",
+            params={"select":"id,symbol,timeframe,side,entry_price,stop_loss,take_profit,status,created_at",
+                    "owner_endpoint":"eq." + endpoint,
+                    "status":"in.(ACTIVE,CLOSE_ALERT_SENT)","order":"created_at.desc","limit":"1"},
+            headers=supabase_headers(), timeout=12,
+        )
+        if response.status_code != 200:
+            raise RuntimeError("No se pudo consultar el seguimiento.")
+        rows = response.json()
+        return jsonify({"active_trade": rows[0] if rows else None})
+    except (RuntimeError, requests.RequestException):
+        return jsonify({"error":"No se pudo consultar el seguimiento de TEST."}), 502
+
+
+@app.route("/api/trades/start", methods=["POST"])
+def start_test_trade():
+    if not request.is_json:
+        return jsonify({"error":"Se requiere JSON."}), 415
+    payload = request.get_json(silent=True) or {}
+    endpoint = str(payload.get("endpoint") or "").strip()
+    symbol = str(payload.get("symbol") or "").upper()
+    timeframe = str(payload.get("timeframe") or "")
+    side = str(payload.get("side") or "").upper()
+    try:
+        entry = float(payload.get("entry_price"))
+        sl = float(payload.get("stop_loss")) if payload.get("stop_loss") not in (None,"") else None
+        tp = float(payload.get("take_profit")) if payload.get("take_profit") not in (None,"") else None
+    except (TypeError, ValueError):
+        return jsonify({"error":"Niveles de operación no válidos."}), 400
+    if (symbol != "XAU/USD" or timeframe not in ("5min","15min") or side not in ("COMPRA","VENTA")
+        or not math.isfinite(entry) or entry <= 0
+        or (sl is not None and (not math.isfinite(sl) or sl <= 0))
+        or (tp is not None and (not math.isfinite(tp) or tp <= 0))):
+        return jsonify({"error":"Datos de operación no permitidos o incorrectos."}), 400
+    try:
+        if not _test_registered_subscription(endpoint):
+            return jsonify({"error":"Este dispositivo no tiene notificaciones registradas."}), 403
+        existing = requests.get(
+            SUPABASE_URL + "/rest/v1/gss_test_active_trades",
+            params={"select":"id,status","owner_endpoint":"eq."+endpoint,
+                    "status":"in.(ACTIVE,CLOSE_ALERT_SENT)","limit":"1"},
+            headers=supabase_headers(), timeout=12,
+        )
+        if existing.status_code != 200:
+            raise RuntimeError("No se pudo comprobar la operación activa.")
+        if existing.json():
+            return jsonify({"error":"Ya tienes una operación en seguimiento. Ciérrala antes de registrar otra."}), 409
+        row = {
+            "owner_endpoint":endpoint,"symbol":symbol,"timeframe":timeframe,"side":side,
+            "entry_price":entry,"stop_loss":sl,"take_profit":tp,
+            "signal_candle_time":str(payload.get("candle_time") or "")[:80],
+            "status":"ACTIVE",
+        }
+        saved = requests.post(
+            SUPABASE_URL + "/rest/v1/gss_test_active_trades",
+            headers={**supabase_headers(),"Prefer":"return=representation"},
+            json=row, timeout=12,
+        )
+        if saved.status_code not in (200,201):
+            raise RuntimeError("No se pudo guardar la operación.")
+        return jsonify({"ok":True,"trade":saved.json()[0] if saved.json() else None,
+                        "orders_sent":False,"environment":"TEST"}), 201
+    except (RuntimeError, requests.RequestException):
+        return jsonify({"error":"No se pudo registrar la operación en TEST."}), 502
+
+
+@app.route("/api/trades/close", methods=["POST"])
+def close_test_trade():
+    payload = request.get_json(silent=True) or {}
+    endpoint = str(payload.get("endpoint") or "").strip()
+    trade_id = str(payload.get("trade_id") or "").strip()
+    if not trade_id or len(trade_id) > 64:
+        return jsonify({"error":"Identificador de seguimiento no válido."}), 400
+    try:
+        if not _test_registered_subscription(endpoint):
+            return jsonify({"error":"Dispositivo no autorizado."}), 403
+        response = requests.patch(
+            SUPABASE_URL + "/rest/v1/gss_test_active_trades",
+            params={"id":"eq."+trade_id,"owner_endpoint":"eq."+endpoint,
+                    "status":"in.(ACTIVE,CLOSE_ALERT_SENT)"},
+            headers={**supabase_headers(),"Prefer":"return=representation"},
+            json={"status":"CLOSED","closed_at":datetime.now(timezone.utc).isoformat()},
+            timeout=12,
+        )
+        if response.status_code not in (200,204):
+            raise RuntimeError("No se pudo cerrar el seguimiento.")
+        return jsonify({"ok":True,"closed":bool(response.json() if response.content else True),
+                        "orders_sent":False})
+    except (RuntimeError, requests.RequestException):
+        return jsonify({"error":"No se pudo detener el seguimiento."}), 502
+
+
+def monitor_test_manual_trades():
+    """Cron-side monitor: two consecutive closed-bar reversal confirmations before push."""
+    try:
+        active = requests.get(
+            SUPABASE_URL + "/rest/v1/gss_test_active_trades",
+            params={"select":"id,owner_endpoint,symbol,timeframe,side,entry_price,status,last_checked_candle_time,reversal_confirmations",
+                    "status":"eq.ACTIVE","limit":"100"},
+            headers=supabase_headers(), timeout=15,
+        )
+        if active.status_code != 200:
+            return [{"status":"active_trade_read_error"}]
+        outcomes = []
+        for trade in active.json():
+            interval = trade["timeframe"]
+            try:
+                with app.test_client() as client:
+                    token = access_serializer().dumps({"access":True})
+                    response = client.get("/api/analysis",
+                        query_string={"symbol":"XAU/USD","interval":interval},
+                        headers={"Authorization":"Bearer "+token})
+                if response.status_code != 200:
+                    outcomes.append({"trade_id":trade["id"],"status":"analysis_unavailable"})
+                    continue
+                data = response.get_json() or {}
+                candles = data.get("recent_candles") or []
+                if len(candles) < 15:
+                    outcomes.append({"trade_id":trade["id"],"status":"insufficient_candles"})
+                    continue
+                candle_time = str(data.get("candle_time") or "")
+                if not candle_time or candle_time == trade.get("last_checked_candle_time"):
+                    outcomes.append({"trade_id":trade["id"],"status":"same_closed_candle"})
+                    continue
+                # Require a decisive close beyond the previous 10-bar swing,
+                # a large opposite candle body, and opposite momentum.
+                current = candles[-1]
+                prior = candles[-11:-1]
+                atr_value = float(data.get("atr14") or 0)
+                body = abs(float(current["close"])-float(candles[-2]["close"]))
+                rsi_value = float(data.get("rsi14") or 50)
+                adx_value = float(data.get("adx14") or 0)
+                hist = float(data.get("macd_histogram") or 0)
+                if trade["side"] == "COMPRA":
+                    structure_break = float(current["close"]) < min(float(c["low"]) for c in prior)
+                    momentum = rsi_value <= 42 and hist < 0 and adx_value >= 20
+                else:
+                    structure_break = float(current["close"]) > max(float(c["high"]) for c in prior)
+                    momentum = rsi_value >= 58 and hist > 0 and adx_value >= 20
+                strong_bar = atr_value > 0 and body >= 0.70 * atr_value
+                confirmed = bool(structure_break and strong_bar and momentum)
+                count = int(trade.get("reversal_confirmations") or 0)+1 if confirmed else 0
+                update = requests.patch(
+                    SUPABASE_URL + "/rest/v1/gss_test_active_trades",
+                    params={"id":"eq."+trade["id"],"status":"eq.ACTIVE"},
+                    headers={**supabase_headers(),"Prefer":"return=minimal"},
+                    json={"last_checked_candle_time":candle_time,"reversal_confirmations":count},
+                    timeout=12,
+                )
+                if update.status_code not in (200,204):
+                    outcomes.append({"trade_id":trade["id"],"status":"state_update_error"})
+                    continue
+                if count < 2:
+                    outcomes.append({"trade_id":trade["id"],"status":"reversal_not_confirmed","confirmations":count})
+                    continue
+                subscription = _test_registered_subscription(trade["owner_endpoint"])
+                if not subscription:
+                    outcomes.append({"trade_id":trade["id"],"status":"device_subscription_missing"})
+                    continue
+                send_web_push(subscription,{
+                    "title":"ALERTA DE CIERRE · GIRO CONFIRMADO",
+                    "body":f"XAU/USD · {('COMPRA' if trade['side']=='COMPRA' else 'VENTA')} en seguimiento {interval}. Dos velas cerradas confirman ruptura y momentum contrario. Revisa MT5; Gedeón no cierra operaciones.",
+                    "tag":"gss-close-"+trade["id"],
+                    "url":"https://global-signal-push-test-panel.onrender.com/panel_escaner_vantage.html?view=scanner&trade_tracking=1",
+                    "data":{"event_type":"ALERTA_CIERRE","trade_id":trade["id"],"symbol":"XAU/USD",
+                            "timeframe":interval,"side":trade["side"],"orders_sent":False}
+                })
+                requests.patch(
+                    SUPABASE_URL + "/rest/v1/gss_test_active_trades",
+                    params={"id":"eq."+trade["id"],"status":"eq.ACTIVE"},
+                    headers={**supabase_headers(),"Prefer":"return=minimal"},
+                    json={"status":"CLOSE_ALERT_SENT","close_alert_sent_at":datetime.now(timezone.utc).isoformat()},
+                    timeout=12,
+                )
+                outcomes.append({"trade_id":trade["id"],"status":"close_alert_sent"})
+            except Exception:
+                app.logger.exception("Error en seguimiento manual TEST trade_id=%s",trade.get("id"))
+                outcomes.append({"trade_id":trade.get("id"),"status":"monitor_error"})
+        return outcomes
+    except Exception:
+        app.logger.exception("No se pudo ejecutar el monitor manual TEST.")
+        return [{"status":"monitor_error"}]
+
+
 @app.route("/api/push/scan", methods=["POST"])
 def push_scan():
     # This scanner is enabled only in the dedicated BiQuote TEST service.
@@ -1689,6 +1895,7 @@ def push_scan():
     if not SIGNAL_CRON_SECRET or not hmac.compare_digest(supplied, SIGNAL_CRON_SECRET):
         return jsonify({"error": "No autorizado."}), 401
 
+    trade_monitor_results = monitor_test_manual_trades()
     results = []
     sent_total = 0
     token = access_serializer().dumps({"access": True})
@@ -2005,4 +2212,4 @@ def push_scan():
             if index < 8:
                 time.sleep(8)
 
-    return jsonify({"ok": True, "alerts_sent": sent_total, "checks": results})
+    return jsonify({"ok": True, "alerts_sent": sent_total, "trade_monitor": trade_monitor_results, "checks": results})

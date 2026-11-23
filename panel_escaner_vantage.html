@@ -1126,7 +1126,6 @@ function render(m,d,err,marketClosed=false){
           data-candle="${esc(String(d.candle_time||""))}"
           style="padding:9px 11px;font-size:11px;border-radius:9px">YA TOMÉ LA ENTRADA</button>
       </div>` : ""}
-      <div id="tradeTrackingStatus" style="margin-top:10px;font-size:11px;color:var(--muted)"></div>
       <div class="foot">
         ${preparing?"PLAN PREVIO: entrada stop provisional; esperar ruptura y nueva validación. ":""}
         Niveles calculados con velas cerradas BiQuote. Son referencias de análisis, no precios Vantage ni órdenes enviadas. Verifica el precio en MT5 antes de operar.
@@ -1225,7 +1224,8 @@ cards.addEventListener("click",async event=>{
 
 
 async function updateManualTradeStatus(){
-  const node=document.getElementById("tradeTrackingStatus");
+  let node=document.getElementById("tradeTrackingStatus");
+  if(!node){cards.insertAdjacentHTML("afterbegin",'<div id="tradeTrackingStatus" style="margin-bottom:10px;font-size:11px;color:var(--muted)"></div>');node=document.getElementById("tradeTrackingStatus");}
   if(!node)return;
   try{
     const registration=await navigator.serviceWorker.ready;

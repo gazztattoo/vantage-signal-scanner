@@ -1794,7 +1794,7 @@ def monitor_test_manual_trades():
     try:
         active = requests.get(
             SUPABASE_URL + "/rest/v1/gss_test_active_trades",
-            params={"select":"id,owner_endpoint,symbol,timeframe,side,entry_price,status,last_checked_candle_time,reversal_confirmations",
+            params={"select":"id,owner_endpoint,symbol,timeframe,side,entry_price,status,last_checked_candle_time,reversal_confirmations,reversal_warning_sent_at",
                     "status":"eq.ACTIVE","limit":"100"},
             headers=supabase_headers(), timeout=15,
         )
@@ -1843,21 +1843,50 @@ def monitor_test_manual_trades():
                     SUPABASE_URL + "/rest/v1/gss_test_active_trades",
                     params={"id":"eq."+trade["id"],"status":"eq.ACTIVE"},
                     headers={**supabase_headers(),"Prefer":"return=minimal"},
-                    json={"last_checked_candle_time":candle_time,"reversal_confirmations":count},
+                    json={
+                    "last_checked_candle_time":candle_time,
+                    "reversal_confirmations":count,
+                    "reversal_warning_sent_at": None if count == 0 else trade.get("reversal_warning_sent_at"),
+                },
                     timeout=12,
                 )
                 if update.status_code not in (200,204):
                     outcomes.append({"trade_id":trade["id"],"status":"state_update_error"})
+                    continue
+                if count == 1 and not trade.get("reversal_warning_sent_at"):
+                    subscription = _test_registered_subscription(trade["owner_endpoint"])
+                    if not subscription:
+                        outcomes.append({"trade_id":trade["id"],"status":"device_subscription_missing","stage":"warning"})
+                        continue
+                    send_web_push(subscription,{
+                        "title":"⚠️ POSIBLE GIRO · REVISA MT5",
+                        "body":f"XAU/USD · {('COMPRA' if trade['side']=='COMPRA' else 'VENTA')} en seguimiento {interval}. Una vela cerrada cumple las condiciones de giro contrario. Es un aviso preventivo, aún no confirmado; revisa tu riesgo y el SL en MT5.",
+                        "tag":"gss-reversal-warning-"+trade["id"],
+                        "url":"https://global-signal-push-test-panel.onrender.com/panel_escaner_vantage.html?view=scanner&trade_tracking=1",
+                        "data":{"event_type":"ALERTA_PREVENTIVA_GIRO","trade_id":trade["id"],"symbol":"XAU/USD",
+                                "timeframe":interval,"side":trade["side"],"orders_sent":False}
+                    })
+                    warning_update = requests.patch(
+                        SUPABASE_URL + "/rest/v1/gss_test_active_trades",
+                        params={"id":"eq."+trade["id"],"status":"eq.ACTIVE"},
+                        headers={**supabase_headers(),"Prefer":"return=minimal"},
+                        json={"reversal_warning_sent_at":datetime.now(timezone.utc).isoformat()},
+                        timeout=12,
+                    )
+                    if warning_update.status_code not in (200,204):
+                        outcomes.append({"trade_id":trade["id"],"status":"warning_state_update_error"})
+                        continue
+                    outcomes.append({"trade_id":trade["id"],"status":"reversal_warning_sent","confirmations":1})
                     continue
                 if count < 2:
                     outcomes.append({"trade_id":trade["id"],"status":"reversal_not_confirmed","confirmations":count})
                     continue
                 subscription = _test_registered_subscription(trade["owner_endpoint"])
                 if not subscription:
-                    outcomes.append({"trade_id":trade["id"],"status":"device_subscription_missing"})
+                    outcomes.append({"trade_id":trade["id"],"status":"device_subscription_missing","stage":"confirmed"})
                     continue
                 send_web_push(subscription,{
-                    "title":"ALERTA DE CIERRE · GIRO CONFIRMADO",
+                    "title":"🔴 GIRO CONFIRMADO · REVISA CIERRE",
                     "body":f"XAU/USD · {('COMPRA' if trade['side']=='COMPRA' else 'VENTA')} en seguimiento {interval}. Dos velas cerradas confirman ruptura y momentum contrario. Revisa MT5; Gedeón no cierra operaciones.",
                     "tag":"gss-close-"+trade["id"],
                     "url":"https://global-signal-push-test-panel.onrender.com/panel_escaner_vantage.html?view=scanner&trade_tracking=1",

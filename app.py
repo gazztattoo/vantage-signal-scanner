@@ -1056,7 +1056,7 @@ def analysis():
         quality_label = {
             "A+": "Excelente confluencia",
             "A": "Buena confluencia",
-            "B": "Preseñal / vigilancia",
+            "B": "Confluencia moderada",
             "C": "Confluencia insuficiente",
         }.get(quality_grade, "Sin clasificar")
         warning = (
@@ -1104,8 +1104,9 @@ def analysis():
             "quality_max": 100,
             "quality_label": quality_label,
             "quality_rule": (
-                "A/A+: 6–7 de 7, MTF alineado y ruptura/retest; "
-                "B: vigilancia/preseñal sin entrada; C: esperar. "
+                "Entrada: ruptura/retest, sesgo principal no contrario, riesgo estructural aceptable y confluencia mínima 4/7. "
+                "Prealerta: estructura cercana, confluencia mínima 3/7 y mercado fuera de rango. "
+                "Los indicadores y las temporalidades superiores suman contexto; no todos deben alinearse. "
                 "La puntuación no es una probabilidad de acierto."
             ),
             "pre_signal": pre_signal,

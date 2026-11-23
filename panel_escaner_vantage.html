@@ -1237,7 +1237,22 @@ async function updateManualTradeStatus(){
     const data=await response.json().catch(()=>({}));
     if(!response.ok)throw new Error(data.error||"No se pudo consultar el seguimiento.");
     const trade=data.active_trade;
-    if(!trade){node.textContent="Sin operación manual en seguimiento.";return;}
+    const trackButtons=[...cards.querySelectorAll("[data-track-entry]")];
+    if(!trade){
+      node.textContent="Sin operación manual en seguimiento.";
+      trackButtons.forEach(button=>{
+        button.disabled=false;button.textContent="YA TOMÉ LA ENTRADA";
+        button.style.background="";button.style.color="";
+      });
+      return;
+    }
+    // The server record is authoritative. Restore the button after navigation,
+    // refresh, card re-render, or reopening the panel.
+    trackButtons.forEach(button=>{
+      button.disabled=true;
+      button.textContent="OPERACIÓN EN SEGUIMIENTO";
+      button.style.background="#183d2a";button.style.color="#58f29a";
+    });
     const side=trade.side==="COMPRA"?"COMPRA":"VENTA";
     node.innerHTML='<div style="padding:10px;border:1px solid #28543a;border-radius:9px;background:#0a1b11;color:#58f29a">'+
       '<strong>OPERACIÓN EN SEGUIMIENTO · '+side+' · '+(trade.timeframe==="15min"?"M15":"M5")+'</strong>'+
@@ -1245,6 +1260,8 @@ async function updateManualTradeStatus(){
       '<button type="button" data-stop-tracking="'+trade.id+'" style="margin-top:8px;padding:7px 9px;font-size:10px;background:#24352b;border-color:#45634e;color:#edf7ef">YA CERRÉ LA OPERACIÓN</button></div>';
   }catch(error){node.textContent="Estado del seguimiento no disponible: "+(error.message||"error");}
 }
+// Recover the persisted server-side state as soon as the panel loads.
+updateManualTradeStatus();
 cards.addEventListener("click",async event=>{
   const stopButton=event.target.closest("[data-stop-tracking]");
   if(!stopButton)return;
@@ -1474,6 +1491,7 @@ function switchView(name){
   if(name==="performance")loadPerformance();
   if(name==="analysis"){}
   if(name==="lab")loadLabStatus();
+  if(name==="scanner")updateManualTradeStatus();
 }
 viewButtons.forEach(button=>button.addEventListener("click",()=>switchView(button.dataset.view)));
 const notificationParams=new URLSearchParams(window.location.search);

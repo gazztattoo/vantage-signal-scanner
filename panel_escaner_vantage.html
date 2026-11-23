@@ -752,19 +752,7 @@ select,button{border-radius:9px}
   </article>
 </section>
 
-<section class="panel" id="vantageCalibration" style="margin-top:14px;padding:16px;border:1px solid #263b49;border-radius:16px;background:#0c151d">
-  <div style="font-size:13px;font-weight:800;letter-spacing:1px;color:#e8eef2">CALIBRACIÓN DE FEED · VANTAGE / BIQUOTE</div>
-  <p style="font-size:12px;color:#91a4b1;line-height:1.5;margin:8px 0 12px">Introduce el Bid y Ask que ves en MT5 y guarda la muestra mientras la cotización BiQuote está fresca. No introduzcas datos de cuenta ni credenciales. Las muestras quedan guardadas solo en este dispositivo.</p>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-    <label style="font-size:11px;color:#9aabb7">Vantage Bid<input id="vantageBidInput" inputmode="decimal" autocomplete="off" placeholder="Ej. 3584,11" style="display:block;width:100%;box-sizing:border-box;margin-top:5px;padding:12px;border-radius:9px;border:1px solid #344b5b;background:#071018;color:#eef4f7;font-size:16px"></label>
-    <label style="font-size:11px;color:#9aabb7">Vantage Ask<input id="vantageAskInput" inputmode="decimal" autocomplete="off" placeholder="Ej. 3584,28" style="display:block;width:100%;box-sizing:border-box;margin-top:5px;padding:12px;border-radius:9px;border:1px solid #344b5b;background:#071018;color:#eef4f7;font-size:16px"></label>
-  </div>
-  <button id="saveVantageSample" type="button" style="width:100%;margin-top:12px;padding:12px;border:0;border-radius:10px;background:#19c994;color:#06120e;font-weight:800">Guardar comparación simultánea</button>
-  <div id="calibrationMessage" role="status" style="font-size:12px;color:#a8bac5;line-height:1.5;margin-top:10px">Esperando la primera comparación Vantage/BiQuote.</div>
-  <div id="calibrationStats" style="font-size:12px;color:#d4e0e7;line-height:1.7;margin-top:8px">Muestras: 0/10 · Corrección todavía no calculable.</div>
-  <div style="font-size:10px;color:#8295a2;line-height:1.5;margin-top:8px">Modo observación: la corrección estimada NO modifica entradas, SL ni TP. Solo se habilitará una propuesta de ajuste tras suficientes muestras sincronizadas y estables, y nunca se considerará precio ejecutable sin validación.</div>
-  <button id="clearVantageSamples" type="button" style="margin-top:10px;padding:8px 10px;border:1px solid #344b5b;border-radius:8px;background:transparent;color:#a9bac4;font-size:11px">Borrar muestras de este dispositivo</button>
-</section>
+
 
 
 <div class="bottom">

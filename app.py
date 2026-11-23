@@ -600,7 +600,19 @@ def fetch_biquote_research_ohlc(symbol, interval):
         max_last_closed_age_minutes=(BIQUOTE_INTERVAL_MINUTES[interval] * 2 + 2),
     )
     if not normalized.get("accepted"):
-        raise RuntimeError(normalized.get("reason", "Datos BiQuote rechazados."))
+        reason = normalized.get("reason", "Datos BiQuote rechazados.")
+        age = normalized.get("age_minutes")
+        if age is not None:
+            reason = (
+                f"{reason} interval={interval} age_minutes={age} "
+                f"max_age_minutes={BIQUOTE_INTERVAL_MINUTES[interval] * 2 + 2}"
+            )
+        app.logger.warning(
+            "BiQuote OHLC rejected symbol=%s interval=%s reason=%s age_minutes=%s last_closed_open_time=%s",
+            symbol, interval, normalized.get("reason", "rejected"),
+            age, normalized.get("last_closed_open_time")
+        )
+        raise RuntimeError(reason)
     if normalized["closed_bars"] < 55:
         raise RuntimeError("BiQuote devolvió menos de 55 velas cerradas; no se publican datos.")
     return normalized

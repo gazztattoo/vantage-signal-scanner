@@ -1900,8 +1900,10 @@ def push_scan():
     results = []
     sent_total = 0
     token = access_serializer().dumps({"access": True})
-    intervals = ["5min", "15min"]
+    # TEST only: process M15 first so its live prealert can be paired with M5 confirmation.
+    intervals = ["15min", "5min"]
     symbols = ["XAU/USD"]
+    m15_prealert_context = None
 
     # Reutiliza el mismo endpoint de análisis que consume el panel.
     # Pausa entre consultas para no superar de golpe el límite del proveedor.
@@ -1934,6 +1936,21 @@ def push_scan():
                 })
             else:
                 data = response.get_json() or {}
+                # Keep the current M15 setup in memory for this scan cycle only.
+                # Its closed-candle timestamp limits the hand-off to a fresh opportunity.
+                if (
+                    interval == "15min"
+                    and data.get("pre_signal") is True
+                    and data.get("pre_signal_side") in ("BUY", "SELL")
+                    and data.get("planned_entry") is not None
+                    and data.get("atr14") is not None
+                ):
+                    m15_prealert_context = {
+                        "side": data.get("pre_signal_side"),
+                        "entry": float(data.get("planned_entry")),
+                        "atr": float(data.get("atr14")),
+                        "candle_time": data.get("candle_time"),
+                    }
                 outcome_result = resolve_pending_signal_outcomes(
                     symbol, interval, data.get("recent_candles", [])
                 )
@@ -1941,8 +1958,8 @@ def push_scan():
                 if data.get("pre_signal") is True and data.get("pre_signal_side") in ("BUY", "SELL"):
                     direction = "PREPARAR_" + ("COMPRA" if data["pre_signal_side"] == "BUY" else "VENTA")
                 elif trade_direction in ("COMPRA", "VENTA"):
-                    # Stage 2 requires a fresh BiQuote quote and a confirmed structure trigger.
-                    # It is still reference-only and must never be presented as Vantage execution.
+                    # Stage 2 requires a fresh BiQuote quote and a confirmed closed-candle structure.
+                    # BiQuote remains reference-only; no Vantage price or broker order is implied.
                     try:
                         quote_check = fetch_biquote_research_tick(symbol)
                         quote_fresh = (
@@ -1951,12 +1968,49 @@ def push_scan():
                             and float(quote_check["quote_age_seconds"]) <= 60
                         )
                     except Exception:
+                        quote_check = {}
                         quote_fresh = False
                     structure_confirmed = data.get("structure_trigger") not in (None, "", "NONE", "PENDING")
-                    direction = (
-                        "ENTRADA_VALIDADA_" + trade_direction
-                        if quote_fresh and structure_confirmed else "ESPERAR"
-                    )
+                    cross_timeframe_confirmation = False
+                    if interval == "5min" and m15_prealert_context and quote_fresh:
+                        # M5 may validate the same-side M15 prealert, but only while
+                        # that M15 candle is fresh and price has not run too far past its level.
+                        try:
+                            m15_stamp = datetime.fromisoformat(
+                                str(m15_prealert_context["candle_time"]).replace("Z", "+00:00")
+                            )
+                            if m15_stamp.tzinfo is None:
+                                m15_stamp = m15_stamp.replace(tzinfo=timezone.utc)
+                            m15_age_minutes = (
+                                datetime.now(timezone.utc) - m15_stamp.astimezone(timezone.utc)
+                            ).total_seconds() / 60
+                            m15_side = m15_prealert_context["side"]
+                            m15_entry = float(m15_prealert_context["entry"])
+                            m15_atr = float(m15_prealert_context["atr"])
+                            live_side_price = float(
+                                quote_check["ask"] if m15_side == "BUY" else quote_check["bid"]
+                            )
+                            max_drift = max(0.35 * m15_atr, 0.50)
+                            crossed_level = (
+                                live_side_price >= m15_entry if m15_side == "BUY"
+                                else live_side_price <= m15_entry
+                            )
+                            cross_timeframe_confirmation = (
+                                m15_side == ("BUY" if trade_direction == "COMPRA" else "SELL")
+                                and -2 <= m15_age_minutes <= 20
+                                and m15_atr > 0
+                                and crossed_level
+                                and abs(live_side_price - m15_entry) <= max_drift
+                            )
+                        except (KeyError, TypeError, ValueError, OverflowError):
+                            cross_timeframe_confirmation = False
+                    if interval == "5min" and m15_prealert_context:
+                        # An active M15 setup takes priority: a conflicting or late M5
+                        # confirmation must not fall back to an unrelated M5 signal.
+                        validated = cross_timeframe_confirmation and structure_confirmed
+                    else:
+                        validated = quote_fresh and structure_confirmed
+                    direction = "ENTRADA_VALIDADA_" + trade_direction if validated else "ESPERAR"
                 else:
                     direction = "ESPERAR"
 
@@ -2066,7 +2120,7 @@ def push_scan():
                                     )
                                 except (TypeError, ValueError):
                                     prealert_is_recent = False
-                            if not prealert_is_recent:
+                            if not prealert_is_recent and not cross_timeframe_confirmation:
                                 results.append({
                                     "symbol": symbol, "interval": interval,
                                     "status": "validated_without_matching_recent_prealert_no_notification",
@@ -2205,12 +2259,20 @@ def push_scan():
                                 "Aún NO es entrada. Datos BiQuote de referencia; compara con Vantage."
                             )
                         else:
-                            alert_title = "ENTRADA VALIDADA · REFERENCIA"
+                            alert_title = (
+                                "ENTRADA VALIDADA · M15→M5"
+                                if interval == "5min" and cross_timeframe_confirmation
+                                else "ENTRADA VALIDADA · REFERENCIA"
+                            )
                             alert_body = (
                                 f"XAU/USD · {short_interval} · {signal_side}. "
                                 f"Nivel técnico {display_price(entry_value)} · "
                                 f"SL {display_price(stop_value)} · TP {display_price(target_value)}. "
-                                "Confirmación técnica BiQuote, NO precio Vantage. Verifica cotización y spread antes de decidir."
+                                + (
+                                    "Prealerta M15 confirmada por estructura M5; el precio sigue cerca del nivel previsto. "
+                                    if interval == "5min" and cross_timeframe_confirmation else ""
+                                )
+                                + "Confirmación técnica BiQuote, NO precio Vantage. Verifica cotización y spread antes de decidir."
                             )
 
                         subs_response = requests.get(
@@ -2250,6 +2312,9 @@ def push_scan():
                                         "data": {
                                             "symbol": symbol, "interval": interval,
                                             "event_type": "PREALERTA" if is_prealert else "ENTRADA_VALIDADA",
+                                            "source_timeframe": "15min" if interval == "5min" and cross_timeframe_confirmation else interval,
+                                            "confirmation_timeframe": interval,
+                                            "cross_timeframe_confirmation": bool(interval == "5min" and cross_timeframe_confirmation),
                                             "direction": signal_side,
                                             "reference_only": True,
                                             "execution_price": False,

@@ -18,7 +18,7 @@ app = Flask(__name__)
 CORS(app, resources={
     r"/api/*": {
         "origins": ["https://gazztattoo.github.io", "https://global-signal-push-test-panel.onrender.com"],
-        "allow_headers": ["Content-Type", "Authorization"],
+        "allow_headers": ["Content-Type", "Authorization", "X-MT5-Token"],
         "methods": ["GET", "POST", "OPTIONS"]
     }
 })
@@ -787,7 +787,9 @@ MT5_LIVE_TICK_LOCK = __import__("threading").Lock()
 
 @app.route("/api/mt5/tick", methods=["POST", "GET"])
 def mt5_live_tick():
-    if DATA_MODE != "mock":
+    # This route exists only on the dedicated TEST branch/service. Permit both
+    # mock and BiQuote TEST modes; the Vantage tick remains shadow-only.
+    if DATA_MODE not in ("mock", "biquote"):
         return jsonify({"error": "El puente MT5 está limitado al entorno TEST."}), 403
     if not MT5_INGEST_TOKEN:
         return jsonify({"error": "La recepción MT5 no está habilitada en TEST."}), 503

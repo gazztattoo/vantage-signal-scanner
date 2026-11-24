@@ -2491,6 +2491,8 @@ def push_scan():
                                             + "view=scanner"
                                             + "&symbol=" + requests.utils.quote(symbol, safe="")
                                             + "&timeframe=" + requests.utils.quote(interval, safe="")
+                                            + "&interval=" + requests.utils.quote(interval, safe="")
+                                            + "&alert_timeframe=" + requests.utils.quote(interval, safe="")
                                             + "&alert_stage=" + requests.utils.quote("PREALERTA" if is_prealert else "ENTRADA_VALIDADA", safe="")
                                             + "&alert_side=" + requests.utils.quote(signal_side, safe="")
                                             + "&alert_entry=" + requests.utils.quote("" if entry_value is None else str(entry_value), safe="")
@@ -2501,6 +2503,7 @@ def push_scan():
                                         "data": {
                                             "symbol": symbol, "interval": interval,
                                             "event_type": "PREALERTA" if is_prealert else "ENTRADA_VALIDADA",
+                                            "alert_timeframe": interval,
                                             "source_timeframe": "15min" if interval == "5min" and cross_timeframe_confirmation else interval,
                                             "confirmation_timeframe": interval,
                                             "cross_timeframe_confirmation": bool(interval == "5min" and cross_timeframe_confirmation),

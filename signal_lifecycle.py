@@ -49,6 +49,7 @@ def build_m15_prealert_context(data: dict[str, Any]) -> dict[str, Any] | None:
         return None
     return {
         "side": data["pre_signal_side"],
+        "entry_type": "BUY_STOP" if data["pre_signal_side"] == "BUY" else "SELL_STOP",
         "entry": entry,
         "stop_loss": stop,
         "take_profit": target,
@@ -79,6 +80,9 @@ def same_m15_plan(first: dict[str, Any] | None, second: dict[str, Any] | None) -
     if not isinstance(first, dict) or not isinstance(second, dict):
         return False
     if first.get("side") != second.get("side"):
+        return False
+    expected_entry_type = "BUY_STOP" if first.get("side") == "BUY" else "SELL_STOP"
+    if first.get("entry_type", expected_entry_type) != second.get("entry_type", expected_entry_type):
         return False
     if str(first.get("candle_time") or "") != str(second.get("candle_time") or ""):
         return False
@@ -111,6 +115,10 @@ def restore_m15_prealert_context(
         return None
     if not isinstance(context, dict) or context.get("side") not in ("BUY", "SELL"):
         return None
+    expected_entry_type = "BUY_STOP" if context["side"] == "BUY" else "SELL_STOP"
+    if context.get("entry_type", expected_entry_type) != expected_entry_type:
+        return None
+    context["entry_type"] = expected_entry_type
     try:
         for key in ("entry", "stop_loss", "take_profit", "atr"):
             context[key] = float(context[key])
@@ -220,6 +228,7 @@ def evaluate_m15_confirmation(
         "valid": True,
         "reason": "M5 confirma, M30 no contradice y el precio sigue junto al nivel M15.",
         "entry": entry,
+        "entry_type": "BUY_STOP" if side == "BUY" else "SELL_STOP",
         "stop_loss": float(prealert["stop_loss"]),
         "take_profit": float(prealert["take_profit"]),
         "reference_price": current,

@@ -1528,13 +1528,14 @@ const notificationSnapshot=(()=>{
   const side=notificationParams.get("alert_side")||"";
   if(!["PREALERTA","ENTRADA_VALIDADA"].includes(stage)||!["COMPRA","VENTA"].includes(side))return {active:false};
   const entry=notificationParams.get("alert_entry")||"";
+  const entryType=notificationParams.get("alert_entry_type")||"";
   const stop=notificationParams.get("alert_stop_loss")||"";
   const target=notificationParams.get("alert_take_profit")||"";
   const candle=notificationParams.get("alert_candle_time")||"";
   const title=stage==="PREALERTA"?"PREPARAR MT5":"ENTRADA VALIDADA · REFERENCIA";
   const detail=stage==="PREALERTA"
-    ?"Esta es la prealerta exacta que recibiste. Todavía no es una entrada."
-    :"Esta es la confirmación técnica exacta que recibiste. BiQuote es referencia; verifica precio y spread en Vantage antes de decidir.";
+    ?"Esta es la prealerta exacta. Prepara la orden STOP en el nivel M15; todavía no es una entrada."
+    :"La estructura está validada para la orden pendiente del nivel M15; no es una entrada a mercado. BiQuote es referencia; comprueba precio y spread en Vantage.";
   const fmtValue=value=>{
     const n=Number(value);
     return value!==""&&Number.isFinite(n)?n.toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2}):"—";
@@ -1555,7 +1556,8 @@ const notificationSnapshot=(()=>{
       <div class="price">${esc(side)}</div>
       <p class="reason">${esc(detail)}</p>
       <div class="levels">
-        <div class="level"><span>Nivel de referencia</span><strong>${esc(fmtValue(entry))}</strong></div>
+        <div class="level"><span>Tipo de orden</span><strong>${esc(entryType||"—")}</strong></div>
+        <div class="level"><span>Nivel M15</span><strong>${esc(fmtValue(entry))}</strong></div>
         <div class="level"><span>Stop Loss</span><strong>${esc(fmtValue(stop))}</strong></div>
         <div class="level"><span>Take Profit</span><strong>${esc(fmtValue(target))}</strong></div>
       </div>

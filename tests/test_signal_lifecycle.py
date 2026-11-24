@@ -43,7 +43,7 @@ class M15LifecycleTests(unittest.TestCase):
         self.assertTrue(prealert_entry_not_crossed(self.context, ahead_quote))
 
     def test_validation_keeps_original_m15_entry(self):
-        quote = {**QUOTE, "bid": 3612.9, "ask": 3613.0}
+        quote = {**QUOTE, "bid": 3613.1, "ask": 3613.3}
         result = evaluate_m15_confirmation(self.context, M5, M30, quote, now=NOW)
         self.assertTrue(result["valid"])
         self.assertEqual(result["entry"], 3613.0)
@@ -52,7 +52,19 @@ class M15LifecycleTests(unittest.TestCase):
         quote = {**QUOTE, "bid": 3608.0, "ask": 3608.2}
         result = evaluate_m15_confirmation(self.context, M5, M30, quote, now=NOW)
         self.assertFalse(result["valid"])
-        self.assertIn("alejó", result["reason"])
+        self.assertIn("cruzó", result["reason"])
+
+    def test_price_that_has_crossed_even_slightly_is_rejected(self):
+        crossed_quote = {**QUOTE, "bid": 3612.9, "ask": 3613.1}
+        result = evaluate_m15_confirmation(self.context, M5, M30, crossed_quote, now=NOW)
+        self.assertFalse(result["valid"])
+        self.assertIn("cruzó", result["reason"])
+
+    def test_price_too_far_from_entry_waits(self):
+        far_quote = {**QUOTE, "bid": 3615.0, "ask": 3615.2}
+        result = evaluate_m15_confirmation(self.context, M5, M30, far_quote, now=NOW)
+        self.assertFalse(result["valid"])
+        self.assertIn("lejos", result["reason"])
 
     def test_opposing_m30_blocks_confirmation(self):
         result = evaluate_m15_confirmation(

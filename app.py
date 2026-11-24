@@ -2325,10 +2325,13 @@ def push_scan():
                             })
                             continue
 
-                        if not direction.startswith("ENTRADA_VALIDADA_"):
+                        if not (
+                            direction.startswith("PREPARAR_")
+                            or direction.startswith("ENTRADA_VALIDADA_")
+                        ):
                             results.append({
                                 "symbol": symbol, "interval": interval,
-                                "status": "non_entry_state_recorded_no_notification",
+                                "status": "non_actionable_state_recorded_no_notification",
                                 "direction": direction,
                             })
                             continue

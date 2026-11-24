@@ -74,6 +74,23 @@ def prealert_entry_not_crossed(context: dict[str, Any], quote: dict[str, Any]) -
     return current < entry if side == "BUY" else current > entry
 
 
+def same_m15_plan(first: dict[str, Any] | None, second: dict[str, Any] | None) -> bool:
+    """Match the immutable M15 opportunity, not merely its candle timestamp."""
+    if not isinstance(first, dict) or not isinstance(second, dict):
+        return False
+    if first.get("side") != second.get("side"):
+        return False
+    if str(first.get("candle_time") or "") != str(second.get("candle_time") or ""):
+        return False
+    try:
+        return all(
+            float(first[key]) == float(second[key])
+            for key in ("entry", "stop_loss", "take_profit", "atr")
+        )
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
 def encode_m15_prealert_context(context: dict[str, Any]) -> str:
     return _PREALERT_PREFIX + json.dumps(context, separators=(",", ":"), sort_keys=True)
 

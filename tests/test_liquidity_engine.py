@@ -41,8 +41,8 @@ class LiquidityEngineTests(unittest.TestCase):
             candle(1, 5, 6, 0, 5),   # earlier low pivot confirms before bar 4
             candle(2, 4, 5, 2, 4),
             candle(3, 5, 8, 4, 6),   # high pivot
-            candle(4, 6, 9, 3, 7),   # takes the high, but this is only its confirmation bar
-            candle(5, 5, 7, 2, 5),
+            candle(4, 6, 7, 3, 6),   # confirmation candle; not a sweep
+            candle(5, 6, 9, 3, 7),   # first later candle allowed to sweep the confirmed pivot
             candle(6, 4, 6, 3, 4),
             candle(7, 4, 5, 3, 4),
             candle(8, 4, 5, 3, 4),
@@ -52,7 +52,8 @@ class LiquidityEngineTests(unittest.TestCase):
         ]
         result = analyze_liquidity(bars, atr_value=1.0, left_bars=1, right_bars=1)
         self.assertGreaterEqual(result["confirmed_pivots"]["highs"], 1)
-        self.assertIsNone(result["last_sweep"])
+        self.assertEqual(result["last_sweep"]["index"], 5)
+        self.assertEqual(result["last_sweep"]["pool"], "BUY_SIDE_LIQUIDITY")
 
     def test_diagnostic_never_emits_trade_entry(self):
         bars = [candle(i, 10, 11, 9, 10) for i in range(30)]

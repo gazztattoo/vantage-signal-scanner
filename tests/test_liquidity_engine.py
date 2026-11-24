@@ -38,13 +38,20 @@ class LiquidityEngineTests(unittest.TestCase):
     def test_pivot_is_not_usable_on_its_confirmation_bar(self):
         bars = [
             candle(0, 4, 5, 3, 4),
-            candle(1, 5, 6, 4, 5),
-            candle(2, 4, 5, 3, 4),
-            candle(3, 5, 8, 4, 6),
-            candle(4, 4, 5, 2, 3),
-            candle(5, 3, 4, 0, 2),
+            candle(1, 5, 6, 0, 5),   # earlier low pivot confirms before bar 4
+            candle(2, 4, 5, 2, 4),
+            candle(3, 5, 8, 4, 6),   # high pivot
+            candle(4, 6, 9, 3, 7),   # takes the high, but this is only its confirmation bar
+            candle(5, 5, 7, 2, 5),
+            candle(6, 4, 6, 3, 4),
+            candle(7, 4, 5, 3, 4),
+            candle(8, 4, 5, 3, 4),
+            candle(9, 4, 5, 3, 4),
+            candle(10, 4, 5, 3, 4),
+            candle(11, 4, 5, 3, 4),
         ]
         result = analyze_liquidity(bars, atr_value=1.0, left_bars=1, right_bars=1)
+        self.assertGreaterEqual(result["confirmed_pivots"]["highs"], 1)
         self.assertIsNone(result["last_sweep"])
 
     def test_diagnostic_never_emits_trade_entry(self):

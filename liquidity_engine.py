@@ -181,11 +181,13 @@ def analyze_liquidity(
             if len(group) < 2:
                 continue
             level = sum(x["price"] for x in group)/len(group)
+            first_touch = min(group, key=lambda p: p["index"])
+            last_touch = max(group, key=lambda p: p["index"])
             outer_edge = (max if kind == "high" else min)(p["price"] for p in points)
             zones.append({"type": "EQUAL_HIGHS" if kind == "high" else "EQUAL_LOWS",
                           "pool": "BUY_SIDE_LIQUIDITY" if kind == "high" else "SELL_SIDE_LIQUIDITY",
                           "level": round(level, 5), "touches": len(group),
-                          "first_time": group[0]["time"], "last_time": group[-1]["time"],
+                          "first_time": first_touch["time"], "last_time": last_touch["time"],
                           "classification": "EXTERNAL" if abs(level-outer_edge) <= 2*tol
                                             else "INTERNAL"})
         return zones

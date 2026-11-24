@@ -2114,7 +2114,8 @@ def monitor_test_manual_trades():
                 )
                 if update.status_code not in (200,204):
                     outcomes.append({"trade_id":trade["id"],"status":"state_update_error"})
-                    continue                if count == 1 and not trade.get("reversal_warning_sent_at"):
+                    continue
+                if count == 1 and not trade.get("reversal_warning_sent_at"):
                     subscription = _test_registered_subscription(trade["owner_endpoint"])
                     if not subscription:
                         outcomes.append({"trade_id":trade["id"],"status":"device_subscription_missing","stage":"warning"})

@@ -1002,6 +1002,36 @@ function instrumentIdentity(m){
   return `<span class="instrument-mark">${esc(m.symbol.slice(0,1))}</span>`;
 }
 
+function renderLiquidityDiagnostics(liquidity){
+  if(!liquidity)return "";
+  if(!liquidity.available){
+    return '<section style="margin-top:12px;padding:11px;border:1px solid var(--line);border-radius:11px;background:#080f0b"><strong style="font-size:11px">LIQUIDEZ · SIN CONTEXTO SUFICIENTE</strong><div class="foot">No se detectaron suficientes pivotes confirmados. Esto no genera una entrada.</div></section>';
+  }
+  const sweep=liquidity.last_sweep;
+  const event=liquidity.last_structure_event;
+  const ob=liquidity.order_block;
+  const label=value=>String(value||"—").replaceAll("_"," ");
+  const level=value=>Number.isFinite(Number(value))?Number(value).toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2}):"—";
+  const zones=(liquidity.zones||[]).slice(0,5).map(zone=>
+    '<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid rgba(143,166,154,.14);font-size:10px"><span>'+esc(label(zone.type))+' · '+esc(label(zone.classification))+'</span><b>'+esc(level(zone.level))+'</b></div>'
+  ).join("");
+  return `
+    <section style="margin-top:12px;padding:11px;border:1px solid #31503d;border-radius:11px;background:#080f0b">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+        <strong style="font-size:11px;letter-spacing:.4px">LIQUIDEZ · DIAGNÓSTICO</strong>
+        <span style="font-size:9px;color:var(--muted)">NO ES UNA ENTRADA</span>
+      </div>
+      <div style="margin-top:9px;font-size:10px;line-height:1.55">
+        <div><b>Último barrido:</b> ${sweep?esc(label(sweep.pool))+" · "+esc(label(sweep.side))+" · "+esc(level(sweep.level)):"No confirmado"}</div>
+        <div><b>Estructura:</b> ${event?esc(label(event.type))+" "+esc(label(event.direction))+" · "+esc(level(event.level)):"Sin BOS/CHoCH reciente"}</div>
+        <div><b>Order Block:</b> ${ob?esc(level(ob.low))+" – "+esc(level(ob.high)):"Sin bloque candidato confirmado"}</div>
+      </div>
+      ${zones?'<div style="margin-top:8px"><div style="font-size:9px;color:var(--muted);font-weight:800;margin-bottom:3px">POOLS DETECTADOS</div>'+zones+'</div>':'<div class="foot">No hay clusters EQH/EQL recientes.</div>'}
+      <div class="foot">Pivotes confirmados · sin anticipar velas futuras · diagnóstico experimental.</div>
+    </section>
+  `;
+}
+
 function render(m,d,err,marketClosed=false){
   if(marketClosed){
     return `
@@ -1088,7 +1118,7 @@ function render(m,d,err,marketClosed=false){
       </div>
       <div class="price">${fmt(first(d,["price"]),8)}</div>
       <div class="priceLabel">CIERRE DE LA VELA ANALIZADA · REFERENCIA HISTÓRICA, NO PRECIO EN DIRECTO</div>
-      <p class="reason">${esc(safeReason)}</p>
+      <p class="reason">${esc(safeReason)}</p>\n      ${renderLiquidityDiagnostics(d.liquidity)}
 
             <div class="levels">
 

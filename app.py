@@ -749,6 +749,7 @@ def biquote_research_analysis():
             "mtf": strategy.get("mtf"),
             "regime": strategy.get("regime"),
             "structure": strategy.get("structure"),
+            "liquidity": strategy.get("liquidity"),
             "score": strategy.get("score"),
             "score_max": strategy.get("score_max"),
             "confluence_grade": strategy.get("confluence_grade"),
@@ -1172,7 +1173,7 @@ def analysis():
             ],
             "method": (
                 "MTF EMA20/50 (dos marcos superiores) + RSI14 + MACD + DI/ADX; "
-                "filtro de régimen; ruptura/retest de rango 20; SL estructural "
+                "filtro de régimen; ruptura/retest de rango 20; diagnóstico de liquidez SMC; SL estructural "
                 "con buffer ATR; TP objetivo 2R."
             ),
             "data_mode": DATA_MODE,

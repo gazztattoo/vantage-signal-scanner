@@ -40,6 +40,13 @@ def build_m15_prealert_context(data: dict[str, Any]) -> dict[str, Any] | None:
         return None
     if min(entry, stop, target, atr) <= 0 or not data.get("candle_time"):
         return None
+    if data["pre_signal_side"] == "BUY" and not (stop < entry < target):
+        return None
+    if data["pre_signal_side"] == "SELL" and not (stop > entry > target):
+        return None
+    age = _age_minutes(data.get("candle_time"), datetime.now(timezone.utc))
+    if age is None or age < -2 or age > 20:
+        return None
     return {
         "side": data["pre_signal_side"],
         "entry": entry,
@@ -115,7 +122,7 @@ def evaluate_m15_confirmation(
         m5_age = float(m5["candle_age_minutes"])
     except (KeyError, TypeError, ValueError):
         return reject("No se pudo verificar la frescura de M5.")
-    if m5_age < -2 or m5_age > 10:
+    if m5_age < -2 or m5_age > 7:
         return reject("La confirmación M5 está desactualizada.")
 
     if not isinstance(m30, dict):
@@ -128,7 +135,7 @@ def evaluate_m15_confirmation(
         m30_age = float(m30["candle_age_minutes"])
     except (KeyError, TypeError, ValueError):
         return reject("No se pudo verificar la frescura de M30.")
-    if m30_age < -2 or m30_age > 65:
+    if m30_age < -2 or m30_age > 35:
         return reject("El contexto M30 está desactualizado.")
 
     if quote.get("accepted") is not True:

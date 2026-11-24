@@ -18,6 +18,7 @@ from signal_lifecycle import (
     encode_m15_prealert_context,
     restore_m15_prealert_context,
     evaluate_m15_confirmation,
+    prealert_entry_not_crossed,
 )
 
 app = Flask(__name__)
@@ -2204,6 +2205,13 @@ def push_scan():
                     # Prefer a fresh M15 plan; otherwise restore the exact immutable
                     # plan persisted in the M15 alert fingerprint from an earlier scan.
                     fresh_context = build_m15_prealert_context(data)
+                    if fresh_context:
+                        try:
+                            prealert_quote = fetch_biquote_research_tick(symbol)
+                        except Exception:
+                            prealert_quote = {}
+                        if not prealert_entry_not_crossed(fresh_context, prealert_quote):
+                            fresh_context = None
                     if fresh_context:
                         m15_prealert_context = fresh_context
                     else:

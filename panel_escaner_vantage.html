@@ -1022,9 +1022,9 @@ function renderLiquidityDiagnostics(liquidity){
         <span style="font-size:9px;color:var(--muted)">NO ES UNA ENTRADA</span>
       </div>
       <div style="margin-top:9px;font-size:10px;line-height:1.55">
-        <div><b>Último barrido:</b> ${sweep?esc(label(sweep.pool))+" · "+esc(label(sweep.side))+" · "+esc(level(sweep.level)):"No confirmado"}</div>
-        <div><b>Estructura:</b> ${event?esc(label(event.type))+" "+esc(label(event.direction))+" · "+esc(level(event.level)):"Sin BOS/CHoCH reciente"}</div>
-        <div><b>Order Block:</b> ${ob?esc(level(ob.low))+" – "+esc(level(ob.high)):"Sin bloque candidato confirmado"}</div>
+        <div><b>Último barrido:</b> ${sweep?esc(label(sweep.pool))+" · "+esc(label(sweep.side))+" · "+esc(level(sweep.level??sweep.high_level))+" · hace "+esc(String(sweep.bars_ago))+" vela(s)":"No confirmado"}</div>
+        <div><b>Estructura:</b> ${event?esc(label(event.type))+" "+esc(label(event.direction))+" · "+esc(level(event.level))+" · hace "+esc(String(event.bars_ago))+" vela(s)":"Sin BOS/CHoCH reciente"}</div>
+        <div><b>Order Block:</b> ${ob?esc(level(ob.low))+" – "+esc(level(ob.high))+" · hace "+esc(String(ob.bars_ago))+" vela(s)":"Sin bloque candidato confirmado"}</div>
       </div>
       ${zones?'<div style="margin-top:8px"><div style="font-size:9px;color:var(--muted);font-weight:800;margin-bottom:3px">POOLS DETECTADOS</div>'+zones+'</div>':'<div class="foot">No hay clusters EQH/EQL recientes.</div>'}
       <div class="foot">Pivotes confirmados · sin anticipar velas futuras · diagnóstico experimental.</div>

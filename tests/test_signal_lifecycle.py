@@ -135,6 +135,7 @@ class M15LifecycleTests(unittest.TestCase):
         result = evaluate_m15_confirmation(buy_plan, buy_m5, buy_m30, quote, now=NOW)
         self.assertTrue(result["valid"])
         self.assertEqual(result["entry"], 3613.0)
+        self.assertEqual(result["entry_type"], "BUY_STOP")
 
     def test_buy_price_already_above_entry_is_rejected(self):
         buy_plan = {

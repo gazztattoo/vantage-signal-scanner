@@ -7,6 +7,7 @@ from signal_lifecycle import (
     restore_m15_prealert_context,
     evaluate_m15_confirmation,
     prealert_entry_not_crossed,
+    same_m15_plan,
 )
 
 
@@ -30,6 +31,17 @@ QUOTE = {"accepted": True, "quote_age_seconds": 5, "bid": 3612.9, "ask": 3613.1}
 class M15LifecycleTests(unittest.TestCase):
     def setUp(self):
         self.context = build_m15_prealert_context(BASE)
+
+    def test_same_m15_plan_requires_exact_original_levels(self):
+        self.assertTrue(same_m15_plan(self.context, dict(self.context)))
+        changed_entry = {**self.context, "entry": 3608.0}
+        changed_stop = {**self.context, "stop_loss": 3621.0}
+        changed_target = {**self.context, "take_profit": 3600.0}
+        changed_atr = {**self.context, "atr": 3.1}
+        changed_side = {**self.context, "side": "BUY"}
+        changed_candle = {**self.context, "candle_time": (NOW - timedelta(minutes=10)).isoformat()}
+        for changed in (changed_entry, changed_stop, changed_target, changed_atr, changed_side, changed_candle):
+            self.assertFalse(same_m15_plan(self.context, changed))
 
     def test_prealert_is_persistable_and_restorable(self):
         fingerprint = encode_m15_prealert_context(self.context)

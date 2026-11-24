@@ -88,6 +88,16 @@ class FXCMResearchAdapterTests(unittest.TestCase):
         )
         self.assertFalse(result["accepted"])
 
+    def test_rejects_misaligned_bar_timestamp(self):
+        bars = [[
+            (NOW - timedelta(minutes=9, seconds=30)).timestamp(),
+            2650, 2651, 2652, 2649, 2650.2, 2651.2, 2652.2, 2649.2, 50
+        ]]
+        result = normalize_fxcm_candles(
+            payload(candles=bars), symbol="XAU/USD", period="m5", now=NOW
+        )
+        self.assertFalse(result["accepted"])
+
 
 if __name__ == "__main__":
     unittest.main()

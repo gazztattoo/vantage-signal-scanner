@@ -3,7 +3,7 @@ from datetime import datetime, timezone, timedelta
 
 from fxcm_research_adapter import normalize_fxcm_candles, RESEARCH_ROLE
 
-NOW = datetime(2026, 11, 24, 12, 10, tzinfo=timezone.utc)
+NOW = datetime(2026, 11, 24, 12, 15, tzinfo=timezone.utc)
 
 
 def payload(period="m5", candles=None):

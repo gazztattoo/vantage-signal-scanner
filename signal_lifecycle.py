@@ -167,14 +167,16 @@ def evaluate_m15_confirmation(
         return reject("La cotización de referencia está antigua o es inválida.")
 
     current = ask if side == "BUY" else bid
+    # Validate while price approaches the planned stop level, before it is crossed.
+    # BUY approaches from below; SELL approaches from above.
     crossed = current >= entry if side == "BUY" else current <= entry
-    if not crossed:
-        return reject("El precio todavía no ha activado el nivel previsto.")
+    if crossed:
+        return reject("El precio ya cruzó la entrada M15; oportunidad descartada.")
     drift = abs(current - entry)
     # Hard cap prevents a wide ATR from allowing a late chase of the market.
     max_drift = min(0.50, max(0.05, 0.10 * atr_value))
     if drift > max_drift:
-        return reject("El precio ya se alejó demasiado de la entrada M15; oportunidad descartada.")
+        return reject("El precio todavía está lejos de la zona de activación M15.")
 
     return {
         "valid": True,

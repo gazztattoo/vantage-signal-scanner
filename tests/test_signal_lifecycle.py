@@ -34,6 +34,7 @@ class M15LifecycleTests(unittest.TestCase):
 
     def test_same_m15_plan_requires_exact_original_levels(self):
         self.assertTrue(same_m15_plan(self.context, dict(self.context)))
+        self.assertEqual(self.context["entry_type"], "SELL_STOP")
         changed_entry = {**self.context, "entry": 3608.0}
         changed_stop = {**self.context, "stop_loss": 3621.0}
         changed_target = {**self.context, "take_profit": 3600.0}
@@ -49,6 +50,7 @@ class M15LifecycleTests(unittest.TestCase):
             fingerprint, "PREPARAR_VENTA", now=NOW
         )
         self.assertEqual(restored["entry"], 3613.0)
+        self.assertEqual(restored["entry_type"], "SELL_STOP")
         self.assertEqual(restored["stop_loss"], 3620.0)
 
     def test_prealert_is_blocked_if_sell_trigger_already_crossed(self):
@@ -64,6 +66,7 @@ class M15LifecycleTests(unittest.TestCase):
         result = evaluate_m15_confirmation(self.context, M5, M30, quote, now=NOW)
         self.assertTrue(result["valid"])
         self.assertEqual(result["entry"], 3613.0)
+        self.assertEqual(result["entry_type"], "SELL_STOP")
 
     def test_early_m5_structure_can_validate_before_entry_crosses(self):
         quote = {**QUOTE, "bid": 3613.1, "ask": 3613.3}

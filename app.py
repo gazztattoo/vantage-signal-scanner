@@ -1297,7 +1297,7 @@ def signal_performance():
             response = requests.get(
                 SUPABASE_URL + "/rest/v1/signal_history",
                 params={
-                    "select": "symbol,timeframe,direction,status,result_r,closed_at,indicators",
+                    "select": "symbol,timeframe,direction,status,result_r,closed_at,result_source,indicators",
                     "order": "signal_at.asc",
                     "limit": str(page_size),
                     "offset": str(offset),
@@ -1391,7 +1391,19 @@ def signal_performance():
         for row in rows:
             indicators = row.get("indicators") if isinstance(row.get("indicators"), dict) else {}
             provider = indicators.get("data_provider")
-            key = str(provider) if provider else "unknown_legacy"
+            if provider == "biquote_reference_only":
+                status = row.get("status")
+                result_source = str(row.get("result_source") or "")
+                safe_timing = (
+                    "Vela OHLC completa cuyo inicio es igual o posterior" in result_source
+                    or "CADUCADA tras 24 velas completas posteriores al instante de señal" in result_source
+                )
+                if status in ("TP", "SL", "CADUCADA") and not safe_timing:
+                    key = "biquote_timing_unverified"
+                else:
+                    key = "biquote_reference_only"
+            else:
+                key = str(provider) if provider else "unknown_legacy"
             groups.setdefault(key, []).append(row)
 
         biquote = summarize(groups.get("biquote_reference_only", []))
@@ -1405,6 +1417,7 @@ def signal_performance():
                 "primary_source": "biquote_reference_only",
                 "primary_source_note": "Las métricas principales solo incluyen señales etiquetadas biquote_reference_only; son resultados OHLC de referencia, no operaciones ejecutadas en Vantage.",
                 "unknown_legacy_count": len(groups.get("unknown_legacy", [])),
+                "biquote_timing_unverified_count": len(groups.get("biquote_timing_unverified", [])),
                 "other_identified_sources": [key for key in groups if key not in ("biquote_reference_only", "unknown_legacy")],
                 "historical_rows_mutated": False,
             },

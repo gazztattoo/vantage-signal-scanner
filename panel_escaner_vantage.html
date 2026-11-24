@@ -1284,7 +1284,8 @@ cards.addEventListener("click",async event=>{
 async function load(m){
   const p=new URLSearchParams({
     symbol:m.symbol,
-    interval:document.getElementById("interval").value
+    interval:document.getElementById("interval").value,
+    client:"panel"
   });
 
   const r=await fetch(`${API_BASE}/api/analysis?${p}`,{});

@@ -2140,7 +2140,7 @@ def push_scan():
 
     scan_started_at = datetime.now(timezone.utc).isoformat()
     app.logger.info("TEST push scan started at %s", scan_started_at)
-    # Política de notificaciones: solo entradas nuevas validadas; sin avisos de gestión.
+    # Notificaciones TEST: prealerta M15 y validación M15→M5; sin avisos de gestión.
     trade_monitor_results = []
     results = []
     sent_total = 0
@@ -2397,9 +2397,8 @@ def push_scan():
                             "outcome_errors": outcome_result["errors"]
                         })
                     else:
-                        # Stage 2 must follow a recent Stage 1 for the SAME symbol,
-                        # timeframe and side. A validated M5 setup must never be
-                        # presented as the continuation of an M15 prealert.
+                        # Stage 2 must follow the exact recent M15 prealert and side.
+                        # M5/M30 are internal evidence only; the alert remains M15.
                         if direction.startswith("ENTRADA_VALIDADA_"):
                             expected_prealert = "PREPARAR_" + direction.removeprefix("ENTRADA_VALIDADA_")
                             previous_created = previous_rows[0].get("created_at") if previous_rows else None
@@ -2409,14 +2408,20 @@ def push_scan():
                                     created_dt = datetime.fromisoformat(previous_created.replace("Z", "+00:00"))
                                     if created_dt.tzinfo is None:
                                         created_dt = created_dt.replace(tzinfo=timezone.utc)
-                                    max_age_minutes = 20 if interval == "15min" else 45
+                                    previous_context = restore_m15_prealert_context(
+                                        previous_rows[0].get("fingerprint") if previous_rows else None,
+                                        previous_direction,
+                                        max_age_minutes=20,
+                                    )
                                     prealert_is_recent = (
-                                        0 <= (datetime.now(timezone.utc) - created_dt).total_seconds()
-                                        <= max_age_minutes * 60
+                                        previous_context is not None
+                                        and m15_prealert_context is not None
+                                        and previous_context.get("candle_time") == m15_prealert_context.get("candle_time")
+                                        and 0 <= (datetime.now(timezone.utc) - created_dt).total_seconds() <= 20 * 60
                                     )
                                 except (TypeError, ValueError):
                                     prealert_is_recent = False
-                            if not prealert_is_recent and not cross_timeframe_confirmation:
+                            if not prealert_is_recent:
                                 results.append({
                                     "symbol": symbol, "interval": interval,
                                     "status": "validated_without_matching_recent_prealert_no_notification",
@@ -2464,9 +2469,8 @@ def push_scan():
                                 "status": "duplicate_state"
                             })
                             continue
-                        # Política TEST: guardar los cambios de estado, pero no notificar
-                        # prealertas, cancelaciones ni estados de espera. Solo se envían
-                        # entradas validadas con datos BiQuote recientes.
+                        # Solo se notifican las dos etapas M15: PREALERTA y VALIDACIÓN.
+                        # M5 y M30 nunca generan avisos independientes.
                         if direction == "ESPERAR":
                             results.append({
                                 "symbol": symbol, "interval": interval,
@@ -2514,7 +2518,7 @@ def push_scan():
                             )
                             alert_body = (
                                 f"XAU/USD · {short_interval} · {signal_side}. "
-                                f"Nivel técnico {display_price(entry_value)} · "
+                                f"Entrada M15 original {display_price(entry_value)} · "
                                 f"SL {display_price(stop_value)} · TP {display_price(target_value)}. "
                                 + (
                                     "Prealerta M15 confirmada por estructura M5; el precio sigue cerca del nivel previsto. "
@@ -2573,6 +2577,8 @@ def push_scan():
                                             "entry": entry_value,
                                             "stop_loss": stop_value,
                                             "take_profit": target_value,
+                                            "reference_confirmation_price": data.get("reference_confirmation_price"),
+                                            "opportunity_candle_time": candle_time,
                                         },
                                     })
                                     delivered += 1

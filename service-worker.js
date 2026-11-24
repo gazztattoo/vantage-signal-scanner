@@ -1,4 +1,4 @@
-const CACHE_NAME = "global-signal-scanner-shell-v28";
+const CACHE_NAME = "global-signal-scanner-shell-v29";
 const SHELL = [
   "./",
   "./panel_escaner_vantage.html",

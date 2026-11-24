@@ -17,7 +17,12 @@ BASE = {
     "planned_take_profit": 3599.0, "atr14": 3.0,
     "candle_time": (NOW - timedelta(minutes=15)).isoformat(),
 }
-M5 = {"signal": "VENTA", "structure_trigger": "BREAKOUT", "candle_age_minutes": 1}
+M5 = {"signal": "VENTA", "structure_trigger": "BREAKOUT", "primary_bias": "BEAR", "candle_age_minutes": 1}
+M5_EARLY = {
+    "signal": "PRESEÑAL", "pre_signal": True, "pre_signal_side": "SELL",
+    "primary_bias": "BEAR", "score": 5, "candle_age_minutes": 1,
+    "structure": {"near_direction": "SELL", "distance_atr": 0.18},
+}
 M30 = {"primary_bias": "BEAR", "candle_age_minutes": 5}
 QUOTE = {"accepted": True, "quote_age_seconds": 5, "bid": 3612.9, "ask": 3613.1}
 
@@ -47,6 +52,18 @@ class M15LifecycleTests(unittest.TestCase):
         result = evaluate_m15_confirmation(self.context, M5, M30, quote, now=NOW)
         self.assertTrue(result["valid"])
         self.assertEqual(result["entry"], 3613.0)
+
+    def test_early_m5_structure_can_validate_before_entry_crosses(self):
+        quote = {**QUOTE, "bid": 3613.1, "ask": 3613.3}
+        result = evaluate_m15_confirmation(self.context, M5_EARLY, M30, quote, now=NOW)
+        self.assertTrue(result["valid"])
+        self.assertEqual(result["entry"], 3613.0)
+
+    def test_early_m5_structure_requires_strong_confluence(self):
+        weak = {**M5_EARLY, "score": 3}
+        quote = {**QUOTE, "bid": 3613.1, "ask": 3613.3}
+        result = evaluate_m15_confirmation(self.context, weak, M30, quote, now=NOW)
+        self.assertFalse(result["valid"])
 
     def test_late_sell_at_3608_is_rejected_instead_of_repriced(self):
         quote = {**QUOTE, "bid": 3608.0, "ask": 3608.2}

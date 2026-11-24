@@ -1,0 +1,24 @@
+name: FXCM research adapter tests
+
+on:
+  push:
+    branches: [fxcm-gold-research]
+    paths:
+      - "fxcm_research_adapter.py"
+      - "tests/test_fxcm_research_adapter.py"
+      - ".github/workflows/fxcm-research-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fxcm-parser-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Run offline FXCM parser tests
+        run: python -m unittest discover -s tests -p "test_fxcm_research_adapter.py" -v

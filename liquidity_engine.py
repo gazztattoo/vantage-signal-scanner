@@ -138,16 +138,20 @@ def analyze_liquidity(
             # Candidate OB = last opposite-colour candle before the displacement break.
             opposite = "BEARISH" if direction == "BULLISH" else "BULLISH"
             ob = None
-            for k in range(i-1, max(start, i-11)-1, -1):
-                prior = bars[k]
-                candle_side = "BULLISH" if prior["close"] > prior["open"] else (
-                    "BEARISH" if prior["close"] < prior["open"] else "DOJI"
-                )
-                if candle_side == opposite:
-                    ob = {"direction": direction, "source": "last_opposite_candle_before_break",
-                          "high": prior["high"], "low": prior["low"],
-                          "candle_time": prior["time"], "index": k}
-                    break
+            # Require a meaningful displacement candle before calling the prior
+            # opposite candle an order-block candidate.
+            displacement = abs(bar["close"] - bar["open"]) >= 0.8 * atr_now
+            if displacement:
+                for k in range(i-1, max(start, i-11)-1, -1):
+                    prior = bars[k]
+                    candle_side = "BULLISH" if prior["close"] > prior["open"] else (
+                        "BEARISH" if prior["close"] < prior["open"] else "DOJI"
+                    )
+                    if candle_side == opposite:
+                        ob = {"direction": direction, "source": "last_opposite_candle_before_displacement",
+                              "high": prior["high"], "low": prior["low"],
+                              "candle_time": prior["time"], "index": k}
+                        break
             broken["order_block_candidate"] = ob
             structure_events.append(broken)
             trend = direction
@@ -170,11 +174,12 @@ def analyze_liquidity(
             if len(group) < 2:
                 continue
             level = sum(x["price"] for x in group)/len(group)
+            outer_edge = (max if kind == "high" else min)(p["price"] for p in points)
             zones.append({"type": "EQUAL_HIGHS" if kind == "high" else "EQUAL_LOWS",
                           "pool": "BUY_SIDE_LIQUIDITY" if kind == "high" else "SELL_SIDE_LIQUIDITY",
                           "level": round(level, 5), "touches": len(group),
                           "first_time": group[0]["time"], "last_time": group[-1]["time"],
-                          "classification": "EXTERNAL" if level >= max(p["price"] for p in points)-2*tol
+                          "classification": "EXTERNAL" if abs(level-outer_edge) <= 2*tol
                                             else "INTERNAL"})
         return zones
 

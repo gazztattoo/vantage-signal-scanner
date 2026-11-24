@@ -59,7 +59,7 @@ class ExpiredSignalOutcomeTests(unittest.TestCase):
 
     def test_expired_sell_is_marked_to_market(self):
         result, payload = self.run_case("VENTA", 95.0)
-        self.assertEqual(result, {"resolved": 0, "expired": 1, "errors": 0})
+        self.assertEqual(result, {"resolved": 0, "expired": 1, "ambiguous": 0, "errors": 0})
         self.assertEqual(payload["exit_price"], 95.0)
         self.assertEqual(payload["result_r"], 0.5)
 

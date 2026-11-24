@@ -112,8 +112,8 @@ jobs:
               require("XAU/USD" in html and "goldNewsEvents" in html, "Panel is missing the gold/news UI")
           with urllib.request.urlopen(panel + "/service-worker.js", timeout=35) as response:
               worker = response.read().decode("utf-8", "replace")
-              require("global-signal-scanner-shell-v29" in worker, "PWA cache version v29 is not deployed")
-          print("PANEL: HTTP 200; XAU/USD and news UI present; PWA cache v29 present")
+              require("global-signal-scanner-shell-v30" in worker, "PWA cache version v29 is not deployed")
+          print("PANEL: HTTP 200; XAU/USD and news UI present; PWA cache v30 present")
 
           try:
               push = get_json(api + "/api/push/public-key", attempts=2, delay=2)

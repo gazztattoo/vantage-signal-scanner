@@ -1512,8 +1512,14 @@ viewButtons.forEach(button=>button.addEventListener("click",()=>switchView(butto
 const notificationParams=new URLSearchParams(window.location.search);
 if(notificationParams.get("view")==="history") switchView("history");
 if(notificationParams.get("view")==="scanner") switchView("scanner");
-const notificationTimeframe=notificationParams.get("timeframe");
-if(["5min","15min","30min"].includes(notificationTimeframe)){
+// Canonical deep-link timeframe comes from the alert-producing interval.
+// Keep legacy `timeframe` as a fallback for notifications already delivered.
+const notificationTimeframe=[
+  notificationParams.get("alert_timeframe"),
+  notificationParams.get("interval"),
+  notificationParams.get("timeframe")
+].find(value=>["5min","15min","30min"].includes(value))||"";
+if(notificationTimeframe){
   document.getElementById("interval").value=notificationTimeframe;
 }
 

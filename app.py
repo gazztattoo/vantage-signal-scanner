@@ -13,6 +13,13 @@ import time
 from strategy_engine import analyze as analyze_strategy
 from mt5_ingest import normalize_mt5_batch
 from experimental_gate import evaluate_shadow_gate
+from signal_lifecycle import (
+    build_m15_prealert_context,
+    encode_m15_prealert_context,
+    restore_m15_prealert_context,
+    evaluate_m15_confirmation,
+    prealert_entry_not_crossed,
+)
 
 app = Flask(__name__)
 CORS(app, resources={
@@ -2134,15 +2141,16 @@ def push_scan():
 
     scan_started_at = datetime.now(timezone.utc).isoformat()
     app.logger.info("TEST push scan started at %s", scan_started_at)
-    # Política de notificaciones: solo entradas nuevas validadas; sin avisos de gestión.
+    # Notificaciones TEST: prealerta M15 y validación M15→M5; sin avisos de gestión.
     trade_monitor_results = []
     results = []
     sent_total = 0
     token = access_serializer().dumps({"access": True})
-    # TEST only: process M15 first so its live prealert can be paired with M5 confirmation.
-    intervals = ["15min", "5min"]
+    # TEST only: M15 is the sole user-facing timeframe. M30 is context and M5 confirms.
+    intervals = ["15min", "30min", "5min"]
     symbols = ["XAU/USD"]
     m15_prealert_context = None
+    m30_context = None
 
     # Reutiliza el mismo endpoint de análisis que consume el panel.
     # Pausa entre consultas para no superar de golpe el límite del proveedor.
@@ -2175,91 +2183,222 @@ def push_scan():
                 })
             else:
                 data = response.get_json() or {}
-                # Keep the current M15 setup in memory for this scan cycle only.
-                # Its closed-candle timestamp limits the hand-off to a fresh opportunity.
-                if (
-                    interval == "15min"
-                    and data.get("pre_signal") is True
-                    and data.get("pre_signal_side") in ("BUY", "SELL")
-                    and data.get("planned_entry") is not None
-                    and data.get("atr14") is not None
-                ):
-                    m15_prealert_context = {
-                        "side": data.get("pre_signal_side"),
-                        "entry": float(data.get("planned_entry")),
-                        "atr": float(data.get("atr14")),
+                cross_timeframe_confirmation = False
+                trade_direction = data.get("signal") or "ESPERAR"
+                already_validated_same_candle = False
+
+                # M30 is context only: it never creates or sends an independent alert.
+                if interval == "30min":
+                    m30_context = {
+                        "primary_bias": data.get("primary_bias"),
+                        "candle_age_minutes": data.get("candle_age_minutes"),
                         "candle_time": data.get("candle_time"),
                     }
-                outcome_result = resolve_pending_signal_outcomes(
-                    symbol, interval, data.get("recent_candles", [])
-                )
-                trade_direction = data.get("signal") or "ESPERAR"
-                cross_timeframe_confirmation = False
-                if data.get("pre_signal") is True and data.get("pre_signal_side") in ("BUY", "SELL"):
-                    direction = "PREPARAR_" + ("COMPRA" if data["pre_signal_side"] == "BUY" else "VENTA")
-                elif trade_direction in ("COMPRA", "VENTA"):
-                    # Stage 2 requires a fresh BiQuote quote and a confirmed closed-candle structure.
-                    # BiQuote remains reference-only; no Vantage price or broker order is implied.
+                    results.append({
+                        "symbol": symbol, "interval": "30min",
+                        "status": "internal_context_only",
+                        "primary_bias": m30_context["primary_bias"],
+                        "candle_age_minutes": m30_context["candle_age_minutes"],
+                    })
+                    continue
+
+                if interval == "15min":
+                    # Read the persisted M15 lifecycle on every scan so a validated
+                    # opportunity cannot fall back to PREPARAR and notify twice.
+                    saved_row = None
+                    saved_state_ok = False
+                    try:
+                        saved = requests.get(
+                            SUPABASE_URL + "/rest/v1/signal_alerts",
+                            params={
+                                "select": "direction,created_at,fingerprint",
+                                "market": "eq." + symbol,
+                                "timeframe": "eq.15min",
+                                "order": "created_at.desc",
+                                "limit": "1",
+                            },
+                            headers=supabase_headers(),
+                            timeout=12,
+                        )
+                        if saved.status_code == 200:
+                            saved_state_ok = True
+                            if saved.json():
+                                saved_row = saved.json()[0]
+                    except Exception:
+                        saved_state_ok = False
+                        app.logger.exception("No se pudo recuperar el estado M15 persistido en TEST.")
+                    if not saved_state_ok:
+                        results.append({
+                            "symbol": symbol, "interval": "15min",
+                            "status": "m15_lifecycle_state_unavailable",
+                        })
+                        continue
+
+                    fresh_context = build_m15_prealert_context(data)
+                    current_m15_candle = str(data.get("candle_time") or "")
+                    already_validated_same_candle = bool(
+                        saved_row
+                        and str(saved_row.get("direction") or "").startswith("ENTRADA_VALIDADA_")
+                        and current_m15_candle
+                        and str(saved_row.get("fingerprint") or "").endswith("|" + current_m15_candle)
+                    )
+                    if already_validated_same_candle:
+                        m15_prealert_context = None
+                        direction = saved_row["direction"]
+                    else:
+                        if fresh_context:
+                            try:
+                                prealert_quote = fetch_biquote_research_tick(symbol)
+                            except Exception:
+                                prealert_quote = {}
+                            if not prealert_entry_not_crossed(fresh_context, prealert_quote):
+                                fresh_context = None
+                        if fresh_context:
+                            m15_prealert_context = fresh_context
+                        else:
+                            m15_prealert_context = restore_m15_prealert_context(
+                                saved_row.get("fingerprint") if saved_row else None,
+                                saved_row.get("direction") if saved_row else None,
+                                max_age_minutes=20,
+                            )
+                        if m15_prealert_context:
+                            direction = "PREPARAR_" + (
+                                "COMPRA" if m15_prealert_context["side"] == "BUY" else "VENTA"
+                            )
+                            data["planned_entry"] = m15_prealert_context["entry"]
+                            data["planned_stop_loss"] = m15_prealert_context["stop_loss"]
+                            data["planned_take_profit"] = m15_prealert_context["take_profit"]
+                        elif (
+                            saved_row
+                            and str(saved_row.get("direction") or "").startswith("ENTRADA_VALIDADA_")
+                            and current_m15_candle
+                            and str(saved_row.get("fingerprint") or "").endswith("|" + current_m15_candle)
+                        ):
+                            direction = saved_row["direction"]
+                        else:
+                            direction = "ESPERAR"
+
+                    outcome_result = resolve_pending_signal_outcomes(
+                        symbol, "15min", data.get("recent_candles", [])
+                    )
+                    candle_time = str(
+                        m15_prealert_context["candle_time"]
+                        if m15_prealert_context else data.get("candle_time") or ""
+                    )
+
+                elif interval == "5min":
+                    # M5 can only validate an active M15 opportunity. It can never
+                    # create a standalone alert or replace the M15 entry/SL/TP.
+                    if not m15_prealert_context:
+                        results.append({
+                            "symbol": symbol, "interval": "5min",
+                            "status": "internal_m5_no_active_m15_prealert",
+                        })
+                        continue
                     try:
                         quote_check = fetch_biquote_research_tick(symbol)
-                        quote_fresh = (
-                            quote_check.get("accepted") is True
-                            and quote_check.get("quote_age_seconds") is not None
-                            and float(quote_check["quote_age_seconds"]) <= 60
-                        )
                     except Exception:
                         quote_check = {}
-                        quote_fresh = False
-                    structure_confirmed = data.get("structure_trigger") not in (None, "", "NONE", "PENDING")
-                    cross_timeframe_confirmation = False
-                    if interval == "5min" and m15_prealert_context and quote_fresh:
-                        # M5 may validate the same-side M15 prealert, but only while
-                        # that M15 candle is fresh and price has not run too far past its level.
-                        try:
-                            m15_stamp = datetime.fromisoformat(
-                                str(m15_prealert_context["candle_time"]).replace("Z", "+00:00")
-                            )
-                            if m15_stamp.tzinfo is None:
-                                m15_stamp = m15_stamp.replace(tzinfo=timezone.utc)
-                            m15_age_minutes = (
-                                datetime.now(timezone.utc) - m15_stamp.astimezone(timezone.utc)
-                            ).total_seconds() / 60
-                            m15_side = m15_prealert_context["side"]
-                            m15_entry = float(m15_prealert_context["entry"])
-                            m15_atr = float(m15_prealert_context["atr"])
-                            live_side_price = float(
-                                quote_check["ask"] if m15_side == "BUY" else quote_check["bid"]
-                            )
-                            max_drift = max(0.35 * m15_atr, 0.50)
-                            crossed_level = (
-                                live_side_price >= m15_entry if m15_side == "BUY"
-                                else live_side_price <= m15_entry
-                            )
-                            cross_timeframe_confirmation = (
-                                m15_side == ("BUY" if trade_direction == "COMPRA" else "SELL")
-                                and -2 <= m15_age_minutes <= 20
-                                and m15_atr > 0
-                                and crossed_level
-                                and abs(live_side_price - m15_entry) <= max_drift
-                            )
-                        except (KeyError, TypeError, ValueError, OverflowError):
-                            cross_timeframe_confirmation = False
-                    if interval == "5min" and m15_prealert_context:
-                        # An active M15 setup takes priority: a conflicting or late M5
-                        # confirmation must not fall back to an unrelated M5 signal.
-                        validated = cross_timeframe_confirmation and structure_confirmed
-                    else:
-                        validated = quote_fresh and structure_confirmed
-                    direction = "ENTRADA_VALIDADA_" + trade_direction if validated else "ESPERAR"
-                else:
-                    direction = "ESPERAR"
+                    confirmation = evaluate_m15_confirmation(
+                        m15_prealert_context, data, m30_context, quote_check
+                    )
+                    if not confirmation.get("valid"):
+                        results.append({
+                            "symbol": symbol, "interval": "5min",
+                            "status": "internal_m5_waiting_or_late",
+                            "reason": confirmation.get("reason"),
+                        })
+                        continue
 
-                # Asegurar el historial en cada ciclo para señales activas.
-                # La clave única hace esta escritura idempotente: si ya existe,
-                # Supabase ignora el duplicado; si faltaba por un fallo previo,
-                # queda recuperada aunque el estado ya estuviera registrado.
-                candle_time = str(data.get("candle_time") or "")
-                if direction.startswith("ENTRADA_VALIDADA_"):
+                    # Do not create a validation/history record unless the exact
+                    # M15 prealert was durably saved and is still recent.
+                    prealert_state = requests.get(
+                        SUPABASE_URL + "/rest/v1/signal_alerts",
+                        params={
+                            "select": "direction,created_at,fingerprint",
+                            "market": "eq." + symbol,
+                            "timeframe": "eq.15min",
+                            "order": "created_at.desc",
+                            "limit": "1",
+                        },
+                        headers=supabase_headers(),
+                        timeout=12,
+                    )
+                    try:
+                        prealert_rows = prealert_state.json() if prealert_state.status_code == 200 else []
+                    except ValueError:
+                        prealert_rows = []
+                    if not isinstance(prealert_rows, list) or not prealert_rows:
+                        results.append({
+                            "symbol": symbol, "interval": "5min",
+                            "status": "m15_prealert_state_unavailable",
+                        })
+                        continue
+                    prealert_row = prealert_rows[0]
+                    expected_prealert = (
+                        "PREPARAR_COMPRA" if m15_prealert_context["side"] == "BUY"
+                        else "PREPARAR_VENTA"
+                    )
+                    persisted_context = restore_m15_prealert_context(
+                        prealert_row.get("fingerprint"),
+                        prealert_row.get("direction"),
+                        max_age_minutes=20,
+                    )
+                    try:
+                        persisted_at = datetime.fromisoformat(
+                            str(prealert_row.get("created_at")).replace("Z", "+00:00")
+                        )
+                        if persisted_at.tzinfo is None:
+                            persisted_at = persisted_at.replace(tzinfo=timezone.utc)
+                        persisted_age = (
+                            datetime.now(timezone.utc) - persisted_at.astimezone(timezone.utc)
+                        ).total_seconds()
+                    except (TypeError, ValueError):
+                        persisted_age = float("inf")
+                    if not (
+                        prealert_row.get("direction") == expected_prealert
+                        and persisted_context is not None
+                        and persisted_context.get("candle_time") == m15_prealert_context.get("candle_time")
+                        and -60 <= persisted_age <= 20 * 60
+                    ):
+                        results.append({
+                            "symbol": symbol, "interval": "5min",
+                            "status": "m15_prealert_not_current_for_validation",
+                        })
+                        continue
+
+                    cross_timeframe_confirmation = True
+                    trade_direction = (
+                        "COMPRA" if m15_prealert_context["side"] == "BUY" else "VENTA"
+                    )
+                    # Promote the validated event to the M15 lifecycle and freeze
+                    # all displayed levels to the original M15 prealert.
+                    data = dict(data)
+                    data.update({
+                        "signal": trade_direction,
+                        "entry": confirmation["entry"],
+                        "stop_loss": confirmation["stop_loss"],
+                        "take_profit": confirmation["take_profit"],
+                        "candle_time": confirmation["opportunity_candle_time"],
+                        "planned_entry": confirmation["entry"],
+                        "planned_stop_loss": confirmation["stop_loss"],
+                        "planned_take_profit": confirmation["take_profit"],
+                        "reference_confirmation_price": confirmation["reference_price"],
+                    })
+                    interval = "15min"
+                    candle_time = str(m15_prealert_context["candle_time"])
+                    outcome_result = {"resolved": 0, "errors": 0}
+                    direction = "ENTRADA_VALIDADA_" + trade_direction
+                else:
+                    results.append({
+                        "symbol": symbol, "interval": interval,
+                        "status": "unsupported_internal_timeframe",
+                    })
+                    continue
+
+                # Asegurar el historial de la oportunidad M15; M5 solo confirma.
+                candle_time = str(data.get("candle_time") or candle_time or "")
+                if direction.startswith("ENTRADA_VALIDADA_") and not already_validated_same_candle:
                     signal_key = "|".join([symbol, interval, trade_direction, candle_time])
                     history_payload = {
                         "signal_key": signal_key,
@@ -2312,7 +2451,7 @@ def push_scan():
                 state_response = requests.get(
                     SUPABASE_URL + "/rest/v1/signal_alerts",
                     params={
-                        "select": "direction,created_at",
+                        "select": "direction,created_at,fingerprint",
                         "market": "eq." + symbol,
                         "timeframe": "eq." + interval,
                         "order": "created_at.desc",
@@ -2332,7 +2471,20 @@ def push_scan():
                         previous_rows[0].get("direction") if previous_rows else None
                     )
 
-                    if previous_direction == direction:
+                    same_signal = previous_direction == direction
+                    if same_signal and direction.startswith("PREPARAR_") and interval == "15min":
+                        stored_context = restore_m15_prealert_context(
+                            previous_rows[0].get("fingerprint") if previous_rows else None,
+                            previous_direction,
+                            max_age_minutes=20,
+                        )
+                        same_signal = bool(
+                            stored_context
+                            and m15_prealert_context
+                            and stored_context.get("candle_time") == m15_prealert_context.get("candle_time")
+                        )
+
+                    if same_signal:
                         results.append({
                             "symbol": symbol, "interval": interval,
                             "status": "same_signal_no_notification",
@@ -2341,9 +2493,8 @@ def push_scan():
                             "outcome_errors": outcome_result["errors"]
                         })
                     else:
-                        # Stage 2 must follow a recent Stage 1 for the SAME symbol,
-                        # timeframe and side. A validated M5 setup must never be
-                        # presented as the continuation of an M15 prealert.
+                        # Stage 2 must follow the exact recent M15 prealert and side.
+                        # M5/M30 are internal evidence only; the alert remains M15.
                         if direction.startswith("ENTRADA_VALIDADA_"):
                             expected_prealert = "PREPARAR_" + direction.removeprefix("ENTRADA_VALIDADA_")
                             previous_created = previous_rows[0].get("created_at") if previous_rows else None
@@ -2353,14 +2504,20 @@ def push_scan():
                                     created_dt = datetime.fromisoformat(previous_created.replace("Z", "+00:00"))
                                     if created_dt.tzinfo is None:
                                         created_dt = created_dt.replace(tzinfo=timezone.utc)
-                                    max_age_minutes = 45 if interval == "5min" else 90
+                                    previous_context = restore_m15_prealert_context(
+                                        previous_rows[0].get("fingerprint") if previous_rows else None,
+                                        previous_direction,
+                                        max_age_minutes=20,
+                                    )
                                     prealert_is_recent = (
-                                        0 <= (datetime.now(timezone.utc) - created_dt).total_seconds()
-                                        <= max_age_minutes * 60
+                                        previous_context is not None
+                                        and m15_prealert_context is not None
+                                        and previous_context.get("candle_time") == m15_prealert_context.get("candle_time")
+                                        and -60 <= (datetime.now(timezone.utc) - created_dt).total_seconds() <= 20 * 60
                                     )
                                 except (TypeError, ValueError):
                                     prealert_is_recent = False
-                            if not prealert_is_recent and not cross_timeframe_confirmation:
+                            if not prealert_is_recent:
                                 results.append({
                                     "symbol": symbol, "interval": interval,
                                     "status": "validated_without_matching_recent_prealert_no_notification",
@@ -2374,9 +2531,13 @@ def push_scan():
                         # El estado se guarda solo después de asegurar el historial.
                         # Si falla este paso, la inserción idempotente del historial
                         # permitirá reintentar el siguiente ciclo sin duplicar señales.
-                        fingerprint = "|".join([
-                            symbol, interval, direction, candle_time
-                        ])
+                        fingerprint = (
+                            encode_m15_prealert_context(m15_prealert_context)
+                            if interval == "15min"
+                            and direction.startswith("PREPARAR_")
+                            and m15_prealert_context
+                            else "|".join([symbol, interval, direction, candle_time])
+                        )
                         insert_response = requests.post(
                             SUPABASE_URL + "/rest/v1/signal_alerts?on_conflict=market,timeframe,fingerprint",
                             headers={
@@ -2404,9 +2565,8 @@ def push_scan():
                                 "status": "duplicate_state"
                             })
                             continue
-                        # Política TEST: guardar los cambios de estado, pero no notificar
-                        # prealertas, cancelaciones ni estados de espera. Solo se envían
-                        # entradas validadas con datos BiQuote recientes.
+                        # Solo se notifican las dos etapas M15: PREALERTA y VALIDACIÓN.
+                        # M5 y M30 nunca generan avisos independientes.
                         if direction == "ESPERAR":
                             results.append({
                                 "symbol": symbol, "interval": interval,
@@ -2432,7 +2592,7 @@ def push_scan():
                         def display_price(value):
                             return f"{float(value):,.{price_digits}f}" if value is not None else "—"
 
-                        short_interval = {"5min": "M5", "15min": "M15"}.get(interval, interval)
+                        short_interval = {"5min": "M5", "15min": "M15", "30min": "M30"}.get(interval, interval)
                         is_prealert = direction.startswith("PREPARAR_")
                         signal_side = "COMPRA" if direction.endswith("COMPRA") else "VENTA"
                         entry_value = data.get("planned_entry") if is_prealert else data.get("entry")
@@ -2449,16 +2609,16 @@ def push_scan():
                         else:
                             alert_title = (
                                 "ENTRADA VALIDADA · M15→M5"
-                                if interval == "5min" and cross_timeframe_confirmation
+                                if cross_timeframe_confirmation
                                 else "ENTRADA VALIDADA · REFERENCIA"
                             )
                             alert_body = (
                                 f"XAU/USD · {short_interval} · {signal_side}. "
-                                f"Nivel técnico {display_price(entry_value)} · "
+                                f"Entrada M15 original {display_price(entry_value)} · "
                                 f"SL {display_price(stop_value)} · TP {display_price(target_value)}. "
                                 + (
                                     "Prealerta M15 confirmada por estructura M5; el precio sigue cerca del nivel previsto. "
-                                    if interval == "5min" and cross_timeframe_confirmation else ""
+                                    if cross_timeframe_confirmation else ""
                                 )
                                 + "Confirmación técnica BiQuote, NO precio Vantage. Verifica cotización y spread antes de decidir."
                             )
@@ -2491,6 +2651,8 @@ def push_scan():
                                             + "view=scanner"
                                             + "&symbol=" + requests.utils.quote(symbol, safe="")
                                             + "&timeframe=" + requests.utils.quote(interval, safe="")
+                                            + "&interval=" + requests.utils.quote(interval, safe="")
+                                            + "&alert_timeframe=" + requests.utils.quote(interval, safe="")
                                             + "&alert_stage=" + requests.utils.quote("PREALERTA" if is_prealert else "ENTRADA_VALIDADA", safe="")
                                             + "&alert_side=" + requests.utils.quote(signal_side, safe="")
                                             + "&alert_entry=" + requests.utils.quote("" if entry_value is None else str(entry_value), safe="")
@@ -2501,15 +2663,18 @@ def push_scan():
                                         "data": {
                                             "symbol": symbol, "interval": interval,
                                             "event_type": "PREALERTA" if is_prealert else "ENTRADA_VALIDADA",
-                                            "source_timeframe": "15min" if interval == "5min" and cross_timeframe_confirmation else interval,
-                                            "confirmation_timeframe": interval,
-                                            "cross_timeframe_confirmation": bool(interval == "5min" and cross_timeframe_confirmation),
+                                            "alert_timeframe": interval,
+                                            "source_timeframe": "5min" if cross_timeframe_confirmation else interval,
+                                            "confirmation_timeframe": "5min" if cross_timeframe_confirmation else interval,
+                                            "cross_timeframe_confirmation": bool(cross_timeframe_confirmation),
                                             "direction": signal_side,
                                             "reference_only": True,
                                             "execution_price": False,
                                             "entry": entry_value,
                                             "stop_loss": stop_value,
                                             "take_profit": target_value,
+                                            "reference_confirmation_price": data.get("reference_confirmation_price"),
+                                            "opportunity_candle_time": candle_time,
                                         },
                                     })
                                     delivered += 1

@@ -1,0 +1,29 @@
+name: Gedeon M15 entry lifecycle tests
+
+on:
+  push:
+    branches:
+      - gedeon-m15-entry-fix
+  pull_request:
+    branches:
+      - push-test
+    paths:
+      - app.py
+      - signal_lifecycle.py
+      - tests/test_signal_lifecycle.py
+      - .github/workflows/gedeon-m15-entry-fix.yml
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install project dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Check Python syntax
+        run: python -m py_compile app.py signal_lifecycle.py
+      - name: Run M15 lifecycle tests
+        run: python -m unittest discover -s tests -v

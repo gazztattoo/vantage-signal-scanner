@@ -2202,51 +2202,71 @@ def push_scan():
                     continue
 
                 if interval == "15min":
-                    # Prefer a fresh M15 plan; otherwise restore the exact immutable
-                    # plan persisted in the M15 alert fingerprint from an earlier scan.
-                    fresh_context = build_m15_prealert_context(data)
-                    if fresh_context:
-                        try:
-                            prealert_quote = fetch_biquote_research_tick(symbol)
-                        except Exception:
-                            prealert_quote = {}
-                        if not prealert_entry_not_crossed(fresh_context, prealert_quote):
-                            fresh_context = None
-                    if fresh_context:
-                        m15_prealert_context = fresh_context
-                    else:
-                        try:
-                            saved = requests.get(
-                                SUPABASE_URL + "/rest/v1/signal_alerts",
-                                params={
-                                    "select": "direction,created_at,fingerprint",
-                                    "market": "eq." + symbol,
-                                    "timeframe": "eq.15min",
-                                    "order": "created_at.desc",
-                                    "limit": "1",
-                                },
-                                headers=supabase_headers(),
-                                timeout=12,
-                            )
-                            if saved.status_code == 200 and saved.json():
-                                row = saved.json()[0]
-                                m15_prealert_context = restore_m15_prealert_context(
-                                    row.get("fingerprint"), row.get("direction"),
-                                    max_age_minutes=20,
-                                )
-                        except Exception:
-                            app.logger.exception("No se pudo recuperar la prealerta M15 persistida en TEST.")
-                            m15_prealert_context = None
-
-                    if m15_prealert_context:
-                        direction = "PREPARAR_" + (
-                            "COMPRA" if m15_prealert_context["side"] == "BUY" else "VENTA"
+                    # Read the persisted M15 lifecycle on every scan so a validated
+                    # opportunity cannot fall back to PREPARAR and notify twice.
+                    saved_row = None
+                    try:
+                        saved = requests.get(
+                            SUPABASE_URL + "/rest/v1/signal_alerts",
+                            params={
+                                "select": "direction,created_at,fingerprint",
+                                "market": "eq." + symbol,
+                                "timeframe": "eq.15min",
+                                "order": "created_at.desc",
+                                "limit": "1",
+                            },
+                            headers=supabase_headers(),
+                            timeout=12,
                         )
-                        data["planned_entry"] = m15_prealert_context["entry"]
-                        data["planned_stop_loss"] = m15_prealert_context["stop_loss"]
-                        data["planned_take_profit"] = m15_prealert_context["take_profit"]
+                        if saved.status_code == 200 and saved.json():
+                            saved_row = saved.json()[0]
+                    except Exception:
+                        app.logger.exception("No se pudo recuperar el estado M15 persistido en TEST.")
+
+                    fresh_context = build_m15_prealert_context(data)
+                    current_m15_candle = str(data.get("candle_time") or "")
+                    already_validated_same_candle = bool(
+                        saved_row
+                        and str(saved_row.get("direction") or "").startswith("ENTRADA_VALIDADA_")
+                        and current_m15_candle
+                        and str(saved_row.get("fingerprint") or "").endswith("|" + current_m15_candle)
+                    )
+                    if already_validated_same_candle:
+                        m15_prealert_context = None
+                        direction = saved_row["direction"]
                     else:
-                        direction = "ESPERAR"
+                        if fresh_context:
+                            try:
+                                prealert_quote = fetch_biquote_research_tick(symbol)
+                            except Exception:
+                                prealert_quote = {}
+                            if not prealert_entry_not_crossed(fresh_context, prealert_quote):
+                                fresh_context = None
+                        if fresh_context:
+                            m15_prealert_context = fresh_context
+                        else:
+                            m15_prealert_context = restore_m15_prealert_context(
+                                saved_row.get("fingerprint") if saved_row else None,
+                                saved_row.get("direction") if saved_row else None,
+                                max_age_minutes=20,
+                            )
+                        if m15_prealert_context:
+                            direction = "PREPARAR_" + (
+                                "COMPRA" if m15_prealert_context["side"] == "BUY" else "VENTA"
+                            )
+                            data["planned_entry"] = m15_prealert_context["entry"]
+                            data["planned_stop_loss"] = m15_prealert_context["stop_loss"]
+                            data["planned_take_profit"] = m15_prealert_context["take_profit"]
+                        elif (
+                            saved_row
+                            and str(saved_row.get("direction") or "").startswith("ENTRADA_VALIDADA_")
+                            and current_m15_candle
+                            and str(saved_row.get("fingerprint") or "").endswith("|" + current_m15_candle)
+                        ):
+                            direction = saved_row["direction"]
+                        else:
+                            direction = "ESPERAR"
+
                     outcome_result = resolve_pending_signal_outcomes(
                         symbol, "15min", data.get("recent_candles", [])
                     )

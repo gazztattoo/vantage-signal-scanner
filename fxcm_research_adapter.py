@@ -5,8 +5,7 @@ FXCM's documented candle tuple is:
 [timestamp, BidOpen, BidClose, BidHigh, BidLow,
  AskOpen, AskClose, AskHigh, AskLow, TickQty]
 
-The adapter preserves Bid and Ask OHLC separately. It must not be treated as
-Vantage execution data or used by the production scanner without live validation.
+Bid and Ask OHLC are preserved separately. This is not Vantage execution data.
 """
 from __future__ import annotations
 
@@ -82,6 +81,7 @@ def normalize_fxcm_candles(
         return {"accepted": False, "reason": "FXCM no devolvió velas."}
 
     duration = timedelta(minutes=PERIOD_MINUTES[period])
+    duration_seconds = int(duration.total_seconds())
     bars = []
     seen = set()
     for index, item in enumerate(raw):
@@ -95,6 +95,8 @@ def normalize_fxcm_candles(
         except (TypeError, ValueError, OverflowError, OSError):
             return {"accepted": False, "reason": f"Timestamp inválido en vela {index}."}
 
+        if int(stamp.timestamp()) % duration_seconds != 0:
+            return {"accepted": False, "reason": f"Timestamp desalineado en vela {index}."}
         if stamp in seen:
             return {"accepted": False, "reason": "FXCM devolvió timestamps duplicados."}
         seen.add(stamp)
@@ -107,10 +109,6 @@ def normalize_fxcm_candles(
             return {"accepted": False, "reason": str(exc)}
         if tick_qty < 0:
             return {"accepted": False, "reason": "Tick quantity negativo."}
-        if ask["high"] < bid["low"] or bid["high"] > ask["low"] + (ask["high"] - ask["low"]) + (bid["high"] - bid["low"]):
-            # Do not assume the broker's spread is constant across a candle;
-            # only require the basic quote-side ordering at open and close.
-            pass
         if ask["open"] < bid["open"] or ask["close"] < bid["close"]:
             return {"accepted": False, "reason": "Ask por debajo de Bid en apertura o cierre."}
 

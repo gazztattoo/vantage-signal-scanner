@@ -27,6 +27,7 @@ class LiquidityEngineTests(unittest.TestCase):
             candle(8, 6, 7, 3, 6),
             candle(9, 5, 6, 2, 5),
             candle(10, 4, 5, 1, 4),
+            candle(11, 4, 5, 2, 4),
         ]
         result = analyze_liquidity(bars, atr_value=1.0, left_bars=1, right_bars=1)
         self.assertTrue(result["available"])

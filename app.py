@@ -2206,6 +2206,7 @@ def push_scan():
                     # Read the persisted M15 lifecycle on every scan so a validated
                     # opportunity cannot fall back to PREPARAR and notify twice.
                     saved_row = None
+                    saved_state_ok = False
                     try:
                         saved = requests.get(
                             SUPABASE_URL + "/rest/v1/signal_alerts",
@@ -2219,10 +2220,18 @@ def push_scan():
                             headers=supabase_headers(),
                             timeout=12,
                         )
-                        if saved.status_code == 200 and saved.json():
-                            saved_row = saved.json()[0]
+                        if saved.status_code == 200:
+                            saved_state_ok = True
+                            if saved.json():
+                                saved_row = saved.json()[0]
                     except Exception:
                         app.logger.exception("No se pudo recuperar el estado M15 persistido en TEST.")
+                    if not saved_state_ok:
+                        results.append({
+                            "symbol": symbol, "interval": "15min",
+                            "status": "m15_lifecycle_state_unavailable",
+                        })
+                        continue
 
                     fresh_context = build_m15_prealert_context(data)
                     current_m15_candle = str(data.get("candle_time") or "")

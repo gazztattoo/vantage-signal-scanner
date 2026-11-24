@@ -1694,7 +1694,7 @@ async function loadPerformance(){
     const sides=Object.entries(data.direction_breakdown||{});
     const sideHtml=sides.length?'<div class="data-panel"><strong style="font-size:12px">Efectividad por dirección</strong></div>'+sides.map(([name,item])=>'<article class="data-row"><div><span>Dirección · señales '+item.total+'</span><strong>'+esc(name)+'</strong></div><div><span>Ganadas</span><strong>'+item.wins+'</strong></div><div><span>Perdidas</span><strong>'+item.losses+'</strong></div></article>').join(""):"";
     breakdown.innerHTML=groupHtml+sideHtml;
-    message.textContent=(data.sample_note?data.sample_note+" ":"")+(data.note||"Resultados simulados del scanner.")+(data.data_quality?(" Fuente principal: BiQuote de referencia. Registros históricos sin proveedor: "+(data.data_quality.unknown_legacy_count??0)+"."):"")+(data.truncated?" Atención: se alcanzó el límite de lectura; la estadística puede estar incompleta.":"");
+    message.textContent=(data.sample_note?data.sample_note+" ":"")+(data.note||"Resultados simulados del scanner.")+(data.data_quality?(" Fuente principal: BiQuote de referencia. Resultados BiQuote antiguos con tiempo no verificable: "+(data.data_quality.biquote_timing_unverified_count??0)+". Registros históricos sin proveedor: "+(data.data_quality.unknown_legacy_count??0)+"."):"")+(data.truncated?" Atención: se alcanzó el límite de lectura; la estadística puede estar incompleta.":"");
   }catch(error){message.textContent=error.message||"Error al calcular rendimiento.";}
 }
 document.getElementById("historyRefresh").addEventListener("click",loadHistory);

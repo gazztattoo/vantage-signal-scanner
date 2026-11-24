@@ -2185,6 +2185,7 @@ def push_scan():
                 data = response.get_json() or {}
                 cross_timeframe_confirmation = False
                 trade_direction = data.get("signal") or "ESPERAR"
+                already_validated_same_candle = False
 
                 # M30 is context only: it never creates or sends an independent alert.
                 if interval == "30min":
@@ -2383,7 +2384,7 @@ def push_scan():
 
                 # Asegurar el historial de la oportunidad M15; M5 solo confirma.
                 candle_time = str(data.get("candle_time") or candle_time or "")
-                if direction.startswith("ENTRADA_VALIDADA_"):
+                if direction.startswith("ENTRADA_VALIDADA_") and not already_validated_same_candle:
                     signal_key = "|".join([symbol, interval, trade_direction, candle_time])
                     history_payload = {
                         "signal_key": signal_key,

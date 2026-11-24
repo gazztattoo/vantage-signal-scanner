@@ -2414,7 +2414,8 @@ def push_scan():
                         quote_check = {}
                     confirmation = evaluate_m15_confirmation(
                         m15_prealert_context, data, m30_context, quote_check
-                    )                    if not confirmation.get("valid"):
+                    )
+                    if not confirmation.get("valid"):
                         results.append({
                             "symbol": symbol, "interval": "5min",
                             "status": "internal_m5_waiting_or_late",

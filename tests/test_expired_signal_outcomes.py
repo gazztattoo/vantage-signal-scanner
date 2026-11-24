@@ -94,8 +94,8 @@ class ExpiredSignalOutcomeTests(unittest.TestCase):
         }]
         candles = [
             {"time": "2026-10-01T00:00:00+00:00", "high": 105.0, "low": 95.0, "close": 100.0},
-            {"time": "2026-10-01T00:05:00+00:00", "high": 121.0, "low": 99.0, "close": 120.0},
-            {"time": "2026-10-01T00:10:00+00:00", "high": 105.0, "low": 89.0, "close": 95.0},
+            {"time": "2026-10-01T00:05:00+00:00", "high": 105.0, "low": 89.0, "close": 95.0},
+            {"time": "2026-10-01T00:10:00+00:00", "high": 105.0, "low": 95.0, "close": 100.0},
         ]
         with patch.object(app.requests, "get", return_value=pending_response):
             with patch.object(app.requests, "patch", return_value=Mock(status_code=204)) as patch_call:
@@ -104,7 +104,7 @@ class ExpiredSignalOutcomeTests(unittest.TestCase):
         payload = patch_call.call_args.kwargs["json"]
         self.assertEqual(payload["status"], "SL")
         self.assertEqual(payload["candles_to_resolution"], 1)
-        self.assertEqual(payload["closing_candle_time"], "2026-10-01T00:10:00+00:00")
+        self.assertEqual(payload["closing_candle_time"], "2026-10-01T00:05:00+00:00")
 
     def test_same_candle_tp_and_sl_is_ambiguous(self):
         pending_response = Mock(status_code=200)

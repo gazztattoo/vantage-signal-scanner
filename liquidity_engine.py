@@ -206,9 +206,16 @@ def analyze_liquidity(
                               "touches": 1, "last_time": latest["time"],
                               "classification": "INTERNAL"})
 
-    last_sweep = sweeps[-1] if sweeps else None
-    last_event = structure_events[-1] if structure_events else None
+    last_sweep = dict(sweeps[-1]) if sweeps else None
+    last_event = dict(structure_events[-1]) if structure_events else None
+    if last_sweep:
+        last_sweep["bars_ago"] = len(bars)-1-last_sweep["index"]
+    if last_event:
+        last_event["bars_ago"] = len(bars)-1-last_event["index"]
     ob = last_event.get("order_block_candidate") if last_event else None
+    if ob:
+        ob = dict(ob)
+        ob["bars_ago"] = len(bars)-1-ob["index"]
     bias = last_sweep["side"] if last_sweep else (
         last_event["direction"] if last_event else trend
     )

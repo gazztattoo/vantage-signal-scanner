@@ -2016,16 +2016,15 @@ if ("serviceWorker" in navigator) {
       const d=await res.json().catch(()=>({}));
       if(!res.ok||d.research_only!==true)throw new Error(d.error||"Análisis BiQuote no disponible");
       const side=d.pre_signal_side||d.signal_research;
-      let headline="ESPERAR CONFIRMACIÓN";
-      if(d.pre_signal===true&&(side==="BUY"||side==="SELL"))headline="PREPARAR MT5 · "+(side==="BUY"?"COMPRA":"VENTA");
-      else if((d.signal_research==="BUY"||d.signal_research==="SELL")&&d.setup_status==="READY")headline="ESTRUCTURA VALIDADA EN BIQUOTE · "+(d.signal_research==="BUY"?"COMPRA":"VENTA");
+      const sideLabel=(side==="BUY"||side==="SELL")?(side==="BUY"?"COMPRA":"VENTA"):"SIN DIRECCIÓN";
+      // This endpoint is research-only: it cannot create an alert or validate an entry.
+      const headline=(d.pre_signal===true||(d.signal_research==="BUY"||d.signal_research==="SELL"))
+        ?"SESGO EN ESTUDIO · "+sideLabel
+        :"ESPERAR · SIN SEÑAL OPERATIVA";
       stage.textContent=headline;
-      reason.textContent=d.reason||"Sin confirmación estructural. No preparar una orden todavía.";
-      const mtf=d.mtf||{};
-      meta.textContent="XAU/USD · "+tf.toUpperCase()+" · Confluencia "+(d.score??"—")+"/"+(d.score_max??7)+" · Sesgo "+labelBias(d.primary_bias)+" · "+(d.provider||"BiQuote")+" · Solo sombra";
-      stage.style.color=d.pre_signal?"#e6bd65":d.setup_status==="READY"?"#83d7a0":"#e9c77e";
-      if(d.pre_signal===true)reason.textContent+=" Espera el disparador; esta preseñal no es una orden.";
-      if(d.setup_status==="READY")reason.textContent+=" La estructura está confirmada en BiQuote, pero falta verificar precio, spread y ejecución en Vantage MT5.";
+      reason.textContent=(d.reason||"Sin confirmación estructural.")+" Módulo BiQuote de investigación: no crea prealertas, no valida entradas y no envía notificaciones.";
+      meta.textContent="XAU/USD · "+tf.toUpperCase()+" · Confluencia "+(d.score??"—")+"/"+(d.score_max??7)+" · Sesgo "+labelBias(d.primary_bias)+" · BiQuote · NO OPERATIVO";
+      stage.style.color="#e9c77e";
       lastKey=headline+"|"+reason.textContent;
     }catch(e){
       stage.textContent="ESPERAR · DATOS NO VALIDADOS";

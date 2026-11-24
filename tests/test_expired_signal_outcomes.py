@@ -35,6 +35,7 @@ class ExpiredSignalOutcomeTests(unittest.TestCase):
         pending_response.json.return_value = [{
             "id": 7,
             "direction": direction,
+            "signal_at": "2026-10-01T00:00:00+00:00",
             "candle_time": "2026-10-01T00:00:00+00:00",
             "entry_price": 100.0,
             "stop_loss": 90.0 if direction == "COMPRA" else 110.0,
@@ -51,7 +52,7 @@ class ExpiredSignalOutcomeTests(unittest.TestCase):
 
     def test_expired_buy_is_marked_to_market(self):
         result, payload = self.run_case("COMPRA", 105.0)
-        self.assertEqual(result, {"resolved": 0, "expired": 1, "errors": 0})
+        self.assertEqual(result, {"resolved": 0, "expired": 1, "ambiguous": 0, "errors": 0})
         self.assertEqual(payload["status"], "CADUCADA")
         self.assertEqual(payload["exit_price"], 105.0)
         self.assertEqual(payload["result_r"], 0.5)
@@ -80,6 +81,52 @@ class ExpiredSignalOutcomeTests(unittest.TestCase):
                 )
         self.assertEqual(result["errors"], 1)
         patch_call.assert_not_called()
+
+
+    def test_first_partially_elapsed_bar_is_excluded(self):
+        pending_response = Mock(status_code=200)
+        pending_response.json.return_value = [{
+            "id": 9, "direction": "COMPRA",
+            "signal_at": "2026-10-01T00:02:00+00:00",
+            "candle_time": "2026-10-01T00:00:00+00:00",
+            "entry_price": 100.0, "stop_loss": 90.0,
+            "take_profit": 120.0, "status": "PENDIENTE",
+        }]
+        candles = [
+            {"time": "2026-10-01T00:00:00+00:00", "high": 105.0, "low": 95.0, "close": 100.0},
+            {"time": "2026-10-01T00:05:00+00:00", "high": 121.0, "low": 99.0, "close": 120.0},
+            {"time": "2026-10-01T00:10:00+00:00", "high": 105.0, "low": 89.0, "close": 95.0},
+        ]
+        with patch.object(app.requests, "get", return_value=pending_response):
+            with patch.object(app.requests, "patch", return_value=Mock(status_code=204)) as patch_call:
+                result = app.resolve_pending_signal_outcomes("EUR/USD", "5min", candles)
+        self.assertEqual(result, {"resolved": 1, "expired": 0, "ambiguous": 0, "errors": 0})
+        payload = patch_call.call_args.kwargs["json"]
+        self.assertEqual(payload["status"], "SL")
+        self.assertEqual(payload["candles_to_resolution"], 1)
+        self.assertEqual(payload["closing_candle_time"], "2026-10-01T00:10:00+00:00")
+
+    def test_same_candle_tp_and_sl_is_ambiguous(self):
+        pending_response = Mock(status_code=200)
+        pending_response.json.return_value = [{
+            "id": 10, "direction": "COMPRA",
+            "signal_at": "2026-10-01T00:00:00+00:00",
+            "candle_time": "2026-10-01T00:00:00+00:00",
+            "entry_price": 100.0, "stop_loss": 90.0,
+            "take_profit": 120.0, "status": "PENDIENTE",
+        }]
+        candles = [{
+            "time": "2026-10-01T00:00:00+00:00",
+            "high": 121.0, "low": 89.0, "close": 105.0,
+        }]
+        with patch.object(app.requests, "get", return_value=pending_response):
+            with patch.object(app.requests, "patch", return_value=Mock(status_code=204)) as patch_call:
+                result = app.resolve_pending_signal_outcomes("EUR/USD", "5min", candles)
+        self.assertEqual(result, {"resolved": 0, "expired": 0, "ambiguous": 1, "errors": 0})
+        payload = patch_call.call_args.kwargs["json"]
+        self.assertEqual(payload["status"], "AMBIGUA")
+        self.assertIsNone(payload["result_r"])
+        self.assertIsNone(payload["exit_price"])
 
 
 if __name__ == "__main__":

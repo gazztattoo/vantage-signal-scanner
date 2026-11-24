@@ -21,6 +21,13 @@ class PerformanceSourceSeparationTests(unittest.TestCase):
             {
                 "symbol": "XAU/USD", "timeframe": "5min", "direction": "COMPRA",
                 "status": "TP", "result_r": 2.0,
+                "result_source": "Vela OHLC completa cuyo inicio es igual o posterior a la siguiente frontera temporal tras signal_at.",
+                "indicators": {"data_provider": "biquote_reference_only"},
+            },
+            {
+                "symbol": "XAU/USD", "timeframe": "5min", "direction": "COMPRA",
+                "status": "SL", "result_r": -1.0,
+                "result_source": "Velas OHLC cerradas posteriores a la señal; si TP y SL coinciden en una vela, se cuenta SL primero.",
                 "indicators": {"data_provider": "biquote_reference_only"},
             },
             {
@@ -37,6 +44,8 @@ class PerformanceSourceSeparationTests(unittest.TestCase):
         self.assertEqual(data["losses"], 0)
         self.assertEqual(data["closed_trades"], 1)
         self.assertEqual(data["data_quality"]["unknown_legacy_count"], 1)
+        self.assertEqual(data["data_quality"]["biquote_timing_unverified_count"], 1)
+        self.assertEqual(data["source_breakdown"]["biquote_timing_unverified"]["losses"], 1)
         self.assertEqual(data["source_breakdown"]["unknown_legacy"]["losses"], 1)
         self.assertEqual(data["source_breakdown"]["biquote_reference_only"]["wins"], 1)
 

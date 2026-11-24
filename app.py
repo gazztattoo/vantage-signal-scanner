@@ -1160,6 +1160,7 @@ def analysis():
             "mtf": strategy.get("mtf"),
             "regime": strategy.get("regime"),
             "structure": strategy.get("structure"),
+            "liquidity": strategy.get("liquidity"),
             "structure_trigger": strategy.get("structure_trigger"),
             "score_components": strategy.get("score_components"),
             "status_code": strategy.get("status_code"),

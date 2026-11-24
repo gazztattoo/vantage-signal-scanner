@@ -67,6 +67,35 @@ def send_web_push(subscription, payload):
     )
 
 
+def _push_subscription_is_stale(exc):
+    """Recognize endpoints invalidated by expiration or a VAPID key rotation."""
+    response_obj = getattr(exc, "response", None)
+    status = getattr(response_obj, "status_code", None)
+    detail = getattr(response_obj, "text", "") if response_obj is not None else str(exc)
+    return status in (404, 410) or (
+        status == 400 and "VapidPkHashMismatch" in str(detail)
+    )
+
+
+def _remove_push_subscription(endpoint):
+    """Remove only the specific unusable TEST endpoint; never touches other devices."""
+    if not endpoint:
+        return False
+    response = requests.delete(
+        SUPABASE_URL + "/rest/v1/push_subscriptions?endpoint=eq."
+        + requests.utils.quote(endpoint, safe=""),
+        headers=supabase_headers(),
+        timeout=10,
+    )
+    if response.status_code not in (200, 204):
+        app.logger.warning(
+            "No se pudo retirar una suscripción push inválida de TEST; HTTP %s",
+            response.status_code,
+        )
+        return False
+    return True
+
+
 def access_serializer():
     if not ACCESS_TOKEN_SECRET:
         raise RuntimeError("Falta configurar ACCESS_TOKEN_SECRET en Render")
@@ -675,9 +704,10 @@ def biquote_research_analysis():
         return jsonify({"enabled": False, "research_only": True, "signals_activated": False}), 503
     symbol = get_symbol(request.args.get("symbol"))
     interval = (request.args.get("interval") or "5min").strip()
+    # Match the production TEST analysis map: M30 is not a dependency of M5/M15.
     frames = {
-        "5min": ("5m", "15m", "30m"),
-        "15min": ("15m", "30m", "1h"),
+        "5min": ("5m", "15m", "1h"),
+        "15min": ("15m", "1h", "4h"),
         "30min": ("30m", "1h", "4h"),
     }
     if not symbol:
@@ -992,9 +1022,11 @@ def analysis():
         if DATA_MODE == "biquote":
             if symbol != "XAU/USD":
                 raise RuntimeError("El motor BiQuote TEST está limitado a XAU/USD.")
+            # Automatic M5/M15 scans must not depend on M30 availability.
+            # M30 remains a manual analysis timeframe; higher context is H1/H4.
             frames = {
-                "5min": ("5m", "15m", "30m"),
-                "15min": ("15m", "30m", "1h"),
+                "5min": ("5m", "15m", "1h"),
+                "15min": ("15m", "1h", "4h"),
                 "30min": ("30m", "1h", "4h"),
             }
             base_interval, htf_1, htf_2 = frames[interval]
@@ -1929,14 +1961,21 @@ def monitor_test_manual_trades():
                     if not subscription:
                         outcomes.append({"trade_id":trade["id"],"status":"device_subscription_missing","stage":"warning"})
                         continue
-                    send_web_push(subscription,{
-                        "title":"⚠️ POSIBLE GIRO · REVISA MT5",
-                        "body":f"XAU/USD · {('COMPRA' if trade['side']=='COMPRA' else 'VENTA')} en seguimiento {interval}. Una vela cerrada cumple las condiciones de giro contrario. Es un aviso preventivo, aún no confirmado; revisa tu riesgo y el SL en MT5.",
-                        "tag":"gss-reversal-warning-"+trade["id"],
-                        "url":"https://global-signal-push-test-panel.onrender.com/panel_escaner_vantage.html?view=scanner&trade_tracking=1",
-                        "data":{"event_type":"ALERTA_PREVENTIVA_GIRO","trade_id":trade["id"],"symbol":"XAU/USD",
-                                "timeframe":interval,"side":trade["side"],"orders_sent":False}
-                    })
+                    try:
+                        send_web_push(subscription,{
+                            "title":"⚠️ POSIBLE GIRO · REVISA MT5",
+                            "body":f"XAU/USD · {('COMPRA' if trade['side']=='COMPRA' else 'VENTA')} en seguimiento {interval}. Una vela cerrada cumple las condiciones de giro contrario. Es un aviso preventivo, aún no confirmado; revisa tu riesgo y el SL en MT5.",
+                            "tag":"gss-reversal-warning-"+trade["id"],
+                            "url":"https://global-signal-push-test-panel.onrender.com/panel_escaner_vantage.html?view=scanner&trade_tracking=1",
+                            "data":{"event_type":"ALERTA_PREVENTIVA_GIRO","trade_id":trade["id"],"symbol":"XAU/USD",
+                                    "timeframe":interval,"side":trade["side"],"orders_sent":False}
+                        })
+                    except Exception as exc:
+                        if _push_subscription_is_stale(exc):
+                            _remove_push_subscription(trade["owner_endpoint"])
+                            outcomes.append({"trade_id":trade["id"],"status":"device_subscription_stale","stage":"warning"})
+                            continue
+                        raise
                     warning_update = requests.patch(
                         SUPABASE_URL + "/rest/v1/gss_test_active_trades",
                         params={"id":"eq."+trade["id"],"status":"eq.ACTIVE"},
@@ -1956,14 +1995,21 @@ def monitor_test_manual_trades():
                 if not subscription:
                     outcomes.append({"trade_id":trade["id"],"status":"device_subscription_missing","stage":"confirmed"})
                     continue
-                send_web_push(subscription,{
-                    "title":"🔴 GIRO CONFIRMADO · REVISA CIERRE",
-                    "body":f"XAU/USD · {('COMPRA' if trade['side']=='COMPRA' else 'VENTA')} en seguimiento {interval}. Dos velas cerradas confirman ruptura y momentum contrario. Revisa MT5; Gedeón no cierra operaciones.",
-                    "tag":"gss-close-"+trade["id"],
-                    "url":"https://global-signal-push-test-panel.onrender.com/panel_escaner_vantage.html?view=scanner&trade_tracking=1",
-                    "data":{"event_type":"ALERTA_CIERRE","trade_id":trade["id"],"symbol":"XAU/USD",
-                            "timeframe":interval,"side":trade["side"],"orders_sent":False}
-                })
+                try:
+                    send_web_push(subscription,{
+                        "title":"🔴 GIRO CONFIRMADO · REVISA CIERRE",
+                        "body":f"XAU/USD · {('COMPRA' if trade['side']=='COMPRA' else 'VENTA')} en seguimiento {interval}. Dos velas cerradas confirman ruptura y momentum contrario. Revisa MT5; Gedeón no cierra operaciones.",
+                        "tag":"gss-close-"+trade["id"],
+                        "url":"https://global-signal-push-test-panel.onrender.com/panel_escaner_vantage.html?view=scanner&trade_tracking=1",
+                        "data":{"event_type":"ALERTA_CIERRE","trade_id":trade["id"],"symbol":"XAU/USD",
+                                "timeframe":interval,"side":trade["side"],"orders_sent":False}
+                    })
+                except Exception as exc:
+                    if _push_subscription_is_stale(exc):
+                        _remove_push_subscription(trade["owner_endpoint"])
+                        outcomes.append({"trade_id":trade["id"],"status":"device_subscription_stale","stage":"confirmed"})
+                        continue
+                    raise
                 requests.patch(
                     SUPABASE_URL + "/rest/v1/gss_test_active_trades",
                     params={"id":"eq."+trade["id"],"status":"eq.ACTIVE"},
@@ -1996,6 +2042,8 @@ def push_scan():
     if not SIGNAL_CRON_SECRET or not hmac.compare_digest(supplied, SIGNAL_CRON_SECRET):
         return jsonify({"error": "No autorizado."}), 401
 
+    scan_started_at = datetime.now(timezone.utc).isoformat()
+    app.logger.info("TEST push scan started at %s", scan_started_at)
     trade_monitor_results = monitor_test_manual_trades()
     results = []
     sent_total = 0
@@ -2302,6 +2350,7 @@ def push_scan():
                                         raise RuntimeError("No se pudieron consultar los dispositivos registrados.")
                                     cancel_delivered = 0
                                     cancel_errors = 0
+                                    cancel_stale = []
                                     for cancel_row in cancel_subs_response.json():
                                         cancel_subscription = cancel_row.get("subscription")
                                         if not isinstance(cancel_subscription, dict):
@@ -2309,18 +2358,29 @@ def push_scan():
                                         try:
                                             send_web_push(cancel_subscription, cancel_payload)
                                             cancel_delivered += 1
-                                        except Exception:
+                                        except Exception as exc:
                                             cancel_errors += 1
-                                            app.logger.exception(
-                                                "No se pudo enviar alerta de cancelación symbol=%s interval=%s",
-                                                symbol, interval,
-                                            )
+                                            if _push_subscription_is_stale(exc):
+                                                cancel_stale.append(cancel_subscription.get("endpoint", ""))
+                                                app.logger.warning(
+                                                    "Suscripción push TEST obsoleta retirada tras fallo de cancelación."
+                                                )
+                                            else:
+                                                app.logger.exception(
+                                                    "No se pudo enviar alerta de cancelación symbol=%s interval=%s",
+                                                    symbol, interval,
+                                                )
+                                    removed_stale = sum(
+                                        1 for endpoint in cancel_stale
+                                        if _remove_push_subscription(endpoint)
+                                    )
                                     results.append({
                                         "symbol": symbol, "interval": interval,
                                         "status": "prealert_cancelled_notification_sent" if cancel_delivered else "prealert_cancelled_notification_failed",
                                         "cancelled_side": cancelled_side,
                                         "push_delivered": cancel_delivered,
                                         "push_errors": cancel_errors,
+                                        "stale_subscriptions_removed": removed_stale,
                                     })
                                 except Exception:
                                     app.logger.exception(
@@ -2388,7 +2448,8 @@ def push_scan():
                         else:
                             subscriptions = subs_response.json()
                             delivered = 0
-                            expired = []
+                            push_errors = 0
+                            stale_endpoints = []
                             for row in subscriptions:
                                 subscription = row.get("subscription")
                                 if not isinstance(subscription, dict):
@@ -2426,24 +2487,41 @@ def push_scan():
                                     })
                                     delivered += 1
                                 except Exception as exc:
-                                    response_obj = getattr(exc, "response", None)
-                                    if getattr(response_obj, "status_code", None) in (404, 410):
-                                        expired.append(subscription.get("endpoint", ""))
+                                    push_errors += 1
+                                    if _push_subscription_is_stale(exc):
+                                        stale_endpoints.append(subscription.get("endpoint", ""))
+                                    else:
+                                        app.logger.exception(
+                                            "Falló la entrega push TEST symbol=%s interval=%s",
+                                            symbol, interval,
+                                        )
 
-                            for endpoint in expired:
-                                if endpoint:
-                                    requests.delete(
-                                        SUPABASE_URL + "/rest/v1/push_subscriptions?endpoint=eq." + requests.utils.quote(endpoint, safe=""),
-                                        headers=supabase_headers(), timeout=10,
-                                    )
+                            removed_stale = sum(
+                                1 for endpoint in stale_endpoints
+                                if _remove_push_subscription(endpoint)
+                            )
 
                             sent_total += delivered
                             results.append({
                                 "symbol": symbol, "interval": interval,
                                 "status": "new_signal_notified" if delivered else "new_signal_no_delivery",
-                                "devices": delivered
+                                "devices": delivered,
+                                "push_errors": push_errors,
+                                "stale_subscriptions_removed": removed_stale,
                             })
             if index < 8:
                 time.sleep(8)
 
-    return jsonify({"ok": True, "alerts_sent": sent_total, "trade_monitor": trade_monitor_results, "checks": results})
+    scan_completed_at = datetime.now(timezone.utc).isoformat()
+    app.logger.info(
+        "TEST push scan completed started_at=%s completed_at=%s alerts_sent=%s checks=%s",
+        scan_started_at, scan_completed_at, sent_total, json.dumps(results, ensure_ascii=False),
+    )
+    return jsonify({
+        "ok": True,
+        "started_at": scan_started_at,
+        "completed_at": scan_completed_at,
+        "alerts_sent": sent_total,
+        "trade_monitor": trade_monitor_results,
+        "checks": results,
+    })

@@ -1683,6 +1683,7 @@ async function loadPerformance(){
       ["Resultados cerrados",data.closed_trades??0],
       ["Ganadas (TP)",data.wins??0],
       ["Perdidas (SL)",data.losses??0],
+      ["Casos ambiguos (excluidos)",data.ambiguous??0],
       ["Porcentaje de acierto",data.win_rate===null?"—":data.win_rate+"%"],
       ["Expectativa media",data.expectancy_r===null?"—":data.expectancy_r+" R"],
       ["Factor de beneficio",data.profit_factor==="inf"?"∞":data.profit_factor??"—"]
@@ -1693,7 +1694,7 @@ async function loadPerformance(){
     const sides=Object.entries(data.direction_breakdown||{});
     const sideHtml=sides.length?'<div class="data-panel"><strong style="font-size:12px">Efectividad por dirección</strong></div>'+sides.map(([name,item])=>'<article class="data-row"><div><span>Dirección · señales '+item.total+'</span><strong>'+esc(name)+'</strong></div><div><span>Ganadas</span><strong>'+item.wins+'</strong></div><div><span>Perdidas</span><strong>'+item.losses+'</strong></div></article>').join(""):"";
     breakdown.innerHTML=groupHtml+sideHtml;
-    message.textContent=(data.sample_note?data.sample_note+" ":"")+(data.note||"Resultados simulados del scanner.")+(data.truncated?" Atención: se alcanzó el límite de lectura; la estadística puede estar incompleta.":"");
+    message.textContent=(data.sample_note?data.sample_note+" ":"")+(data.note||"Resultados simulados del scanner.")+(data.data_quality?(" Fuente principal: BiQuote de referencia. Registros históricos sin proveedor: "+(data.data_quality.unknown_legacy_count??0)+"."):"")+(data.truncated?" Atención: se alcanzó el límite de lectura; la estadística puede estar incompleta.":"");
   }catch(error){message.textContent=error.message||"Error al calcular rendimiento.";}
 }
 document.getElementById("historyRefresh").addEventListener("click",loadHistory);

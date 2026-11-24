@@ -35,6 +35,25 @@ class LiquidityEngineTests(unittest.TestCase):
         self.assertEqual(result["last_sweep"]["pool"], "BUY_SIDE_LIQUIDITY")
         self.assertEqual(result["last_sweep"]["side"], "BEARISH")
 
+    def test_dual_sided_sweep_is_ambiguous(self):
+        bars = [
+            candle(0, 4, 5, 3, 4),
+            candle(1, 5, 6, 4, 5),
+            candle(2, 4, 5, 3, 4),
+            candle(3, 5, 8, 4, 6),
+            candle(4, 4, 5, 2, 3),
+            candle(5, 3, 4, 0, 2),
+            candle(6, 2, 3, 1, 2),
+            candle(7, 5, 9, -1.5, 7),  # takes both confirmed pools
+            candle(8, 6, 7, 4.5, 6),
+            candle(9, 5, 6, 4.5, 5),
+            candle(10, 4, 5, 4.5, 4),
+            candle(11, 4, 5, 4.5, 4),
+        ]
+        result = analyze_liquidity(bars, atr_value=1.0, left_bars=1, right_bars=1)
+        self.assertEqual(result["last_sweep"]["pool"], "DUAL_SIDED_LIQUIDITY")
+        self.assertEqual(result["last_sweep"]["side"], "AMBIGUOUS")
+
     def test_pivot_is_not_usable_on_its_confirmation_bar(self):
         bars = [
             candle(0, 4, 5, 3, 4),

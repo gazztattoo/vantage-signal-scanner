@@ -2275,6 +2275,7 @@ def push_scan():
                                 and not prealert_entry_not_crossed(m15_prealert_context, prealert_quote)
                             ):
                                 m15_prealert_context = None
+                        terminal_prealert_reason = None
                         if m15_prealert_context:
                             direction = "PREPARAR_" + (
                                 "COMPRA" if m15_prealert_context["side"] == "BUY" else "VENTA"
@@ -2289,6 +2290,43 @@ def push_scan():
                             and str(saved_row.get("fingerprint") or "").endswith("|" + current_m15_candle)
                         ):
                             direction = saved_row["direction"]
+                        elif saved_is_prealert:
+                            # Recover the immutable plan even after its 20-minute
+                            # validation window, solely to notify its terminal state.
+                            try:
+                                raw_fingerprint = str(saved_row.get("fingerprint") or "")
+                                raw_context = json.loads(raw_fingerprint.split("M15_PREALERT|", 1)[1])
+                                raw_side = raw_context.get("side")
+                                raw_candle = datetime.fromisoformat(
+                                    str(raw_context.get("candle_time") or "").replace("Z", "+00:00")
+                                )
+                                if raw_candle.tzinfo is None:
+                                    raw_candle = raw_candle.replace(tzinfo=timezone.utc)
+                                age_minutes = (
+                                    datetime.now(timezone.utc) - raw_candle.astimezone(timezone.utc)
+                                ).total_seconds() / 60.0
+                                if age_minutes > 20 and raw_side in ("BUY", "SELL"):
+                                    direction = "PREALERTA_EXPIRADA"
+                                    terminal_prealert_reason = "La prealerta M15 cumplió 20 minutos sin confirmación M5."
+                                elif (
+                                    raw_side in ("BUY", "SELL")
+                                    and prealert_quote.get("accepted") is True
+                                    and float(prealert_quote.get("quote_age_seconds", 9999)) <= 60
+                                ):
+                                    current_quote = float(
+                                        prealert_quote["ask"] if raw_side == "BUY" else prealert_quote["bid"]
+                                    )
+                                    raw_entry = float(raw_context["entry"])
+                                    crossed = current_quote >= raw_entry if raw_side == "BUY" else current_quote <= raw_entry
+                                    if crossed:
+                                        direction = "PREALERTA_CANCELADA"
+                                        terminal_prealert_reason = "El precio ya cruzó el nivel M15 sin validación M5."
+                                    else:
+                                        direction = "ESPERAR"
+                                else:
+                                    direction = "ESPERAR"
+                            except (KeyError, TypeError, ValueError, IndexError):
+                                direction = "ESPERAR"
                         else:
                             direction = "ESPERAR"
 
@@ -2590,9 +2628,13 @@ def push_scan():
                             })
                             continue
 
+                        is_terminal_prealert = direction in (
+                            "PREALERTA_CANCELADA", "PREALERTA_EXPIRADA"
+                        )
                         if not (
                             direction.startswith("PREPARAR_")
                             or direction.startswith("ENTRADA_VALIDADA_")
+                            or is_terminal_prealert
                         ):
                             results.append({
                                 "symbol": symbol, "interval": interval,
@@ -2616,7 +2658,17 @@ def push_scan():
                         entry_value = data.get("planned_entry") if is_prealert else data.get("entry")
                         stop_value = data.get("planned_stop_loss") if is_prealert else data.get("stop_loss")
                         target_value = data.get("planned_take_profit") if is_prealert else data.get("take_profit")
-                        if is_prealert:
+                        if is_terminal_prealert:
+                            alert_title = (
+                                "PREALERTA CANCELADA · XAU/USD"
+                                if direction == "PREALERTA_CANCELADA"
+                                else "PREALERTA EXPIRADA · XAU/USD"
+                            )
+                            alert_body = (
+                                (terminal_prealert_reason or "La oportunidad M15 terminó sin entrada validada.")
+                                + " No coloques la orden. Espera una nueva prealerta."
+                            )
+                        elif is_prealert:
                             alert_title = "PREPARAR MT5 · XAU/USD"
                             alert_body = (
                                 f"PREALERTA {signal_side} · {short_interval}. "

@@ -31,10 +31,11 @@ CORS(app, resources={
     }
 })
 
-# TEST only: mock remains the safe default; BiQuote activation is explicit per TEST service.
-DATA_MODE = os.environ.get("TEST_DATA_MODE", "mock").strip().lower()
-if DATA_MODE not in ("mock", "biquote"):
-    DATA_MODE = "mock"
+# Fail closed: operational TEST may use verified BiQuote only. Missing/invalid
+# configuration disables market analysis; synthetic/mock data is never operational.
+DATA_MODE = os.environ.get("TEST_DATA_MODE", "disabled").strip().lower()
+if DATA_MODE != "biquote":
+    DATA_MODE = "disabled"
 # MT5 ingestion is a separate shadow feed; it never changes DATA_MODE or signal inputs.
 MT5_INGEST_TOKEN = os.environ.get("MT5_INGEST_TOKEN", "")
 MT5_TEST_SUPABASE_URL = "https://viiraygjdqwiuawnzyrc.supabase.co"
@@ -297,8 +298,7 @@ def economic_news_context():
                 "id": str(row.get("id", "")),
                 "time": event_time.isoformat(),
                 "minutes_until": minutes,
-                "currency": currency,
-                "impact": impact,
+                "currency": currency,                "impact": impact,
                 "title": str(row.get("title", row.get("name", "Evento económico")))[:180],
                 "forecast": row.get("forecast"),
                 "previous": row.get("previous"),
@@ -597,8 +597,7 @@ def fetch_biquote_research_tick(symbol):
         symbol=symbol,
         max_age_seconds=60,
     )
-    if not result.get("accepted"):
-        raise RuntimeError(result.get("reason", "Cotización BiQuote rechazada."))
+    if not result.get("accepted"):        raise RuntimeError(result.get("reason", "Cotización BiQuote rechazada."))
     result.update({
         "research_only": True,
         "signals_activated": False,
@@ -897,8 +896,7 @@ def ingest_mt5_candles():
             SUPABASE_URL + "/rest/v1/mt5_market_candles",
             params={"on_conflict": "symbol,timeframe,open_time"},
             json=rows,
-            headers=headers,
-            timeout=15,
+            headers=headers,            timeout=15,
         )
     except (requests.RequestException, RuntimeError):
         app.logger.error("Falló el transporte de ingestión MT5 hacia el almacenamiento TEST.")
@@ -1024,6 +1022,23 @@ def analysis():
             "error": "Intervalo no permitido",
             "allowed_intervals": sorted(ALLOWED_INTERVALS),
         }), 400
+
+    # Hard operational boundary: never calculate or display a trade setup unless
+    # the TEST service is explicitly configured for real BiQuote data.
+    if DATA_MODE != "biquote" or not BIQUOTE_RESEARCH_ENABLED:
+        return jsonify({
+            "symbol": symbol,
+            "interval": interval,
+            "signal": "ESPERAR",
+            "reason": "DATOS REALES NO DISPONIBLES. BiQuote no está habilitado; no se genera ninguna entrada.",
+            "entry": None, "stop_loss": None, "take_profit": None,
+            "planned_entry": None, "planned_stop_loss": None, "planned_take_profit": None,
+            "pre_signal": False, "pre_signal_side": None,
+            "data_mode": "disabled", "provider": None,
+            "data_source": None, "execution_price": False,
+            "signals_activated": False, "orders_sent": False,
+            "warning": "Escáner bloqueado: no se utilizan datos simulados ni proveedores alternativos.",
+        }), 200
 
     try:
         live_bundle = None
@@ -1197,8 +1212,7 @@ def analysis():
             ),
             "indicator_diagnostics": {
                 "adx": {
-                    "value": round(float(strategy.get("adx14")), 2) if strategy.get("adx14") is not None else None,
-                    "required": "contexto >=18",
+                    "value": round(float(strategy.get("adx14")), 2) if strategy.get("adx14") is not None else None,                    "required": "contexto >=18",
                     "passed": strategy.get("adx14") is not None and float(strategy.get("adx14")) >= 18,
                 },
                 "macd": {
@@ -1497,8 +1511,7 @@ def lab_status():
             total = content_range.rsplit("/", 1)[-1]
             return int(total) if total.isdigit() else 0
 
-        total_signals = exact_count("/rest/v1/signal_history")
-        pending_signals = exact_count(
+        total_signals = exact_count("/rest/v1/signal_history")        pending_signals = exact_count(
             "/rest/v1/signal_history",
             {"select": "id", "status": "eq.PENDIENTE"},
         )
@@ -1509,7 +1522,7 @@ def lab_status():
         subscriptions = exact_count("/rest/v1/push_subscriptions")
         return jsonify({
             "checked_at": datetime.now(timezone.utc).isoformat(),
-            "data_provider": "biquote" if DATA_MODE == "biquote" else "synthetic_mock",
+            "data_provider": "biquote" if DATA_MODE == "biquote" else None,
             "provider_configured": DATA_MODE == "biquote" and BIQUOTE_RESEARCH_ENABLED,
             "data_mode": DATA_MODE,
             "signals_activated": False,
@@ -1797,8 +1810,7 @@ def resolve_pending_signal_outcomes(symbol, interval, recent_candles):
                 timeout=15,
             )
             if patch.status_code in (200, 204):
-                if is_ambiguous:
-                    ambiguous += 1
+                if is_ambiguous:                    ambiguous += 1
                 elif is_expired:
                     expired += 1
                 else:
@@ -1878,7 +1890,11 @@ def _test_registered_subscription(endpoint):
 
 @app.route("/api/push/test-reversal", methods=["POST"])
 def push_test_reversal():
-    """Send two staged, clearly labeled TEST pushes only to the requesting device."""
+    """Disabled: synthetic reversal notifications are prohibited in operational TEST."""
+    return jsonify({
+        "error": "Las notificaciones de escenarios simulados están deshabilitadas.",
+        "simulated": False, "push_sent": False, "orders_sent": False,
+    }), 410
     payload = request.get_json(silent=True) or {}
     endpoint = str(payload.get("endpoint") or "").strip()
     if not endpoint.startswith("https://") or len(endpoint) > 2048:
@@ -2097,8 +2113,7 @@ def monitor_test_manual_trades():
                 )
                 if update.status_code not in (200,204):
                     outcomes.append({"trade_id":trade["id"],"status":"state_update_error"})
-                    continue
-                if count == 1 and not trade.get("reversal_warning_sent_at"):
+                    continue                if count == 1 and not trade.get("reversal_warning_sent_at"):
                     subscription = _test_registered_subscription(trade["owner_endpoint"])
                     if not subscription:
                         outcomes.append({"trade_id":trade["id"],"status":"device_subscription_missing","stage":"warning"})
@@ -2397,8 +2412,7 @@ def push_scan():
                         quote_check = {}
                     confirmation = evaluate_m15_confirmation(
                         m15_prealert_context, data, m30_context, quote_check
-                    )
-                    if not confirmation.get("valid"):
+                    )                    if not confirmation.get("valid"):
                         results.append({
                             "symbol": symbol, "interval": "5min",
                             "status": "internal_m5_waiting_or_late",
@@ -2697,8 +2711,7 @@ def push_scan():
                         is_prealert = direction.startswith("PREPARAR_")
                         signal_side = "COMPRA" if direction.endswith("COMPRA") else "VENTA"
                         entry_type_value = data.get("planned_entry_type") or (
-                            "BUY_STOP" if signal_side == "COMPRA" else "SELL_STOP"
-                        )
+                            "BUY_STOP" if signal_side == "COMPRA" else "SELL_STOP"                        )
                         entry_value = data.get("planned_entry") if is_prealert else data.get("entry")
                         stop_value = data.get("planned_stop_loss") if is_prealert else data.get("stop_loss")
                         target_value = data.get("planned_take_profit") if is_prealert else data.get("take_profit")

@@ -2279,6 +2279,59 @@ def push_scan():
                         })
                         continue
 
+                    # Do not create a validation/history record unless the exact
+                    # M15 prealert was durably saved and is still recent.
+                    prealert_state = requests.get(
+                        SUPABASE_URL + "/rest/v1/signal_alerts",
+                        params={
+                            "select": "direction,created_at,fingerprint",
+                            "market": "eq." + symbol,
+                            "timeframe": "eq.15min",
+                            "order": "created_at.desc",
+                            "limit": "1",
+                        },
+                        headers=supabase_headers(),
+                        timeout=12,
+                    )
+                    if prealert_state.status_code != 200 or not prealert_state.json():
+                        results.append({
+                            "symbol": symbol, "interval": "5min",
+                            "status": "m15_prealert_state_unavailable",
+                        })
+                        continue
+                    prealert_row = prealert_state.json()[0]
+                    expected_prealert = (
+                        "PREPARAR_COMPRA" if m15_prealert_context["side"] == "BUY"
+                        else "PREPARAR_VENTA"
+                    )
+                    persisted_context = restore_m15_prealert_context(
+                        prealert_row.get("fingerprint"),
+                        prealert_row.get("direction"),
+                        max_age_minutes=20,
+                    )
+                    try:
+                        persisted_at = datetime.fromisoformat(
+                            str(prealert_row.get("created_at")).replace("Z", "+00:00")
+                        )
+                        if persisted_at.tzinfo is None:
+                            persisted_at = persisted_at.replace(tzinfo=timezone.utc)
+                        persisted_age = (
+                            datetime.now(timezone.utc) - persisted_at.astimezone(timezone.utc)
+                        ).total_seconds()
+                    except (TypeError, ValueError):
+                        persisted_age = float("inf")
+                    if not (
+                        prealert_row.get("direction") == expected_prealert
+                        and persisted_context is not None
+                        and persisted_context.get("candle_time") == m15_prealert_context.get("candle_time")
+                        and 0 <= persisted_age <= 20 * 60
+                    ):
+                        results.append({
+                            "symbol": symbol, "interval": "5min",
+                            "status": "m15_prealert_not_current_for_validation",
+                        })
+                        continue
+
                     cross_timeframe_confirmation = True
                     trade_direction = (
                         "COMPRA" if m15_prealert_context["side"] == "BUY" else "VENTA"

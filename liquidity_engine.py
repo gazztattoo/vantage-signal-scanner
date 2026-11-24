@@ -196,15 +196,14 @@ def analyze_liquidity(
         ("SELL_SIDE_LIQUIDITY", recent_lows, "SWING_LOW"),
     ):
         if points:
-            extreme = (max if kind == "SWING_HIGH" else min)(p["price"] for p in points)
+            outer_point = (max if kind == "SWING_HIGH" else min)(points, key=lambda p: p["price"])
             latest = max(points, key=lambda p: p["index"])
-            zones.append({"type": kind, "pool": pool, "level": round(extreme, 5),
-                          "touches": 1, "last_time": latest["time"],
+            zones.append({"type": kind, "pool": pool, "level": round(outer_point["price"], 5),
+                          "touches": 1, "last_time": outer_point["time"],
                           "classification": "EXTERNAL"})
-            inner = max(points, key=lambda p: p["index"])
-            if abs(inner["price"]-extreme) > tol:
-                zones.append({"type": kind, "pool": pool, "level": round(inner["price"], 5),
-                              "touches": 1, "last_time": inner["time"],
+            if latest["index"] != outer_point["index"] and abs(latest["price"]-outer_point["price"]) > tol:
+                zones.append({"type": kind, "pool": pool, "level": round(latest["price"], 5),
+                              "touches": 1, "last_time": latest["time"],
                               "classification": "INTERNAL"})
 
     last_sweep = sweeps[-1] if sweeps else None

@@ -2225,6 +2225,7 @@ def push_scan():
                             if saved.json():
                                 saved_row = saved.json()[0]
                     except Exception:
+                        saved_state_ok = False
                         app.logger.exception("No se pudo recuperar el estado M15 persistido en TEST.")
                     if not saved_state_ok:
                         results.append({
@@ -2323,13 +2324,17 @@ def push_scan():
                         headers=supabase_headers(),
                         timeout=12,
                     )
-                    if prealert_state.status_code != 200 or not prealert_state.json():
+                    try:
+                        prealert_rows = prealert_state.json() if prealert_state.status_code == 200 else []
+                    except ValueError:
+                        prealert_rows = []
+                    if not isinstance(prealert_rows, list) or not prealert_rows:
                         results.append({
                             "symbol": symbol, "interval": "5min",
                             "status": "m15_prealert_state_unavailable",
                         })
                         continue
-                    prealert_row = prealert_state.json()[0]
+                    prealert_row = prealert_rows[0]
                     expected_prealert = (
                         "PREPARAR_COMPRA" if m15_prealert_context["side"] == "BUY"
                         else "PREPARAR_VENTA"

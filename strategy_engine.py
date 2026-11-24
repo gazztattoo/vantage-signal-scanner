@@ -11,7 +11,8 @@ from math import isfinite
 from typing import Any
 
 TIMEFRAME_MINUTES = {"5min": 5, "15min": 15, "30min": 30}
-MTF_MAP = {"5min": (15, 30), "15min": (30, 60), "30min": (60, 240)}
+# Automatic M5/M15 context avoids the M30 feed; M30 remains manual-only.
+MTF_MAP = {"5min": (15, 60), "15min": (60, 240), "30min": (60, 240)}
 
 
 def _time_seconds(value: Any) -> int:

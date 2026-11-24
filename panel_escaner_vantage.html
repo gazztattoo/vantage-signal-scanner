@@ -1738,6 +1738,40 @@ scannerInterval.addEventListener("change",()=>{
 const pushStatus=document.getElementById("pushStatus");
 const pushToggleButton=document.getElementById("pushToggle");
 const PUSH_API=API_BASE+"/api/push";
+async function fetchCurrentPushKey(){
+  const response=await fetch(PUSH_API+"/public-key",{cache:"no-store"});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||!data.public_key)throw new Error(data.error||"No se pudo obtener la clave pública.");
+  return data.public_key;
+}
+function urlBase64ToUint8Array(value){
+  const padding="=".repeat((4-value.length%4)%4);
+  const base64=(value+padding).replace(/-/g,"+").replace(/_/g,"/");
+  const raw=atob(base64);
+  return Uint8Array.from([...raw].map(char=>char.charCodeAt(0)));
+}
+async function pushSubscriptionMatchesCurrentKey(subscription,key){
+  const actual=subscription?.options?.applicationServerKey;
+  if(!actual)return false;
+  const expected=urlBase64ToUint8Array(key);
+  const stored=new Uint8Array(actual);
+  return expected.length===stored.length&&expected.every((value,index)=>value===stored[index]);
+}
+async function savePushSubscription(subscription){
+  const response=await fetch(PUSH_API+"/subscribe",{
+    method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({subscription:subscription.toJSON()})
+  });
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(result.error||"No se pudo guardar la suscripción.");
+}
+async function removeServerPushSubscription(subscription){
+  if(!subscription)return;
+  await fetch(PUSH_API+"/unsubscribe",{
+    method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({endpoint:subscription.endpoint})
+  }).catch(()=>null);
+}
 async function restorePushState(){
   try{
     if(!("serviceWorker" in navigator)||!("PushManager" in window)||!("Notification" in window)){
@@ -1752,27 +1786,27 @@ async function restorePushState(){
       pushToggleButton.disabled=true; return;
     }
     if(subscription){
-      pushStatus.textContent="Notificaciones activadas en este dispositivo";
-      pushToggleButton.textContent="🔕 Desactivar notificaciones";
+      const key=await fetchCurrentPushKey();
+      if(await pushSubscriptionMatchesCurrentKey(subscription,key)){
+        pushStatus.textContent="Notificaciones activadas en este dispositivo";
+        pushToggleButton.textContent="🔕 Desactivar notificaciones";
+      }else{
+        pushStatus.textContent="La suscripción anterior necesita actualizarse";
+        pushToggleButton.textContent="🔄 Reparar notificaciones";
+      }
     }else{
       pushStatus.textContent=Notification.permission==="granted"?"Permiso concedido, falta activar la suscripción":"Notificaciones desactivadas";
       pushToggleButton.textContent="🔔 Activar notificaciones";
     }
     pushToggleButton.disabled=false;
   }catch(error){
-    pushStatus.textContent="No se pudo comprobar el estado de las notificaciones";
-    pushToggleButton.textContent="🔔 Activar notificaciones";
+    pushStatus.textContent="No se pudo verificar la suscripción push";
+    pushToggleButton.textContent="🔄 Revisar notificaciones";
     pushToggleButton.disabled=false;
   }
 }
 restorePushState();
 
-function urlBase64ToUint8Array(value){
-  const padding="=".repeat((4-value.length%4)%4);
-  const base64=(value+padding).replace(/-/g,"+").replace(/_/g,"/");
-  const raw=atob(base64);
-  return Uint8Array.from([...raw].map(char=>char.charCodeAt(0)));
-}
 pushToggleButton.addEventListener("click",async()=>{
   pushToggleButton.disabled=true;
   try{
@@ -1780,29 +1814,38 @@ pushToggleButton.addEventListener("click",async()=>{
     const registration=await navigator.serviceWorker.ready;
     let subscription=await registration.pushManager.getSubscription();
     if(subscription){
-      pushStatus.textContent="Desactivando notificaciones…";
-      const response=await fetch(PUSH_API+"/unsubscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({endpoint:subscription.endpoint})});
-      const result=await response.json().catch(()=>({}));
-      if(!response.ok)throw new Error(result.error||"No se pudo eliminar la suscripción del servidor.");
-      await subscription.unsubscribe();
-      pushStatus.textContent="Notificaciones desactivadas en este dispositivo.";
-    }else{
+      const key=await fetchCurrentPushKey();
+      if(await pushSubscriptionMatchesCurrentKey(subscription,key)){
+        pushStatus.textContent="Desactivando notificaciones…";
+        const response=await fetch(PUSH_API+"/unsubscribe",{
+          method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({endpoint:subscription.endpoint})
+        });
+        const result=await response.json().catch(()=>({}));
+        if(!response.ok)throw new Error(result.error||"No se pudo eliminar la suscripción del servidor.");
+        await subscription.unsubscribe();
+        pushStatus.textContent="Notificaciones desactivadas en este dispositivo.";
+      }else{
+        pushStatus.textContent="Reparando suscripción antigua…";
+        await removeServerPushSubscription(subscription);
+        await subscription.unsubscribe();
+        subscription=null;
+      }
+    }
+    if(!subscription){
       pushStatus.textContent="Preparando notificaciones…";
-      const permission=await Notification.requestPermission();
+      const permission=Notification.permission==="granted"?"granted":await Notification.requestPermission();
       if(permission!=="granted")throw new Error("No se concedió permiso para notificaciones.");
-      const keyResponse=await fetch(PUSH_API+"/public-key");
-      const keyData=await keyResponse.json().catch(()=>({}));
-      if(!keyResponse.ok||!keyData.public_key)throw new Error(keyData.error||"No se pudo obtener la clave pública.");
-      subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(keyData.public_key)});
-      const response=await fetch(PUSH_API+"/subscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({subscription:subscription.toJSON()})});
-      const result=await response.json().catch(()=>({}));
-      if(!response.ok)throw new Error(result.error||"No se pudo guardar la suscripción.");
-      pushStatus.textContent="Notificaciones activadas en este dispositivo";
+      const key=await fetchCurrentPushKey();
+      subscription=await registration.pushManager.subscribe({
+        userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(key)
+      });
+      await savePushSubscription(subscription);
+      pushStatus.textContent="Notificaciones activadas y actualizadas en este dispositivo";
     }
   }catch(error){pushStatus.textContent=error.message||"No se pudo cambiar el estado de las notificaciones.";}
   finally{await restorePushState();}
-});
-</script>
+});</script>
 
 <script>
 if ("serviceWorker" in navigator) {

@@ -1511,7 +1511,8 @@ def lab_status():
             total = content_range.rsplit("/", 1)[-1]
             return int(total) if total.isdigit() else 0
 
-        total_signals = exact_count("/rest/v1/signal_history")        pending_signals = exact_count(
+        total_signals = exact_count("/rest/v1/signal_history")
+        pending_signals = exact_count(
             "/rest/v1/signal_history",
             {"select": "id", "status": "eq.PENDIENTE"},
         )

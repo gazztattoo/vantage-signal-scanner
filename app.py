@@ -2324,7 +2324,7 @@ def push_scan():
                         prealert_row.get("direction") == expected_prealert
                         and persisted_context is not None
                         and persisted_context.get("candle_time") == m15_prealert_context.get("candle_time")
-                        and 0 <= persisted_age <= 20 * 60
+                        and -60 <= persisted_age <= 20 * 60
                     ):
                         results.append({
                             "symbol": symbol, "interval": "5min",
@@ -2478,7 +2478,7 @@ def push_scan():
                                         previous_context is not None
                                         and m15_prealert_context is not None
                                         and previous_context.get("candle_time") == m15_prealert_context.get("candle_time")
-                                        and 0 <= (datetime.now(timezone.utc) - created_dt).total_seconds() <= 20 * 60
+                                        and -60 <= (datetime.now(timezone.utc) - created_dt).total_seconds() <= 20 * 60
                                     )
                                 except (TypeError, ValueError):
                                     prealert_is_recent = False

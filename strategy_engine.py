@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 from math import isfinite
 from typing import Any
 
+from liquidity_engine import analyze_liquidity
+
 TIMEFRAME_MINUTES = {"5min": 5, "15min": 15, "30min": 30}
 # Automatic M5/M15 context avoids the M30 feed; M30 remains manual-only.
 MTF_MAP = {"5min": (15, 60), "15min": (60, 240), "30min": (60, 240)}
@@ -317,6 +319,8 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timefr
         regime = "TREND"
 
     structure = _structure(bars, atr_now)
+    # Shadow diagnostics only: liquidity context does not alter entries or scores.
+    liquidity_context = analyze_liquidity(candles, atr_value=atr_now)
     sides = {}
     for side in ("BUY", "SELL"):
         desired = "BULL" if side == "BUY" else "BEAR"
@@ -385,6 +389,7 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timefr
             "aligned_sell": sides["SELL"]["mtf_aligned"],
         },
         "regime": regime, "structure": structure,
+        "liquidity": liquidity_context,
         "score": score, "score_max": 7,
         "confluence_grade": confluence_grade,
         "setup_grade": grade, "quality_grade": grade,

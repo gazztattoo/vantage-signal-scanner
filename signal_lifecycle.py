@@ -131,10 +131,31 @@ def evaluate_m15_confirmation(
         return reject("La prealerta M15 caducó.")
     side = prealert.get("side")
     expected_signal = "COMPRA" if side == "BUY" else "VENTA"
-    if m5.get("signal") != expected_signal:
-        return reject("M5 todavía no confirma la misma dirección.")
-    if m5.get("structure_trigger") in (None, "", "NONE", "PENDING"):
-        return reject("M5 todavía no confirma la ruptura o el retest.")
+    expected_bias = "BULL" if side == "BUY" else "BEAR"
+    if m5.get("primary_bias") not in (expected_bias, "NEUTRAL"):
+        return reject("El sesgo interno M5 contradice la prealerta M15.")
+    # Prefer M5's early structural setup so validation can arrive before the
+    # M15 stop level is crossed. A fully confirmed M5 breakout is also accepted
+    # only if price has not already crossed the original M15 entry.
+    if m5.get("pre_signal") is True:
+        structure = m5.get("structure") if isinstance(m5.get("structure"), dict) else {}
+        try:
+            m5_score = float(m5["score"])
+            distance_atr = float(structure["distance_atr"])
+        except (KeyError, TypeError, ValueError):
+            return reject("Faltan datos para validar la estructura anticipada M5.")
+        if (
+            m5.get("pre_signal_side") != side
+            or structure.get("near_direction") != side
+            or m5_score < 4
+            or distance_atr > 0.25
+        ):
+            return reject("La estructura anticipada M5 aún no tiene confluencia suficiente.")
+    elif (
+        m5.get("signal") != expected_signal
+        or m5.get("structure_trigger") in (None, "", "NONE", "PENDING")
+    ):
+        return reject("M5 todavía no confirma la misma dirección ni el disparador estructural.")
     try:
         m5_age = float(m5["candle_age_minutes"])
     except (KeyError, TypeError, ValueError):

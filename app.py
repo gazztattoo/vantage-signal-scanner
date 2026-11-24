@@ -2044,7 +2044,8 @@ def push_scan():
 
     scan_started_at = datetime.now(timezone.utc).isoformat()
     app.logger.info("TEST push scan started at %s", scan_started_at)
-    trade_monitor_results = monitor_test_manual_trades()
+    # Política de notificaciones: solo entradas nuevas validadas; sin avisos de gestión.
+    trade_monitor_results = []
     results = []
     sent_total = 0
     token = access_serializer().dumps({"access": True})
@@ -2313,90 +2314,23 @@ def push_scan():
                                 "status": "duplicate_state"
                             })
                             continue
+                        # Política TEST: guardar los cambios de estado, pero no notificar
+                        # prealertas, cancelaciones ni estados de espera. Solo se envían
+                        # entradas validadas con datos BiQuote recientes.
                         if direction == "ESPERAR":
-                            # Notify only when a previously issued PREALERTA is invalidated.
-                            # A normal WAIT state remains silent; this is a transition alert.
-                            if previous_direction in ("PREPARAR_COMPRA", "PREPARAR_VENTA"):
-                                short_interval = {"5min": "M5", "15min": "M15"}.get(interval, interval)
-                                cancelled_side = "COMPRA" if previous_direction.endswith("COMPRA") else "VENTA"
-                                cancel_payload = {
-                                    "title": "PREALERTA CANCELADA · XAU/USD",
-                                    "body": (
-                                        f"La PREALERTA de {cancelled_side} en {short_interval} perdió validez. "
-                                        "El motor pasó a ESPERAR por cambio de condiciones. "
-                                        "No abras una operación basándote en esa señal."
-                                    ),
-                                    "tag": "gss-cancel-XAUUSD-" + interval + "-" + candle_time,
-                                    "url": (
-                                        "https://global-signal-push-test-panel.onrender.com/panel_escaner_vantage.html"
-                                        "?view=scanner&symbol=XAU%2FUSD&timeframe="
-                                        + requests.utils.quote(interval, safe="")
-                                        + "&alert_stage=CANCELADA&alert_side="
-                                        + requests.utils.quote(cancelled_side, safe="")
-                                    ),
-                                    "data": {
-                                        "symbol": symbol, "interval": interval,
-                                        "event_type": "PREALERTA_CANCELADA",
-                                        "cancelled_side": cancelled_side,
-                                        "orders_sent": False,
-                                    },
-                                }
-                                try:
-                                    cancel_subs_response = requests.get(
-                                        SUPABASE_URL + "/rest/v1/push_subscriptions?select=subscription",
-                                        headers=supabase_headers(), timeout=15,
-                                    )
-                                    if cancel_subs_response.status_code != 200:
-                                        raise RuntimeError("No se pudieron consultar los dispositivos registrados.")
-                                    cancel_delivered = 0
-                                    cancel_errors = 0
-                                    cancel_stale = []
-                                    for cancel_row in cancel_subs_response.json():
-                                        cancel_subscription = cancel_row.get("subscription")
-                                        if not isinstance(cancel_subscription, dict):
-                                            continue
-                                        try:
-                                            send_web_push(cancel_subscription, cancel_payload)
-                                            cancel_delivered += 1
-                                        except Exception as exc:
-                                            cancel_errors += 1
-                                            if _push_subscription_is_stale(exc):
-                                                cancel_stale.append(cancel_subscription.get("endpoint", ""))
-                                                app.logger.warning(
-                                                    "Suscripción push TEST obsoleta retirada tras fallo de cancelación."
-                                                )
-                                            else:
-                                                app.logger.exception(
-                                                    "No se pudo enviar alerta de cancelación symbol=%s interval=%s",
-                                                    symbol, interval,
-                                                )
-                                    removed_stale = sum(
-                                        1 for endpoint in cancel_stale
-                                        if _remove_push_subscription(endpoint)
-                                    )
-                                    results.append({
-                                        "symbol": symbol, "interval": interval,
-                                        "status": "prealert_cancelled_notification_sent" if cancel_delivered else "prealert_cancelled_notification_failed",
-                                        "cancelled_side": cancelled_side,
-                                        "push_delivered": cancel_delivered,
-                                        "push_errors": cancel_errors,
-                                        "stale_subscriptions_removed": removed_stale,
-                                    })
-                                except Exception:
-                                    app.logger.exception(
-                                        "Error preparando alerta de cancelación symbol=%s interval=%s",
-                                        symbol, interval,
-                                    )
-                                    results.append({
-                                        "symbol": symbol, "interval": interval,
-                                        "status": "prealert_cancelled_notification_error",
-                                        "cancelled_side": cancelled_side,
-                                    })
-                            else:
-                                results.append({
-                                    "symbol": symbol, "interval": interval,
-                                    "status": "state_reset_no_notification"
-                                })
+                            results.append({
+                                "symbol": symbol, "interval": interval,
+                                "status": "state_reset_no_notification",
+                                "previous_direction": previous_direction,
+                            })
+                            continue
+
+                        if not direction.startswith("ENTRADA_VALIDADA_"):
+                            results.append({
+                                "symbol": symbol, "interval": interval,
+                                "status": "non_entry_state_recorded_no_notification",
+                                "direction": direction,
+                            })
                             continue
 
                         # Solo se notifica una transición nueva a COMPRA o VENTA.

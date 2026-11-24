@@ -23,11 +23,11 @@ class LiquidityEngineTests(unittest.TestCase):
             candle(4, 4, 5, 2, 3),
             candle(5, 3, 4, 0, 2),   # pivot low, confirmed after bar 6
             candle(6, 2, 3, 1, 2),
-            candle(7, 5, 9, 2, 7),   # closes below pivot high: buy-side sweep
-            candle(8, 6, 7, 3, 6),
-            candle(9, 5, 6, 2, 5),
-            candle(10, 4, 5, 1, 4),
-            candle(11, 4, 5, 3.5, 4),
+            candle(7, 5, 9, 4.5, 7),   # closes below pivot high: buy-side sweep
+            candle(8, 6, 7, 4.5, 6),
+            candle(9, 5, 6, 4.5, 5),
+            candle(10, 4, 5, 4.5, 4),
+            candle(11, 4, 5, 4.5, 4),
         ]
         result = analyze_liquidity(bars, atr_value=1.0, left_bars=1, right_bars=1)
         self.assertTrue(result["available"])

@@ -19,6 +19,7 @@ from signal_lifecycle import (
     restore_m15_prealert_context,
     evaluate_m15_confirmation,
     prealert_entry_not_crossed,
+    same_m15_plan,
 )
 
 app = Flask(__name__)
@@ -2358,7 +2359,7 @@ def push_scan():
                     if not (
                         prealert_row.get("direction") == expected_prealert
                         and persisted_context is not None
-                        and persisted_context.get("candle_time") == m15_prealert_context.get("candle_time")
+                        and same_m15_plan(persisted_context, m15_prealert_context)
                         and -60 <= persisted_age <= 20 * 60
                     ):
                         results.append({
@@ -2512,7 +2513,7 @@ def push_scan():
                                     prealert_is_recent = (
                                         previous_context is not None
                                         and m15_prealert_context is not None
-                                        and previous_context.get("candle_time") == m15_prealert_context.get("candle_time")
+                                        and same_m15_plan(previous_context, m15_prealert_context)
                                         and -60 <= (datetime.now(timezone.utc) - created_dt).total_seconds() <= 20 * 60
                                     )
                                 except (TypeError, ValueError):

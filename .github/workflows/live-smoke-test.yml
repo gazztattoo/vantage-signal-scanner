@@ -56,6 +56,7 @@ jobs:
               "provider_configured": lab.get("provider_configured"),
               "push_devices": (lab.get("records") or {}).get("push_devices"),
               "signals_activated": lab.get("signals_activated"),
+              "automatic_push_scan_enabled": lab.get("automatic_push_scan_enabled"),
           }))
 
           news = get_json(api + "/api/news/calendar")

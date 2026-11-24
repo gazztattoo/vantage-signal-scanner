@@ -2247,13 +2247,21 @@ def push_scan():
                         m15_prealert_context = None
                         direction = saved_row["direction"]
                     else:
-                        if fresh_context:
+                        # Check the live reference quote for BOTH a newly detected
+                        # prealert and a restored persisted prealert. Otherwise a
+                        # crossed level could be resurrected from storage and sent.
+                        prealert_quote = {}
+                        saved_is_prealert = bool(
+                            saved_row
+                            and str(saved_row.get("direction") or "").startswith("PREPARAR_")
+                        )
+                        if fresh_context or saved_is_prealert:
                             try:
                                 prealert_quote = fetch_biquote_research_tick(symbol)
                             except Exception:
                                 prealert_quote = {}
-                            if not prealert_entry_not_crossed(fresh_context, prealert_quote):
-                                fresh_context = None
+                        if fresh_context and not prealert_entry_not_crossed(fresh_context, prealert_quote):
+                            fresh_context = None
                         if fresh_context:
                             m15_prealert_context = fresh_context
                         else:
@@ -2262,6 +2270,11 @@ def push_scan():
                                 saved_row.get("direction") if saved_row else None,
                                 max_age_minutes=20,
                             )
+                            if (
+                                m15_prealert_context
+                                and not prealert_entry_not_crossed(m15_prealert_context, prealert_quote)
+                            ):
+                                m15_prealert_context = None
                         if m15_prealert_context:
                             direction = "PREPARAR_" + (
                                 "COMPRA" if m15_prealert_context["side"] == "BUY" else "VENTA"

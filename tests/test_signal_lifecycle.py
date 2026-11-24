@@ -138,6 +138,21 @@ class M15LifecycleTests(unittest.TestCase):
         self.assertFalse(result["valid"])
         self.assertIn("cruzó", result["reason"])
 
+    def test_stale_reference_quote_blocks_validation(self):
+        stale_quote = {**QUOTE, "bid": 3613.1, "ask": 3613.3, "quote_age_seconds": 90}
+        result = evaluate_m15_confirmation(self.context, M5, M30, stale_quote, now=NOW)
+        self.assertFalse(result["valid"])
+        self.assertIn("antigua", result["reason"])
+
+    def test_stale_m30_context_blocks_validation(self):
+        stale_context = {**M30, "candle_age_minutes": 40}
+        result = evaluate_m15_confirmation(
+            self.context, M5, stale_context,
+            {**QUOTE, "bid": 3613.1, "ask": 3613.3}, now=NOW
+        )
+        self.assertFalse(result["valid"])
+        self.assertIn("desactualizado", result["reason"])
+
     def test_invalid_stop_target_order_is_rejected(self):
         invalid = {**BASE, "planned_stop_loss": 3590.0, "planned_take_profit": 3620.0}
         self.assertIsNone(build_m15_prealert_context(invalid))

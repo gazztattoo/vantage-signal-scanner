@@ -165,7 +165,7 @@ class BiQuoteResearchEndpointTests(unittest.TestCase):
         datasets = {
             "5m": {"bars": self._research_bars(120, 5), "closed_bars": 120, "last_closed_close_time": "2026-11-19T20:00:00+00:00"},
             "15m": {"bars": self._research_bars(60, 15), "closed_bars": 60, "last_closed_close_time": "2026-11-19T20:00:00+00:00"},
-            "30m": {"bars": self._research_bars(60, 30), "closed_bars": 60, "last_closed_close_time": "2026-11-19T20:00:00+00:00"},
+            "1h": {"bars": self._research_bars(60, 30), "closed_bars": 60, "last_closed_close_time": "2026-11-19T20:00:00+00:00"},
         }
         strategy = {
             "signal": "WAIT", "pre_signal": False, "primary_bias": "BULL",
@@ -190,16 +190,16 @@ class BiQuoteResearchEndpointTests(unittest.TestCase):
         self.assertEqual(data["quality_grade"], "C")
         self.assertEqual(data["setup_status"], "WAIT")
         self.assertIn("BREAKOUT_OR_RETEST", data["confirmation_missing"])
-        self.assertEqual(data["candles"], {"5m": 120, "15m": 60, "30m": 60})
+        self.assertEqual(data["candles"], {"5m": 120, "15m": 60, "1h": 60})
         kwargs = analyze.call_args.kwargs
         self.assertEqual(len(kwargs["higher_timeframes"]["15min"]), 60)
-        self.assertEqual(len(kwargs["higher_timeframes"]["30min"]), 60)
+        self.assertEqual(len(kwargs["higher_timeframes"]["60min"]), 60)
 
     def test_shadow_analysis_rejects_insufficient_higher_timeframe_history(self):
         datasets = {
             "5m": {"bars": self._research_bars(120, 5), "closed_bars": 120, "last_closed_close_time": "2026-11-19T20:00:00+00:00"},
             "15m": {"bars": self._research_bars(59, 15), "closed_bars": 59, "last_closed_close_time": "2026-11-19T20:00:00+00:00"},
-            "30m": {"bars": self._research_bars(60, 30), "closed_bars": 60, "last_closed_close_time": "2026-11-19T20:00:00+00:00"},
+            "1h": {"bars": self._research_bars(60, 30), "closed_bars": 60, "last_closed_close_time": "2026-11-19T20:00:00+00:00"},
         }
         with patch.object(app, "BIQUOTE_RESEARCH_ENABLED", True), patch(
             "app.cached_biquote_research_ohlc",
@@ -220,7 +220,7 @@ class BiQuoteResearchEndpointTests(unittest.TestCase):
                     "last_closed_open_time": "2026-11-23T01:45:00+00:00",
                     "last_closed_close_time": "2026-11-23T02:00:00+00:00",
                     "last_closed_age_minutes": 2.0},
-            "30m": {"bars": self._research_bars(60, 30), "closed_bars": 60,
+            "1h": {"bars": self._research_bars(60, 30), "closed_bars": 60,
                     "last_closed_open_time": "2026-11-23T01:30:00+00:00",
                     "last_closed_close_time": "2026-11-23T02:00:00+00:00",
                     "last_closed_age_minutes": 2.0},
@@ -247,10 +247,10 @@ class BiQuoteResearchEndpointTests(unittest.TestCase):
         self.assertFalse(payload["signals_activated"])
         self.assertEqual(payload["live_feed"]["provider"], "biquote")
         self.assertEqual(payload["live_feed"]["candles_by_timeframe"],
-                         {"5m": 120, "15m": 60, "30m": 60})
+                         {"5m": 120, "15m": 60, "1h": 60})
         self.assertEqual(analyze.call_count, 1)
         self.assertEqual(len(analyze.call_args.kwargs["higher_timeframes"]["15min"]), 60)
-        self.assertEqual(len(analyze.call_args.kwargs["higher_timeframes"]["30min"]), 60)
+        self.assertEqual(len(analyze.call_args.kwargs["higher_timeframes"]["60min"]), 60)
 
     def test_operational_analysis_rejects_non_gold_when_biquote_mode_is_active(self):
         with patch.object(app, "DATA_MODE", "biquote"), patch.object(

@@ -1229,6 +1229,50 @@ def analysis():
         response_payload["experimental_shadow"] = evaluate_shadow_gate(
             symbol=symbol, timeframe=interval, signal=raw_signal, data_mode=DATA_MODE
         )
+
+        # TEST panel lifecycle guard: hide old M15 preparations after terminal state.
+        # Internal cron analysis is unchanged; only explicit panel requests get this overlay.
+        if DATA_MODE == "biquote" and interval == "15min" and request.args.get("client") == "panel":
+            try:
+                lifecycle_state = requests.get(
+                    SUPABASE_URL + "/rest/v1/signal_alerts",
+                    params={
+                        "select": "direction,created_at",
+                        "market": "eq." + symbol,
+                        "timeframe": "eq.15min",
+                        "order": "created_at.desc",
+                        "limit": "1",
+                    },
+                    headers=supabase_headers(),
+                    timeout=8,
+                )
+                if lifecycle_state.status_code == 200:
+                    lifecycle_rows = lifecycle_state.json()
+                    latest_direction = (
+                        str(lifecycle_rows[0].get("direction") or "")
+                        if lifecycle_rows else ""
+                    )
+                    if latest_direction in ("PREALERTA_EXPIRADA", "PREALERTA_CANCELADA"):
+                        response_payload.update({
+                            "signal": "ESPERAR",
+                            "pre_signal": False,
+                            "pre_signal_side": None,
+                            "entry": None,
+                            "stop_loss": None,
+                            "take_profit": None,
+                            "planned_entry": None,
+                            "planned_stop_loss": None,
+                            "planned_take_profit": None,
+                            "reason": (
+                                "La prealerta anterior fue "
+                                + ("expirada" if latest_direction == "PREALERTA_EXPIRADA" else "cancelada")
+                                + ". No hay ninguna preparación activa; esperar una nueva oportunidad."
+                            ),
+                            "m15_prealert_lifecycle": latest_direction,
+                        })
+            except (requests.RequestException, ValueError, TypeError):
+                app.logger.exception("No se pudo sincronizar el estado M15 del panel TEST.")
+
         return jsonify(response_payload)
     except requests.RequestException:
         return jsonify({

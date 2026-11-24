@@ -109,13 +109,20 @@ def analyze_liquidity(
         # Sweep: wick takes a confirmed pool, but the candle closes back through it.
         swept_high = [p for p in eligible_highs if bar["high"] > p["price"] + tol and bar["close"] < p["price"]]
         swept_low = [p for p in eligible_lows if bar["low"] < p["price"] - tol and bar["close"] > p["price"]]
-        if swept_high:
+        if swept_high and swept_low:
+            high_pool = max(swept_high, key=lambda p: p["index"])
+            low_pool = max(swept_low, key=lambda p: p["index"])
+            sweeps.append({"side": "AMBIGUOUS", "pool": "DUAL_SIDED_LIQUIDITY",
+                           "high_level": high_pool["price"], "low_level": low_pool["price"],
+                           "sweep_high": bar["high"], "sweep_low": bar["low"],
+                           "close": bar["close"], "candle_time": bar["time"], "index": i})
+        elif swept_high:
             pool = max(swept_high, key=lambda p: p["index"])
             sweeps.append({"side": "BEARISH", "pool": "BUY_SIDE_LIQUIDITY",
                            "level": pool["price"], "sweep_high": bar["high"],
                            "close": bar["close"], "candle_time": bar["time"],
                            "pivot_time": pool["time"], "index": i})
-        if swept_low:
+        elif swept_low:
             pool = max(swept_low, key=lambda p: p["index"])
             sweeps.append({"side": "BULLISH", "pool": "SELL_SIDE_LIQUIDITY",
                            "level": pool["price"], "sweep_low": bar["low"],

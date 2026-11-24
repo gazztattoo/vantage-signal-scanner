@@ -1277,18 +1277,16 @@ def signal_history():
 
 @app.route("/api/performance", methods=["GET"])
 def signal_performance():
-    """Estadísticas de señales simuladas, basadas exclusivamente en resultados guardados."""
+    """Separa estadísticas BiQuote de referencia, fuentes identificadas y legado desconocido."""
     try:
         rows = []
         page_size = 1000
         offset = 0
-        # Paginar para que el crecimiento del historial no corte silenciosamente
-        # la muestra en el límite por defecto de PostgREST.
         while offset < 20000:
             response = requests.get(
                 SUPABASE_URL + "/rest/v1/signal_history",
                 params={
-                    "select": "symbol,timeframe,direction,status,result_r,closed_at",
+                    "select": "symbol,timeframe,direction,status,result_r,closed_at,indicators",
                     "order": "signal_at.asc",
                     "limit": str(page_size),
                     "offset": str(offset),
@@ -1304,79 +1302,102 @@ def signal_performance():
                 break
             offset += page_size
 
-        wins = sum(1 for row in rows if row.get("status") == "TP")
-        losses = sum(1 for row in rows if row.get("status") == "SL")
-        pending = sum(1 for row in rows if row.get("status") == "PENDIENTE")
-        expired = sum(1 for row in rows if row.get("status") == "CADUCADA")
-        cancelled = sum(1 for row in rows if row.get("status") == "CANCELADA")
-        closed = wins + losses
-        r_values = [
-            float(row["result_r"]) for row in rows
-            if row.get("status") in ("TP", "SL") and row.get("result_r") is not None
-        ]
-        positive_r = sum(value for value in r_values if value > 0)
-        negative_r = abs(sum(value for value in r_values if value < 0))
-        average_r = (sum(r_values) / len(r_values)) if r_values else None
-        breakdown = {}
-        direction_breakdown = {}
+        def summarize(group_rows):
+            wins = sum(1 for row in group_rows if row.get("status") == "TP")
+            losses = sum(1 for row in group_rows if row.get("status") == "SL")
+            pending = sum(1 for row in group_rows if row.get("status") == "PENDIENTE")
+            expired = sum(1 for row in group_rows if row.get("status") == "CADUCADA")
+            cancelled = sum(1 for row in group_rows if row.get("status") == "CANCELADA")
+            ambiguous = sum(1 for row in group_rows if row.get("status") == "AMBIGUA")
+            closed = wins + losses
+            r_values = [
+                float(row["result_r"]) for row in group_rows
+                if row.get("status") in ("TP", "SL") and row.get("result_r") is not None
+            ]
+            positive_r = sum(value for value in r_values if value > 0)
+            negative_r = abs(sum(value for value in r_values if value < 0))
+            average_r = sum(r_values) / len(r_values) if r_values else None
+            breakdown = {}
+            direction_breakdown = {}
+            for row in group_rows:
+                status = row.get("status")
+                key = str(row.get("symbol") or "SIN SÍMBOLO") + " · " + str(row.get("timeframe") or "SIN TF")
+                item = breakdown.setdefault(key, {
+                    "total": 0, "pending": 0, "wins": 0, "losses": 0,
+                    "expired": 0, "cancelled": 0, "ambiguous": 0, "closed": 0
+                })
+                item["total"] += 1
+                if status == "PENDIENTE":
+                    item["pending"] += 1
+                elif status == "TP":
+                    item["wins"] += 1
+                    item["closed"] += 1
+                elif status == "SL":
+                    item["losses"] += 1
+                    item["closed"] += 1
+                elif status == "CADUCADA":
+                    item["expired"] += 1
+                elif status == "CANCELADA":
+                    item["cancelled"] += 1
+                elif status == "AMBIGUA":
+                    item["ambiguous"] += 1
+
+                direction = row.get("direction") or "SIN DIRECCIÓN"
+                side = direction_breakdown.setdefault(direction, {
+                    "total": 0, "wins": 0, "losses": 0, "closed": 0, "ambiguous": 0
+                })
+                side["total"] += 1
+                if status == "TP":
+                    side["wins"] += 1
+                    side["closed"] += 1
+                elif status == "SL":
+                    side["losses"] += 1
+                    side["closed"] += 1
+                elif status == "AMBIGUA":
+                    side["ambiguous"] += 1
+
+            sample_size = len(r_values)
+            sample_note = (
+                "Muestra inicial: todavía hacen falta más resultados cerrados para valorar la estrategia."
+                if sample_size < 30 else
+                "Muestra en desarrollo: conviene acumular al menos 100 resultados y comprobar estabilidad por mercado."
+                if sample_size < 100 else
+                "Muestra de 100 o más resultados; sigue siendo necesario validar por mercado y en distintos periodos."
+            )
+            return {
+                "total_signals": len(group_rows), "closed_trades": closed,
+                "pending": pending, "expired": expired, "cancelled": cancelled,
+                "ambiguous": ambiguous, "wins": wins, "losses": losses,
+                "win_rate": round((wins / closed) * 100, 2) if closed else None,
+                "average_r": round(average_r, 4) if average_r is not None else None,
+                "expectancy_r": round(average_r, 4) if average_r is not None else None,
+                "profit_factor": round(positive_r / negative_r, 4) if negative_r > 0 else (None if positive_r == 0 else "inf"),
+                "sample_size": sample_size, "sample_note": sample_note,
+                "breakdown": breakdown, "direction_breakdown": direction_breakdown,
+            }
+
+        groups = {}
         for row in rows:
-            status = row.get("status")
-            key = row["symbol"] + " · " + row["timeframe"]
-            item = breakdown.setdefault(key, {
-                "total": 0, "pending": 0, "wins": 0, "losses": 0,
-                "expired": 0, "cancelled": 0, "closed": 0
-            })
-            item["total"] += 1
-            if status == "PENDIENTE":
-                item["pending"] += 1
-            elif status == "TP":
-                item["wins"] += 1
-                item["closed"] += 1
-            elif status == "SL":
-                item["losses"] += 1
-                item["closed"] += 1
-            elif status == "CADUCADA":
-                item["expired"] += 1
-            elif status == "CANCELADA":
-                item["cancelled"] += 1
+            indicators = row.get("indicators") if isinstance(row.get("indicators"), dict) else {}
+            provider = indicators.get("data_provider")
+            key = str(provider) if provider else "unknown_legacy"
+            groups.setdefault(key, []).append(row)
 
-            direction = row.get("direction") or "SIN DIRECCIÓN"
-            side = direction_breakdown.setdefault(direction, {
-                "total": 0, "wins": 0, "losses": 0, "closed": 0
-            })
-            side["total"] += 1
-            if status == "TP":
-                side["wins"] += 1
-                side["closed"] += 1
-            elif status == "SL":
-                side["losses"] += 1
-                side["closed"] += 1
-
-        sample_size = len(r_values)
-        sample_note = (
-            "Muestra inicial: todavía hacen falta más resultados cerrados para valorar la estrategia."
-            if sample_size < 30 else
-            "Muestra en desarrollo: conviene acumular al menos 100 resultados y comprobar estabilidad por mercado."
-            if sample_size < 100 else
-            "Muestra de 100 o más resultados; sigue siendo necesario validar por mercado y en distintos periodos."
-        )
+        biquote = summarize(groups.get("biquote_reference_only", []))
+        source_breakdown = {
+            key: summarize(group_rows) for key, group_rows in groups.items()
+        }
         return jsonify({
-            "total_signals": len(rows),
-            "closed_trades": closed,
-            "pending": pending,
-            "expired": expired,
-            "cancelled": cancelled,
-            "wins": wins,
-            "losses": losses,
-            "win_rate": round((wins / closed) * 100, 2) if closed else None,
-            "average_r": round(average_r, 4) if average_r is not None else None,
-            "expectancy_r": round(average_r, 4) if average_r is not None else None,
-            "profit_factor": round(positive_r / negative_r, 4) if negative_r > 0 else (None if positive_r == 0 else "inf"),
-            "sample_size": sample_size,
-            "sample_note": sample_note,
-            "breakdown": breakdown,
-            "direction_breakdown": direction_breakdown,
-            "note": "Estadísticas de señales simuladas del scanner. TP/SL se evalúan con velas OHLC cerradas; no son operaciones reales ni garantizan rentabilidad.",
+            **biquote,
+            "source_breakdown": source_breakdown,
+            "data_quality": {
+                "primary_source": "biquote_reference_only",
+                "primary_source_note": "Las métricas principales solo incluyen señales etiquetadas biquote_reference_only; son resultados OHLC de referencia, no operaciones ejecutadas en Vantage.",
+                "unknown_legacy_count": len(groups.get("unknown_legacy", [])),
+                "other_identified_sources": [key for key in groups if key not in ("biquote_reference_only", "unknown_legacy")],
+                "historical_rows_mutated": False,
+            },
+            "note": "Estadísticas de señales simuladas. La muestra principal es BiQuote de referencia; no representa fills ni P/L reales de Vantage. Los casos AMBIGUA se excluyen de win rate y R.",
             "truncated": len(rows) >= 20000,
         })
     except (RuntimeError, requests.RequestException, ValueError, TypeError, KeyError):
@@ -1549,35 +1570,60 @@ def push_test():
 
 
 def resolve_pending_signal_outcomes(symbol, interval, recent_candles):
-    """Cierra TP/SL o caduca señales tras 24 velas cerradas posteriores."""
+    """Resuelve solo con velas completas posteriores al instante real de la señal."""
     if not recent_candles:
-        return {"resolved": 0, "expired": 0, "errors": 0}
-    response = requests.get(        SUPABASE_URL + "/rest/v1/signal_history",
+        return {"resolved": 0, "expired": 0, "ambiguous": 0, "errors": 0}
+    response = requests.get(
+        SUPABASE_URL + "/rest/v1/signal_history",
         params={
-            "select": "id,direction,candle_time,entry_price,stop_loss,take_profit,status",
+            "select": "id,direction,signal_at,candle_time,entry_price,stop_loss,take_profit,status",
             "symbol": "eq." + symbol,
             "timeframe": "eq." + interval,
             "status": "eq.PENDIENTE",
-            "order": "candle_time.asc",
+            "order": "signal_at.asc",
             "limit": "200",
         },
         headers=supabase_headers(), timeout=15,
     )
     if response.status_code != 200:
-        return {"resolved": 0, "expired": 0, "errors": 1}
+        return {"resolved": 0, "expired": 0, "ambiguous": 0, "errors": 1}
 
     pending = response.json()
     resolved = 0
     expired = 0
+    ambiguous = 0
     errors = 0
     interval_seconds = INTERVAL_MINUTES[interval] * 60
     max_lifetime_candles = 24
 
     for signal in pending:
         try:
-            signal_time = datetime.fromisoformat(str(signal["candle_time"]).replace("Z", "+00:00"))
+            # BiQuote adapter supplies openTime as UTC ISO timestamps. A candle
+            # is eligible only if its OPEN is at/after the next full boundary
+            # following signal_at; its OHLC therefore contains no pre-signal data.
+            raw_signal_at = signal.get("signal_at")
+            if raw_signal_at:
+                signal_at = datetime.fromisoformat(str(raw_signal_at).replace("Z", "+00:00"))
+                if signal_at.tzinfo is None:
+                    signal_at = signal_at.replace(tzinfo=timezone.utc)
+            else:
+                # Legacy pending rows without signal_at: conservatively start
+                # after the candle_time bar has fully elapsed; never backfill
+                # with the partially elapsed candle.
+                signal_at = datetime.fromisoformat(str(signal["candle_time"]).replace("Z", "+00:00"))
+                if signal_at.tzinfo is None:
+                    signal_at = signal_at.replace(tzinfo=timezone.utc)
+                signal_at += timedelta(seconds=interval_seconds)
+
+            signal_epoch = signal_at.astimezone(timezone.utc).timestamp()
+            first_eligible_epoch = (
+                math.ceil(signal_epoch / interval_seconds) * interval_seconds
+            )
+            first_eligible_time = datetime.fromtimestamp(first_eligible_epoch, timezone.utc)
+
             stop = float(signal["stop_loss"])
             target = float(signal["take_profit"])
+            entry_price = float(signal["entry_price"])
             direction = signal["direction"]
             outcome = None
             closing_candle = None
@@ -1585,7 +1631,10 @@ def resolve_pending_signal_outcomes(symbol, interval, recent_candles):
 
             for candle in recent_candles:
                 candle_time = datetime.fromisoformat(str(candle["time"]).replace("Z", "+00:00"))
-                if candle_time <= signal_time:
+                if candle_time.tzinfo is None:
+                    candle_time = candle_time.replace(tzinfo=timezone.utc)
+                candle_time = candle_time.astimezone(timezone.utc)
+                if candle_time < first_eligible_time:
                     continue
 
                 candles_elapsed += 1
@@ -1598,8 +1647,9 @@ def resolve_pending_signal_outcomes(symbol, interval, recent_candles):
                     hit_sl = high >= stop
                     hit_tp = low <= target
 
-                # Si ambos niveles aparecen tocados en la misma vela OHLC,
-                # se aplica el criterio conservador: SL primero.
+                if hit_sl and hit_tp:
+                    outcome, closing_candle = "AMBIGUA", candle
+                    break
                 if hit_sl:
                     outcome, closing_candle = "SL", candle
                     break
@@ -1615,6 +1665,9 @@ def resolve_pending_signal_outcomes(symbol, interval, recent_candles):
                 continue
 
             close_time = datetime.fromisoformat(str(closing_candle["time"]).replace("Z", "+00:00"))
+            if close_time.tzinfo is None:
+                close_time = close_time.replace(tzinfo=timezone.utc)
+            close_time = close_time.astimezone(timezone.utc)
             closed_at = datetime.fromtimestamp(
                 close_time.timestamp() + interval_seconds, timezone.utc
             ).isoformat()
@@ -1622,7 +1675,7 @@ def resolve_pending_signal_outcomes(symbol, interval, recent_candles):
             close_low = float(closing_candle["low"])
             close_price = float(closing_candle["close"])
             is_expired = outcome == "CADUCADA"
-            entry_price = float(signal["entry_price"])
+            is_ambiguous = outcome == "AMBIGUA"
             initial_risk = abs(entry_price - stop)
             if initial_risk <= 0:
                 raise ValueError("Riesgo inicial inválido para calcular el resultado.")
@@ -1631,19 +1684,29 @@ def resolve_pending_signal_outcomes(symbol, interval, recent_candles):
                 else (entry_price - close_price)
             ) / initial_risk
 
+            if is_ambiguous:
+                result_source = (
+                    "AMBIGUA: la misma vela OHLC tocó TP y SL. "
+                    "El orden intravela no se puede determinar con estos datos; excluida de métricas."
+                )
+            elif is_expired:
+                result_source = (
+                    "CADUCADA tras 24 velas completas posteriores al instante de señal; "
+                    "resultado R calculado al cierre de la vela 24."
+                )
+            else:
+                result_source = (
+                    "Vela OHLC completa cuyo inicio es igual o posterior a la siguiente "
+                    "frontera temporal tras signal_at; no incluye tramo anterior a la señal."
+                )
+
             patch_data = {
                 "status": outcome,
-                "exit_price": close_price if is_expired else (stop if outcome == "SL" else target),
+                "exit_price": None if is_ambiguous else (close_price if is_expired else (stop if outcome == "SL" else target)),
                 "closed_at": closed_at,
-                "result_r": round(expired_result_r, 6) if is_expired else (2.0 if outcome == "TP" else -1.0),
-                "result_source": (
-                    "CADUCADA tras 24 velas cerradas; resultado R calculado al cierre "
-                    "de la vela 24 usando el riesgo inicial y el precio de entrada."
-                    if is_expired else
-                    "Velas OHLC cerradas posteriores a la señal; "
-                    "si TP y SL coinciden en una vela, se cuenta SL primero."
-                ),
-                "closing_candle_time": close_time.astimezone(timezone.utc).isoformat(),
+                "result_r": None if is_ambiguous else (round(expired_result_r, 6) if is_expired else (2.0 if outcome == "TP" else -1.0)),
+                "result_source": result_source,
+                "closing_candle_time": close_time.isoformat(),
                 "closing_candle_high": close_high,
                 "closing_candle_low": close_low,
                 "closing_candle_close": close_price,
@@ -1658,7 +1721,9 @@ def resolve_pending_signal_outcomes(symbol, interval, recent_candles):
                 timeout=15,
             )
             if patch.status_code in (200, 204):
-                if is_expired:
+                if is_ambiguous:
+                    ambiguous += 1
+                elif is_expired:
                     expired += 1
                 else:
                     resolved += 1
@@ -1667,7 +1732,8 @@ def resolve_pending_signal_outcomes(symbol, interval, recent_candles):
         except (KeyError, TypeError, ValueError, requests.RequestException):
             errors += 1
 
-    return {"resolved": resolved, "expired": expired, "errors": errors}
+    return {"resolved": resolved, "expired": expired, "ambiguous": ambiguous, "errors": errors}
+
 
 SIGNAL_CRON_SECRET = os.environ.get("SIGNAL_CRON_SECRET", "")
 

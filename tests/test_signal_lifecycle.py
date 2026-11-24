@@ -6,6 +6,7 @@ from signal_lifecycle import (
     encode_m15_prealert_context,
     restore_m15_prealert_context,
     evaluate_m15_confirmation,
+    prealert_entry_not_crossed,
 )
 
 
@@ -32,6 +33,14 @@ class M15LifecycleTests(unittest.TestCase):
         )
         self.assertEqual(restored["entry"], 3613.0)
         self.assertEqual(restored["stop_loss"], 3620.0)
+
+    def test_prealert_is_blocked_if_sell_trigger_already_crossed(self):
+        crossed_quote = {**QUOTE, "bid": 3608.0, "ask": 3608.2}
+        self.assertFalse(prealert_entry_not_crossed(self.context, crossed_quote))
+
+    def test_prealert_is_allowed_while_sell_trigger_is_still_ahead(self):
+        ahead_quote = {**QUOTE, "bid": 3614.0, "ask": 3614.2}
+        self.assertTrue(prealert_entry_not_crossed(self.context, ahead_quote))
 
     def test_validation_keeps_original_m15_entry(self):
         quote = {**QUOTE, "bid": 3612.9, "ask": 3613.0}

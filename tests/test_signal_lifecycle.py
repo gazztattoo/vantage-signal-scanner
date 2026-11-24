@@ -1,5 +1,5 @@
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from signal_lifecycle import (
     build_m15_prealert_context,
@@ -9,12 +9,12 @@ from signal_lifecycle import (
 )
 
 
-NOW = datetime(2026, 11, 24, 12, 0, tzinfo=timezone.utc)
+NOW = datetime.now(timezone.utc)
 BASE = {
     "pre_signal": True, "pre_signal_side": "SELL",
     "planned_entry": 3613.0, "planned_stop_loss": 3620.0,
     "planned_take_profit": 3599.0, "atr14": 3.0,
-    "candle_time": "2026-11-24T11:45:00+00:00",
+    "candle_time": (NOW - timedelta(minutes=15)).isoformat(),
 }
 M5 = {"signal": "VENTA", "structure_trigger": "BREAKOUT", "candle_age_minutes": 1}
 M30 = {"primary_bias": "BEAR", "candle_age_minutes": 5}
@@ -39,25 +39,36 @@ class M15LifecycleTests(unittest.TestCase):
         self.assertTrue(result["valid"])
         self.assertEqual(result["entry"], 3613.0)
 
-    def test_late_sell_is_rejected_instead_of_repriced(self):
+    def test_late_sell_at_3608_is_rejected_instead_of_repriced(self):
         quote = {**QUOTE, "bid": 3608.0, "ask": 3608.2}
         result = evaluate_m15_confirmation(self.context, M5, M30, quote, now=NOW)
         self.assertFalse(result["valid"])
         self.assertIn("alejó", result["reason"])
 
     def test_opposing_m30_blocks_confirmation(self):
-        result = evaluate_m15_confirmation(self.context, M5, {**M30, "primary_bias": "BULL"}, QUOTE, now=NOW)
+        result = evaluate_m15_confirmation(
+            self.context, M5, {**M30, "primary_bias": "BULL"}, QUOTE, now=NOW
+        )
         self.assertFalse(result["valid"])
         self.assertIn("M30", result["reason"])
 
     def test_m5_wrong_side_blocks_confirmation(self):
-        result = evaluate_m15_confirmation(self.context, {**M5, "signal": "COMPRA"}, M30, QUOTE, now=NOW)
+        result = evaluate_m15_confirmation(
+            self.context, {**M5, "signal": "COMPRA"}, M30, QUOTE, now=NOW
+        )
         self.assertFalse(result["valid"])
 
     def test_expired_prealert_is_rejected(self):
-        stale = {**self.context, "candle_time": "2026-11-24T11:30:00+00:00"}
+        stale = {
+            **self.context,
+            "candle_time": (NOW - timedelta(minutes=30)).isoformat(),
+        }
         result = evaluate_m15_confirmation(stale, M5, M30, QUOTE, now=NOW)
         self.assertFalse(result["valid"])
+
+    def test_invalid_stop_target_order_is_rejected(self):
+        invalid = {**BASE, "planned_stop_loss": 3590.0, "planned_take_profit": 3620.0}
+        self.assertIsNone(build_m15_prealert_context(invalid))
 
 
 if __name__ == "__main__":

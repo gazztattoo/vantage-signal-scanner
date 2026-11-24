@@ -1259,7 +1259,7 @@ def signal_history():
             allowed = {
                 "symbol": ALLOWED_SYMBOLS,
                 "timeframe": ALLOWED_INTERVALS,
-                "status": {"PENDIENTE", "TP", "SL", "CADUCADA", "CANCELADA"},
+                "status": {"PENDIENTE", "TP", "SL", "CADUCADA", "CANCELADA", "AMBIGUA"},
             }[query_name]
             if value not in allowed:
                 return jsonify({"error": "Filtro no permitido: " + query_name}), 400

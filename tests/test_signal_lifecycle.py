@@ -104,6 +104,40 @@ class M15LifecycleTests(unittest.TestCase):
         result = evaluate_m15_confirmation(stale, M5, M30, QUOTE, now=NOW)
         self.assertFalse(result["valid"])
 
+    def test_buy_confirmation_uses_same_m15_level_from_below(self):
+        buy_plan = {
+            "side": "BUY", "entry": 3613.0, "stop_loss": 3606.0,
+            "take_profit": 3627.0, "atr": 3.0,
+            "candle_time": (NOW - timedelta(minutes=15)).isoformat(),
+        }
+        buy_m5 = {
+            "signal": "PRESEÑAL", "pre_signal": True, "pre_signal_side": "BUY",
+            "primary_bias": "BULL", "score": 5, "candle_age_minutes": 1,
+            "structure": {"near_direction": "BUY", "distance_atr": 0.18},
+        }
+        buy_m30 = {"primary_bias": "BULL", "candle_age_minutes": 5}
+        quote = {"accepted": True, "quote_age_seconds": 5, "bid": 3612.7, "ask": 3612.9}
+        result = evaluate_m15_confirmation(buy_plan, buy_m5, buy_m30, quote, now=NOW)
+        self.assertTrue(result["valid"])
+        self.assertEqual(result["entry"], 3613.0)
+
+    def test_buy_price_already_above_entry_is_rejected(self):
+        buy_plan = {
+            "side": "BUY", "entry": 3613.0, "stop_loss": 3606.0,
+            "take_profit": 3627.0, "atr": 3.0,
+            "candle_time": (NOW - timedelta(minutes=15)).isoformat(),
+        }
+        buy_m5 = {
+            "signal": "PRESEÑAL", "pre_signal": True, "pre_signal_side": "BUY",
+            "primary_bias": "BULL", "score": 5, "candle_age_minutes": 1,
+            "structure": {"near_direction": "BUY", "distance_atr": 0.18},
+        }
+        buy_m30 = {"primary_bias": "BULL", "candle_age_minutes": 5}
+        quote = {"accepted": True, "quote_age_seconds": 5, "bid": 3613.1, "ask": 3613.3}
+        result = evaluate_m15_confirmation(buy_plan, buy_m5, buy_m30, quote, now=NOW)
+        self.assertFalse(result["valid"])
+        self.assertIn("cruzó", result["reason"])
+
     def test_invalid_stop_target_order_is_rejected(self):
         invalid = {**BASE, "planned_stop_loss": 3590.0, "planned_take_profit": 3620.0}
         self.assertIsNone(build_m15_prealert_context(invalid))

@@ -2382,6 +2382,7 @@ def push_scan():
                         "take_profit": confirmation["take_profit"],
                         "candle_time": confirmation["opportunity_candle_time"],
                         "planned_entry": confirmation["entry"],
+                        "planned_entry_type": confirmation["entry_type"],
                         "planned_stop_loss": confirmation["stop_loss"],
                         "planned_take_profit": confirmation["take_profit"],
                         "reference_confirmation_price": confirmation["reference_price"],
@@ -2596,6 +2597,9 @@ def push_scan():
                         short_interval = {"5min": "M5", "15min": "M15", "30min": "M30"}.get(interval, interval)
                         is_prealert = direction.startswith("PREPARAR_")
                         signal_side = "COMPRA" if direction.endswith("COMPRA") else "VENTA"
+                        entry_type_value = data.get("planned_entry_type") or (
+                            "BUY_STOP" if signal_side == "COMPRA" else "SELL_STOP"
+                        )
                         entry_value = data.get("planned_entry") if is_prealert else data.get("entry")
                         stop_value = data.get("planned_stop_loss") if is_prealert else data.get("stop_loss")
                         target_value = data.get("planned_take_profit") if is_prealert else data.get("take_profit")
@@ -2603,7 +2607,7 @@ def push_scan():
                             alert_title = "PREPARAR MT5 · XAU/USD"
                             alert_body = (
                                 f"PREALERTA {signal_side} · {short_interval}. "
-                                f"Nivel provisional {display_price(entry_value)} · "
+                                f"Prepara {entry_type_value} en {display_price(entry_value)} · "
                                 f"SL {display_price(stop_value)} · TP {display_price(target_value)}. "
                                 "Aún NO es entrada. Datos BiQuote de referencia; compara con Vantage."
                             )
@@ -2615,13 +2619,13 @@ def push_scan():
                             )
                             alert_body = (
                                 f"XAU/USD · {short_interval} · {signal_side}. "
-                                f"Entrada M15 original {display_price(entry_value)} · "
+                                f"Orden pendiente {entry_type_value} · nivel M15 {display_price(entry_value)} · "
                                 f"SL {display_price(stop_value)} · TP {display_price(target_value)}. "
                                 + (
                                     "Prealerta M15 confirmada por estructura M5; el precio sigue cerca del nivel previsto. "
                                     if cross_timeframe_confirmation else ""
                                 )
-                                + "Confirmación técnica BiQuote, NO precio Vantage. Verifica cotización y spread antes de decidir."
+                                + "Confirmación técnica BiQuote, NO precio Vantage. No uses entrada a mercado por el precio actual: deja la orden pendiente en el nivel M15 indicado y verifica cotización y spread en Vantage."
                             )
 
                         subs_response = requests.get(
@@ -2657,6 +2661,7 @@ def push_scan():
                                             + "&alert_stage=" + requests.utils.quote("PREALERTA" if is_prealert else "ENTRADA_VALIDADA", safe="")
                                             + "&alert_side=" + requests.utils.quote(signal_side, safe="")
                                             + "&alert_entry=" + requests.utils.quote("" if entry_value is None else str(entry_value), safe="")
+                                            + "&alert_entry_type=" + requests.utils.quote(entry_type_value, safe="")
                                             + "&alert_stop_loss=" + requests.utils.quote("" if stop_value is None else str(stop_value), safe="")
                                             + "&alert_take_profit=" + requests.utils.quote("" if target_value is None else str(target_value), safe="")
                                             + "&alert_candle_time=" + requests.utils.quote(candle_time, safe="")
@@ -2672,6 +2677,7 @@ def push_scan():
                                             "reference_only": True,
                                             "execution_price": False,
                                             "entry": entry_value,
+                                            "entry_type": entry_type_value,
                                             "stop_loss": stop_value,
                                             "take_profit": target_value,
                                             "reference_confirmation_price": data.get("reference_confirmation_price"),

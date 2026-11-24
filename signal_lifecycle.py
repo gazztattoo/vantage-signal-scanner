@@ -57,6 +57,23 @@ def build_m15_prealert_context(data: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
+def prealert_entry_not_crossed(context: dict[str, Any], quote: dict[str, Any]) -> bool:
+    """A prealert is useful only while the planned trigger is still ahead of price."""
+    if not context or quote.get("accepted") is not True:
+        return False
+    try:
+        age = float(quote["quote_age_seconds"])
+        bid, ask = float(quote["bid"]), float(quote["ask"])
+        entry = float(context["entry"])
+        side = context["side"]
+    except (KeyError, TypeError, ValueError):
+        return False
+    if age < 0 or age > 60 or bid <= 0 or ask < bid:
+        return False
+    current = ask if side == "BUY" else bid
+    return current < entry if side == "BUY" else current > entry
+
+
 def encode_m15_prealert_context(context: dict[str, Any]) -> str:
     return _PREALERT_PREFIX + json.dumps(context, separators=(",", ":"), sort_keys=True)
 

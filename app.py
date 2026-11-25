@@ -347,23 +347,7 @@ def economic_news_calendar():
 @app.route("/api/market-status", methods=["GET"])
 def market_status():
     now = datetime.now(timezone.utc)
-    if DATA_MODE == "mock":
-        # TEST uses synthetic candles, so real-world exchange hours must not hide its cards.
         return jsonify({
-            "checked_at": now.isoformat(),
-            "data_mode": "mock",
-            "markets": {
-                symbol: {
-                    "open": True,
-                    "status": "SIMULADO",
-                    "reason": "Datos sintéticos de TEST; no representa una sesión real.",
-                    "server_time": now.astimezone(CANARY_TZ).isoformat(),
-                    "server_utc_offset": "SIMULADO",
-                }
-                for symbol in sorted(ALLOWED_SYMBOLS)
-            },
-        })
-    return jsonify({
         "checked_at": now.isoformat(),
         "markets": {symbol: market_session(symbol, now) for symbol in sorted(ALLOWED_SYMBOLS)}
     })
@@ -539,45 +523,6 @@ def parse_candle_time(raw_time):
 
     return parsed
 
-
-def generate_mock_candles(symbol, interval, count=1200):
-    """Velas sintéticas deterministas para probar la interfaz sin datos de mercado."""
-    now = datetime.now(timezone.utc)
-    step = INTERVAL_MINUTES[interval] * 60
-    latest_open = int(now.timestamp() // step) * step - step
-    bases = {"EUR/USD": 1.0850, "XAU/USD": 2350.0, "BTC/USD": 68000.0}
-    amplitudes = {"EUR/USD": 0.00045, "XAU/USD": 1.8, "BTC/USD": 42.0}
-    trends = {"EUR/USD": 0.000002, "XAU/USD": 0.012, "BTC/USD": 0.28}
-    base, amplitude, trend = bases[symbol], amplitudes[symbol], trends[symbol]
-    candles = []
-    previous = base
-    for i in range(count):
-        close = base + trend * i + amplitude * math.sin(i / 4.7) + amplitude * 0.35 * math.sin(i / 1.9)
-        open_price = previous
-        spread = amplitude * (0.35 + abs(math.sin(i * 1.31)) * 0.35)
-        candle_time = datetime.fromtimestamp(latest_open - (count - 1 - i) * step, timezone.utc).astimezone(CANARY_TZ)
-        candles.append({
-            "time": candle_time.isoformat(),
-            "open": open_price,
-            "high": max(open_price, close) + spread,
-            "low": min(open_price, close) - spread,
-            "close": close,
-        })
-        previous = close
-    latest_time = datetime.fromtimestamp(latest_open, timezone.utc).astimezone(CANARY_TZ)
-    age_seconds = max((now - latest_time.astimezone(timezone.utc)).total_seconds(), 0)
-    return candles, latest_time.isoformat(), round(age_seconds / 60, 2)
-
-
-# BiQuote research feed is isolated from the strategy engine and disabled unless
-# explicitly enabled in the TEST service environment. It never changes DATA_MODE.
-BIQUOTE_RESEARCH_ENABLED = os.environ.get("BIQUOTE_RESEARCH_ENABLED", "true").strip().lower() in ("1", "true", "yes", "on")
-BIQUOTE_RESEARCH_CACHE = {}
-BIQUOTE_RESEARCH_CACHE_TTL = {"5m": 20, "15m": 45, "30m": 90, "1h": 180, "4h": 360}
-BIQUOTE_INTERVAL_MINUTES = {"5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240}
-BIQUOTE_INTERVAL_LIMITS = {"5m": 288, "15m": 192, "30m": 192, "1h": 168, "4h": 180}
-BIQUOTE_TICK_RESEARCH_CACHE = {}
-BIQUOTE_TICK_RESEARCH_TTL_SECONDS = 8
 
 
 def fetch_biquote_research_tick(symbol):
@@ -831,12 +776,8 @@ def biquote_research_ohlc():
 
 
 def fetch_candles(symbol, interval):
-    """TEST fail-closed: synthetic candles only; never call external market providers."""
-    if DATA_MODE != "mock":
-        raise RuntimeError(
-            "TEST está bloqueado para proveedores externos; solo se permiten datos sintéticos."
-        )
-    return generate_mock_candles(symbol, interval)
+    """No fallback candles: only the verified BiQuote path may supply market data."""
+    raise RuntimeError("No hay datos reales BiQuote verificados; análisis bloqueado.")
 
 
 @app.route("/")
@@ -929,7 +870,7 @@ MT5_LIVE_TICK_LOCK = __import__("threading").Lock()
 def mt5_live_tick():
     # This route exists only on the dedicated TEST branch/service. Permit both
     # mock and BiQuote TEST modes; the Vantage tick remains shadow-only.
-    if DATA_MODE not in ("mock", "biquote"):
+    if DATA_MODE != "biquote":
         return jsonify({"error": "El puente MT5 está limitado al entorno TEST."}), 403
     if not MT5_INGEST_TOKEN:
         return jsonify({"error": "La recepción MT5 no está habilitada en TEST."}), 503
@@ -980,28 +921,6 @@ def mt5_live_tick():
     if age > 60:
         return jsonify({"available": False, "reason": "El último tick MT5 está obsoleto."}), 404
     return jsonify({"available": True, **row}), 200
-
-
-@app.route("/api/price")
-def price():
-    symbol = get_symbol(request.args.get("symbol"))
-    if not symbol:
-        return jsonify({
-            "error": "Símbolo no permitido",
-            "allowed_symbols": sorted(ALLOWED_SYMBOLS),
-        }), 400
-    if DATA_MODE != "mock":
-        return jsonify({
-            "error": "TEST está bloqueado para proveedores externos.",
-            "data_mode": DATA_MODE,
-        }), 503
-    candles, _, _ = generate_mock_candles(symbol, "5min")
-    return jsonify({
-        "symbol": symbol,
-        "price": candles[-1]["close"],
-        "data_mode": "mock",
-        "warning": "PRECIO SIMULADO: solo para pruebas, no operar.",
-    })
 
 
 @app.route("/api/analysis")
@@ -1827,51 +1746,8 @@ def resolve_pending_signal_outcomes(symbol, interval, recent_candles):
 SIGNAL_CRON_SECRET = os.environ.get("SIGNAL_CRON_SECRET", "")
 
 
-def build_test_alert_event(analysis):
-    """Build a TEST-only alert preview; never sends a push or creates an order."""
-    if not isinstance(analysis, dict):
-        raise ValueError("analysis must be an object")
-    symbol = get_symbol(analysis.get("symbol"))
-    interval = analysis.get("interval")
-    if not symbol or interval not in ALLOWED_INTERVALS:
-        raise ValueError("unsupported symbol or timeframe")
-    if analysis.get("pre_signal") is True:
-        side = analysis.get("pre_signal_side")
-        if side not in ("BUY", "SELL"):
-            return None
-        return {
-            "event_type": "PREALERTA",
-            "symbol": symbol, "interval": interval, "side": side,
-            "entry": None, "stop_loss": None, "take_profit": None,
-            "message": f"{symbol} · {interval}: posible {side}. Prepara MT5; todavía no hay entrada confirmada.",
-        }
-    direction = analysis.get("signal")
-    if direction in ("BUY", "SELL"):
-        return {
-            "event_type": "ENTRADA_VALIDADA",
-            "symbol": symbol, "interval": interval, "side": direction,
-            "entry": analysis.get("entry"), "stop_loss": analysis.get("stop_loss"),
-            "take_profit": analysis.get("take_profit"),
-            "message": f"{symbol} · {interval}: {direction} confirmada.",
-        }
-    return None
 
 
-@app.route("/api/test/alert-preview", methods=["POST"])
-def test_alert_preview():
-    """Offline preview of the two-stage alert contract. No push, provider or broker."""
-    if DATA_MODE != "mock":
-        return jsonify({"error": "Este endpoint es exclusivo de TEST."}), 403
-    payload = request.get_json(silent=True) or {}
-    try:
-        event = build_test_alert_event(payload.get("analysis"))
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
-    return jsonify({
-        "ok": True, "dry_run": True, "push_sent": False,
-        "provider_calls": 0, "orders_sent": False,
-        "event": event,
-    })
 
 
 
@@ -1887,48 +1763,6 @@ def _test_registered_subscription(endpoint):
         raise RuntimeError("No se pudo verificar el dispositivo.")
     rows = response.json()
     return rows[0].get("subscription") if rows else None
-
-
-@app.route("/api/push/test-reversal", methods=["POST"])
-def push_test_reversal():
-    """Disabled: synthetic reversal notifications are prohibited in operational TEST."""
-    return jsonify({
-        "error": "Las notificaciones de escenarios simulados están deshabilitadas.",
-        "simulated": False, "push_sent": False, "orders_sent": False,
-    }), 410
-    payload = request.get_json(silent=True) or {}
-    endpoint = str(payload.get("endpoint") or "").strip()
-    if not endpoint.startswith("https://") or len(endpoint) > 2048:
-        return jsonify({"error":"Suscripción de este dispositivo no válida."}), 400
-    try:
-        subscription = _test_registered_subscription(endpoint)
-        if not subscription:
-            return jsonify({"error":"No hay una suscripción activa para este dispositivo."}), 404
-        base = "https://global-signal-push-test-panel.onrender.com/panel_escaner_vantage.html?view=scanner&test_reversal=1"
-        warning = {
-            "title":"🟡 PRUEBA TEST · POSIBLE GIRO",
-            "body":"Aviso preventivo simulado: una vela cerrada cumple condiciones iniciales. No es una señal de mercado ni requiere operar.",
-            "tag":"gss-reversal-test-warning",
-            "url":base,
-            "data":{"event_type":"TEST_ALERTA_PREVENTIVA_GIRO","orders_sent":False,"simulated":True}
-        }
-        confirmed = {
-            "title":"🔴 PRUEBA TEST · GIRO CONFIRMADO",
-            "body":"Segunda vela simulada confirma el escenario. Esta notificación es una prueba; no es una señal ni una orden.",
-            "tag":"gss-reversal-test-confirmed",
-            "url":base,
-            "data":{"event_type":"TEST_ALERTA_CIERRE","orders_sent":False,"simulated":True}
-        }
-        send_web_push(subscription, warning)
-        send_web_push(subscription, confirmed)
-        return jsonify({"ok":True,"sent":2,"target":"requesting_device_only","simulated":True,"orders_sent":False})
-    except RuntimeError as exc:
-        return jsonify({"error":str(exc)}), 503
-    except Exception as exc:
-        response_obj = getattr(exc, "response", None)
-        status = getattr(response_obj, "status_code", None)
-        app.logger.warning("TEST reversal push failed status=%s detail=%s", status, str(exc)[:240])
-        return jsonify({"error":"No se pudieron enviar las dos notificaciones de prueba.","provider_status":status}), 502
 
 
 @app.route("/api/trades/active", methods=["GET"])

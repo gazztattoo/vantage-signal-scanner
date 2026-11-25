@@ -347,7 +347,7 @@ def economic_news_calendar():
 @app.route("/api/market-status", methods=["GET"])
 def market_status():
     now = datetime.now(timezone.utc)
-        return jsonify({
+    return jsonify({
         "checked_at": now.isoformat(),
         "markets": {symbol: market_session(symbol, now) for symbol in sorted(ALLOWED_SYMBOLS)}
     })

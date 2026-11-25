@@ -1032,12 +1032,34 @@ function render(m,d,err,marketClosed=false){
               <div class="market">${m.category}</div>
             </div>
           </div>
-          <span class="pill sell">SIN DATOS</span>
+          <span class="pill">DATOS NO DISPONIBLES</span>
         </div>
         <p class="reason error">${esc(err)}</p>
-        <div class="foot">
-          Comprueba que Render esté activo y que la API responda.
+        <div class="foot">Sin datos reales verificados no se muestra ninguna señal.</div>
+      </article>
+    `;
+  }
+
+  // Fail closed in the UI too: never render BUY/SELL unless the API
+  // explicitly identifies fresh, real BiQuote market data.
+  if(d.data_mode!=="biquote" || d.provider!=="biquote" ||
+     d.execution_price!==false || d.signals_activated!==false){
+    return `
+      <article class="card">
+        <div class="cardhead">
+          <div class="instrument-id">
+            ${instrumentIdentity(m)}
+            <div class="instrument-copy">
+              <div class="symbol">${m.symbol}</div>
+              <div class="market">${m.category} · ${esc(d.interval||document.getElementById("interval").value)}</div>
+            </div>
+          </div>
+          <span class="pill">ESPERAR</span>
         </div>
+        <div class="priceLabel">SIN SEÑAL OPERATIVA</div>
+        <div class="price">ESPERAR</div>
+        <p class="reason">BiQuote real y verificable no está habilitado. Se han bloqueado las señales y los niveles de entrada.</p>
+        <div class="foot">No se utilizan datos simulados ni se generan órdenes.</div>
       </article>
     `;
   }
@@ -1481,7 +1503,7 @@ async function update(){
     updateManualTradeStatus();
     updateDeskTimeframes(data);
     updateOverview([{m:markets[0],d:data}]);
-    updated.textContent=(data.data_mode==="biquote"?"BiQuote · última vela cerrada · ":"Prueba simulada · ")+new Date().toLocaleTimeString("es-ES");
+    updated.textContent=(data.data_mode==="biquote"?"BiQuote · última vela cerrada · ":"Datos reales no habilitados · ")+new Date().toLocaleTimeString("es-ES");
   }catch(error){
     const message=error.name==="AbortError"
       ?"Tiempo de espera agotado: la API TEST no respondió en 25 segundos."
@@ -2015,12 +2037,8 @@ if ("serviceWorker" in navigator) {
       const res=await fetch(window.API_BASE+"/api/research/biquote/analysis?"+qs.toString(),{cache:"no-store",headers:{Accept:"application/json"}});
       const d=await res.json().catch(()=>({}));
       if(!res.ok||d.research_only!==true)throw new Error(d.error||"Análisis BiQuote no disponible");
-      const side=d.pre_signal_side||d.signal_research;
-      const sideLabel=(side==="BUY"||side==="SELL")?(side==="BUY"?"COMPRA":"VENTA"):"SIN DIRECCIÓN";
-      // This endpoint is research-only: it cannot create an alert or validate an entry.
-      const headline=(d.pre_signal===true||(d.signal_research==="BUY"||d.signal_research==="SELL"))
-        ?"SESGO EN ESTUDIO · "+sideLabel
-        :"ESPERAR · SIN SEÑAL OPERATIVA";
+      // Research output is never presented as a directional signal.
+      const headline="ESPERAR · INVESTIGACIÓN NO OPERATIVA";
       stage.textContent=headline;
       reason.textContent=(d.reason||"Sin confirmación estructural.")+" Módulo BiQuote de investigación: no crea prealertas, no valida entradas y no envía notificaciones.";
       meta.textContent="XAU/USD · "+tf.toUpperCase()+" · Confluencia "+(d.score??"—")+"/"+(d.score_max??7)+" · Sesgo "+labelBias(d.primary_bias)+" · BiQuote · NO OPERATIVO";

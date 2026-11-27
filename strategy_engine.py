@@ -230,6 +230,12 @@ def _structure(bars: list[dict], atr_now: float, lookback: int = 20):
         direction, kind, level = "BUY", "BREAKOUT", upper
     elif last["close"] < lower and previous["close"] >= lower:
         direction, kind, level = "SELL", "BREAKOUT", lower
+    # Liquidity sweep and reclaim: price runs a prior range extreme intrabar,
+    # then the closed candle finishes back inside the range.
+    elif last["low"] < lower and last["close"] > lower:
+        direction, kind, level = "BUY", "SWEEP_RECLAIM", last["low"]
+    elif last["high"] > upper and last["close"] < upper:
+        direction, kind, level = "SELL", "SWEEP_RECLAIM", last["high"]
     else:
         start = max(lookback + 1, len(bars) - 6)
         for j in range(len(bars) - 2, start - 1, -1):
@@ -344,7 +350,7 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timefr
         desired = "BULL" if side == "BUY" else "BEAR"
         opposed = "BEAR" if side == "BUY" else "BULL"
         st = structure
-        side_structure_ok = st["direction"] == side and st["type"] in ("BREAKOUT", "RETEST")
+        side_structure_ok = st["direction"] == side and st["type"] in ("BREAKOUT", "RETEST", "SWEEP_RECLAIM")
         side_primary_ok = primary in (desired, "NEUTRAL")
         side_htf_conflict = bias1 == opposed and bias2 == opposed
         side_near = st["near_direction"] == side
@@ -395,7 +401,7 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timefr
                 and sides[side]["score"] >= 4
             ),
         }
-    structure_ok = structure["direction"] == best_side and structure["type"] in ("BREAKOUT", "RETEST")
+    structure_ok = structure["direction"] == best_side and structure["type"] in ("BREAKOUT", "RETEST", "SWEEP_RECLAIM")
     primary_aligned = primary == ("BULL" if best_side == "BUY" else "BEAR")
     primary_not_opposed = primary in (("BULL", "NEUTRAL") if best_side == "BUY" else ("BEAR", "NEUTRAL"))
     opposed_bias = "BEAR" if best_side == "BUY" else "BULL"

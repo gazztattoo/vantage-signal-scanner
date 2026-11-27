@@ -2225,8 +2225,11 @@ def push_scan():
                                 )
                                 if raw_candle.tzinfo is None:
                                     raw_candle = raw_candle.replace(tzinfo=timezone.utc)
+                                # candle_time is the M15 candle OPEN; the alert
+                                # lifecycle starts when that 15-minute candle closes.
+                                candle_close = raw_candle.astimezone(timezone.utc) + timedelta(minutes=15)
                                 age_minutes = (
-                                    datetime.now(timezone.utc) - raw_candle.astimezone(timezone.utc)
+                                    datetime.now(timezone.utc) - candle_close
                                 ).total_seconds() / 60.0
                                 if age_minutes > 20 and raw_side in ("BUY", "SELL"):
                                     direction = "PREALERTA_EXPIRADA"

@@ -44,7 +44,10 @@ def build_m15_prealert_context(data: dict[str, Any]) -> dict[str, Any] | None:
         return None
     if data["pre_signal_side"] == "SELL" and not (stop > entry > target):
         return None
-    age = _age_minutes(data.get("candle_time"), datetime.now(timezone.utc))
+    # BiQuote candle_time is the candle OPEN. M15 becomes actionable only
+    # after its 15-minute candle has closed, so lifecycle age starts at close.
+    candle_close = _stamp(data.get("candle_time"))
+    age = _age_minutes(candle_close + timedelta(minutes=15), datetime.now(timezone.utc)) if candle_close else None
     if age is None or age < -2 or age > 20:
         return None
     return {
@@ -127,7 +130,9 @@ def restore_m15_prealert_context(
     except (KeyError, TypeError, ValueError):
         return None
     now = now or datetime.now(timezone.utc)
-    age = _age_minutes(context.get("candle_time"), now)
+    candle_open = _stamp(context.get("candle_time"))
+    candle_close = candle_open + timedelta(minutes=15) if candle_open else None
+    age = _age_minutes(candle_close, now) if candle_close else None
     if age is None or age < -2 or age > max_age_minutes:
         return None
     expected = "PREPARAR_COMPRA" if context["side"] == "BUY" else "PREPARAR_VENTA"
@@ -151,7 +156,9 @@ def evaluate_m15_confirmation(
     if not prealert:
         return reject("No existe una prealerta M15 activa.")
     now = now or datetime.now(timezone.utc)
-    age = _age_minutes(prealert.get("candle_time"), now)
+    candle_open = _stamp(prealert.get("candle_time"))
+    candle_close = candle_open + timedelta(minutes=15) if candle_open else None
+    age = _age_minutes(candle_close, now) if candle_close else None
     if age is None or age < -2 or age > 20:
         return reject("La prealerta M15 caducó.")
     side = prealert.get("side")

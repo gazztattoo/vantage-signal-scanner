@@ -1,10 +1,11 @@
-"""Read-only SignalR connectivity probe for BiQuote TEST.
+"""Read-only SignalR diagnostics for BiQuote TEST.
 
-This module never supplies market data to the trading engine. It checks whether
-a fresh XAUUSD tick can be received over the documented free SignalR hub.
+This module never supplies market data to the trading engine. It observes
+subscription state, ticks and candle events only.
 """
 from __future__ import annotations
 
+import ast
 import asyncio
 from datetime import datetime, timezone
 from typing import Any
@@ -18,10 +19,16 @@ SYMBOL = "XAUUSD"
 def _unwrap(payload: Any) -> dict | None:
     if isinstance(payload, dict):
         return payload
-    if isinstance(payload, list):
+    if isinstance(payload, str):
+        try:
+            payload = ast.literal_eval(payload)
+        except (ValueError, SyntaxError):
+            return None
+    if isinstance(payload, (list, tuple)):
         for item in payload:
-            if isinstance(item, dict):
-                return item
+            result = _unwrap(item)
+            if result is not None:
+                return result
     return None
 
 
@@ -38,7 +45,6 @@ def _parse_timestamp(value: Any) -> datetime | None:
 
 
 async def _probe(timeout_seconds: int) -> dict:
-    fresh_tick_received = asyncio.Event()
     report: dict[str, Any] = {
         "provider": "biquote",
         "transport": "signalr",
@@ -51,12 +57,13 @@ async def _probe(timeout_seconds: int) -> dict:
         "tick_fresh": False,
         "subscription_state_received": False,
         "subscription_state": None,
+        "candle_count": 0,
+        "candles": [],
         "research_only": True,
         "signals_activated": False,
         "execution_price": False,
         "checked_at": datetime.now(timezone.utc).isoformat(),
     }
-
     client = SignalRClient(HUB_URL)
 
     async def on_open() -> None:
@@ -70,12 +77,10 @@ async def _probe(timeout_seconds: int) -> dict:
         tick = _unwrap(message)
         if not tick or str(tick.get("symbol", "")).upper() != SYMBOL:
             return
-
         report["tick_received"] = True
         report["tick_count"] += 1
         stamp = _parse_timestamp(tick.get("timestamp"))
-        now = datetime.now(timezone.utc)
-        age = (now - stamp).total_seconds() if stamp else None
+        age = (datetime.now(timezone.utc) - stamp).total_seconds() if stamp else None
         bid, ask = tick.get("bid"), tick.get("ask")
         valid_prices = (
             isinstance(bid, (int, float)) and not isinstance(bid, bool) and bid > 0
@@ -91,11 +96,6 @@ async def _probe(timeout_seconds: int) -> dict:
         }
         report["tick_fresh"] = bool(fresh and valid_prices)
 
-        # Ignore cached/stale snapshots and keep listening for a genuinely
-        # current update until the probe deadline.
-        if report["tick_fresh"]:
-            fresh_tick_received.set()
-
     async def on_subscription_state(message: Any) -> None:
         state = _unwrap(message)
         report["subscription_state_received"] = True
@@ -104,9 +104,23 @@ async def _probe(timeout_seconds: int) -> dict:
             return
         report["subscription_state"] = {
             key: state.get(key)
-            for key in ("symbol", "state", "marketState", "status", "isOpen", "message")
+            for key in ("symbol", "state", "marketState", "status", "isOpen",
+                        "quoteAgeSeconds", "seeded", "message")
             if key in state
         }
+
+    async def on_candle(message: Any) -> None:
+        candle = _unwrap(message)
+        if not candle or str(candle.get("symbol", "")).upper() != SYMBOL:
+            return
+        report["candle_count"] += 1
+        item = {
+            key: candle.get(key)
+            for key in ("symbol", "interval", "timeframe", "period", "openTime",
+                        "timestamp", "time", "open", "high", "low", "close")
+            if key in candle
+        }
+        report["candles"] = (report["candles"] + [item])[-6:]
 
     async def on_error(error: Any) -> None:
         report["client_error"] = type(error).__name__
@@ -114,19 +128,14 @@ async def _probe(timeout_seconds: int) -> dict:
     client.on_open(on_open)
     client.on("ReceiveTick", on_tick)
     client.on("ReceiveSubscriptionState", on_subscription_state)
+    client.on("ReceiveCandle", on_candle)
     client.on_error(on_error)
 
     task = asyncio.create_task(client.run())
     try:
-        await asyncio.wait_for(fresh_tick_received.wait(), timeout=timeout_seconds)
-    except asyncio.TimeoutError:
-        report["timeout_seconds"] = timeout_seconds
-        if not report["connected"]:
-            report["verdict"] = "SIGNALR_CONNECTION_TIMEOUT"
-        elif report["tick_received"]:
-            report["verdict"] = "CONNECTED_STALE_TICK_ONLY"
-        else:
-            report["verdict"] = "CONNECTED_NO_XAUUSD_TICK"
+        # Keep the connection open for the full diagnostic window so the
+        # subscription state and both candle streams have time to arrive.
+        await asyncio.sleep(timeout_seconds)
     finally:
         task.cancel()
         try:
@@ -134,15 +143,22 @@ async def _probe(timeout_seconds: int) -> dict:
         except (asyncio.CancelledError, Exception):
             pass
 
-    if report["tick_fresh"]:
+    report["timeout_seconds"] = timeout_seconds
+    if not report["connected"]:
+        report["verdict"] = "SIGNALR_CONNECTION_TIMEOUT"
+    elif report["tick_fresh"]:
         report["verdict"] = "LIVE_SIGNALR_TICK_VERIFIED"
+    elif report["tick_received"]:
+        report["verdict"] = "CONNECTED_STALE_TICK_ONLY"
+    else:
+        report["verdict"] = "CONNECTED_NO_XAUUSD_TICK"
     report["signals_activated"] = False
     report["execution_price"] = False
     return report
 
 
 def probe_biquote_signalr(timeout_seconds: int = 20) -> dict:
-    """Open a short-lived SignalR connection and verify a fresh XAUUSD tick."""
+    """Open a short-lived SignalR connection and inspect live market events."""
     try:
         return asyncio.run(_probe(max(5, min(int(timeout_seconds), 30))))
     except Exception as exc:

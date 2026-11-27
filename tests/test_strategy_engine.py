@@ -96,6 +96,28 @@ class MultiTimeframeEngineTests(unittest.TestCase):
         self.assertFalse(result["side_diagnostics"]["SELL"]["entry_eligible_context"])
         self.assertEqual(result["wait_diagnostics"]["best_side"], "BUY")
 
+    def test_low_adx_allows_only_high_confluence_very_near_prealert(self):
+        bars = trend_bars(breakout=False)
+        close = bars[-1]["close"]
+        atr_value = 1.0
+        near_structure = {
+            "type": "NONE", "direction": "NONE", "level": None,
+            "near_direction": "BUY", "distance_atr": 0.20,
+            "range_high": close + 0.20 * atr_value,
+            "range_low": close - 2.0 * atr_value,
+        }
+        with patch("strategy_engine._structure", return_value=near_structure):
+            with patch("strategy_engine.adx_di", return_value=(
+                [None] * (len(bars) - 1) + [10.0],
+                [None] * (len(bars) - 1) + [30.0],
+                [None] * (len(bars) - 1) + [10.0],
+            )):
+                result = analyze(bars, "5min", "XAU/USD")
+        self.assertEqual(result["regime"], "RANGE")
+        self.assertTrue(result["pre_signal"])
+        self.assertEqual(result["pre_signal_side"], "BUY")
+        self.assertTrue(result["side_diagnostics"]["BUY"]["prealert_eligible_context"])
+
     def test_wait_diagnostics_explain_missing_structure_for_each_side(self):
         no_trigger = {
             "type": "NONE", "direction": "NONE", "level": None,

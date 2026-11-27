@@ -28,10 +28,8 @@ class TestMt5IngestEndpoint(unittest.TestCase):
     def setUp(self):
         self.client = app.app.test_client()
         self.patches = [
-            # Mock mode exists only inside this isolated unit-test process.
-            # The deployed TEST service accepts BiQuote or disables analysis; it
-            # never enables synthetic/mock market data operationally.
-            patch.object(app, "DATA_MODE", "mock"),
+            # BiQuote TEST permits shadow ingestion; it never activates signals.
+            patch.object(app, "DATA_MODE", "biquote"),
             patch.object(app, "MT5_INGEST_TOKEN", "test-only-mt5-token"),
             patch.object(app, "SUPABASE_URL", app.MT5_TEST_SUPABASE_URL),
             patch.object(app, "SUPABASE_SECRET_KEY", "test-only-supabase-key"),
@@ -64,7 +62,7 @@ class TestMt5IngestEndpoint(unittest.TestCase):
         self.assertEqual(response.status_code, 503)
         db_post.assert_not_called()
 
-    def test_ingestion_is_refused_outside_mock_test_mode(self):
+    def test_ingestion_is_refused_when_biquote_test_mode_is_disabled(self):
         with patch.object(app, "DATA_MODE", "biquote"):
             with patch.object(app.requests, "post") as db_post:
                 response = self.client.post(
@@ -97,7 +95,7 @@ class TestMt5IngestEndpoint(unittest.TestCase):
         data = response.get_json()
         self.assertTrue(data["ok"])
         self.assertEqual(data["stored"], 1)
-        self.assertEqual(data["data_mode"], "mock")
+        self.assertEqual(data["data_mode"], "biquote")
         self.assertFalse(data["signals_activated"])
         args, kwargs = db_post.call_args
         self.assertEqual(args[0], app.MT5_TEST_SUPABASE_URL + "/rest/v1/mt5_market_candles")

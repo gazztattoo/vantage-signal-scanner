@@ -111,10 +111,23 @@ class M15LifecycleTests(unittest.TestCase):
         )
         self.assertFalse(result["valid"])
 
+    def test_prealert_has_full_twenty_minutes_after_m15_close(self):
+        plan = {**self.context, "candle_time": (NOW - timedelta(minutes=35)).isoformat()}
+        fingerprint = encode_m15_prealert_context(plan)
+        restored_at_limit = restore_m15_prealert_context(
+            fingerprint, "PREPARAR_VENTA", now=NOW, max_age_minutes=20
+        )
+        self.assertIsNotNone(restored_at_limit)
+        plan_after_limit = {**plan, "candle_time": (NOW - timedelta(minutes=36)).isoformat()}
+        expired = encode_m15_prealert_context(plan_after_limit)
+        self.assertIsNone(restore_m15_prealert_context(
+            expired, "PREPARAR_VENTA", now=NOW, max_age_minutes=20
+        ))
+
     def test_expired_prealert_is_rejected(self):
         stale = {
             **self.context,
-            "candle_time": (NOW - timedelta(minutes=30)).isoformat(),
+            "candle_time": (NOW - timedelta(minutes=36)).isoformat(),
         }
         result = evaluate_m15_confirmation(stale, M5, M30, QUOTE, now=NOW)
         self.assertFalse(result["valid"])

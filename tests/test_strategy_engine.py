@@ -90,6 +90,26 @@ class MultiTimeframeEngineTests(unittest.TestCase):
         self.assertEqual(result["structure"]["direction"], "BUY")
         self.assertTrue(result["mtf"]["aligned_buy"])
         self.assertGreaterEqual(result["score"], 4)
+        self.assertIn("BUY", result["side_diagnostics"])
+        self.assertIn("SELL", result["side_diagnostics"])
+        self.assertTrue(result["side_diagnostics"]["BUY"]["entry_eligible_context"])
+        self.assertFalse(result["side_diagnostics"]["SELL"]["entry_eligible_context"])
+        self.assertEqual(result["wait_diagnostics"]["best_side"], "BUY")
+
+    def test_wait_diagnostics_explain_missing_structure_for_each_side(self):
+        no_trigger = {
+            "type": "NONE", "direction": "NONE", "level": None,
+            "near_direction": "NONE", "distance_atr": None,
+            "range_high": 101.0, "range_low": 99.0,
+        }
+        with patch("strategy_engine._structure", return_value=no_trigger):
+            result = analyze(trend_bars(breakout=False), "5min", "XAU/USD")
+        self.assertEqual(result["signal"], "WAIT")
+        self.assertIn("FALTA_RUPTURA_O_RETEST",
+                      result["side_diagnostics"]["BUY"]["blockers"])
+        self.assertIn("FALTA_RUPTURA_O_RETEST",
+                      result["side_diagnostics"]["SELL"]["blockers"])
+        self.assertFalse(result["side_diagnostics"]["BUY"]["entry_eligible_context"])
 
     def test_both_higher_timeframes_opposed_block_a_confirmed_entry(self):
         bars = trend_bars()

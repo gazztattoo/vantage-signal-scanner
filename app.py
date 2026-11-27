@@ -14,6 +14,7 @@ from strategy_engine import analyze as analyze_strategy
 from mt5_ingest import normalize_mt5_batch
 from experimental_gate import evaluate_shadow_gate
 from biquote_diagnostics import diagnose_biquote
+from biquote_signalr_probe import probe_biquote_signalr
 from signal_lifecycle import (
     build_m15_prealert_context,
     encode_m15_prealert_context,
@@ -1446,6 +1447,29 @@ def biquote_feed_diagnostics():
             "provider": "biquote", "diagnostics_available": False,
             "error": "diagnostic_probe_failed", "research_only": True,
             "signals_activated": False,
+        }), 502
+
+@app.route("/api/diagnostics/biquote-signalr", methods=["GET"])
+def biquote_signalr_diagnostics():
+    """Short-lived read-only SignalR probe; never feeds the trading engine."""
+    if DATA_MODE != "biquote" or not BIQUOTE_RESEARCH_ENABLED:
+        return jsonify({
+            "enabled": False, "provider": "biquote", "transport": "signalr",
+            "research_only": True, "signals_activated": False,
+            "execution_price": False,
+        }), 503
+    try:
+        timeout_seconds = request.args.get("timeout", default=20, type=int)
+        result = probe_biquote_signalr(timeout_seconds=timeout_seconds)
+        status = 200 if result.get("tick_fresh") else 503
+        return jsonify(result), status
+    except Exception as exc:
+        app.logger.warning("BiQuote SignalR diagnostics failed: %s", type(exc).__name__)
+        return jsonify({
+            "provider": "biquote", "transport": "signalr",
+            "verdict": "SIGNALR_PROBE_FAILED",
+            "error": type(exc).__name__, "research_only": True,
+            "signals_activated": False, "execution_price": False,
         }), 502
 
 

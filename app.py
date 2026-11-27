@@ -15,6 +15,7 @@ from mt5_ingest import normalize_mt5_batch
 from experimental_gate import evaluate_shadow_gate
 from biquote_diagnostics import diagnose_biquote
 from biquote_signalr_probe import probe_biquote_signalr
+from dukascopy_diagnostics import diagnose_dukascopy
 from signal_lifecycle import (
     build_m15_prealert_context,
     encode_m15_prealert_context,
@@ -1470,6 +1471,26 @@ def biquote_signalr_diagnostics():
             "verdict": "SIGNALR_PROBE_FAILED",
             "error": type(exc).__name__, "research_only": True,
             "signals_activated": False, "execution_price": False,
+        }), 502
+
+
+@app.route("/api/diagnostics/dukascopy", methods=["GET"])
+def dukascopy_diagnostics():
+    """Read-only Dukascopy feed check; never feeds signals or execution."""
+    try:
+        result = diagnose_dukascopy()
+        status = 200 if result.get("data_verified") else 503
+        return jsonify(result), status
+    except Exception as exc:
+        app.logger.warning("Dukascopy diagnostics failed: %s", type(exc).__name__)
+        return jsonify({
+            "provider": "dukascopy",
+            "verdict": "DUKASCOPY_PROBE_FAILED",
+            "error": type(exc).__name__,
+            "research_only": True,
+            "signals_activated": False,
+            "execution_price": False,
+            "data_verified": False,
         }), 502
 
 

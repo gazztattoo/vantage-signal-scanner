@@ -337,6 +337,51 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timefr
     best_side = max(("BUY", "SELL"), key=lambda s: sides[s]["score"])
     best = sides[best_side]
     score = int(best["score"])
+    for side in ("BUY", "SELL"):
+        desired = "BULL" if side == "BUY" else "BEAR"
+        opposed = "BEAR" if side == "BUY" else "BULL"
+        st = structure
+        side_structure_ok = st["direction"] == side and st["type"] in ("BREAKOUT", "RETEST")
+        side_primary_ok = primary in (desired, "NEUTRAL")
+        side_htf_conflict = bias1 == opposed and bias2 == opposed
+        side_near = st["near_direction"] == side
+        blockers = []
+        if not side_primary_ok:
+            blockers.append("TENDENCIA_PRIMARIA_EN_CONTRA")
+        if side_htf_conflict:
+            blockers.append("H1_H4_EN_CONTRA")
+        if sides[side]["score"] < 3:
+            blockers.append("CONFLUENCIA_INSUFICIENTE_PARA_PREALERTA")
+        if sides[side]["score"] < 4:
+            blockers.append("CONFLUENCIA_INSUFICIENTE_PARA_ENTRADA")
+        if regime == "RANGE":
+            blockers.append("MERCADO_LATERAL_SIN_PREALERTA")
+        if not side_structure_ok:
+            blockers.append("FALTA_RUPTURA_O_RETEST")
+        if not side_structure_ok and not side_near:
+            blockers.append("ESTRUCTURA_NO_CERCANA")
+        sides[side]["diagnostic"] = {
+            "side": side, "score": sides[side]["score"], "score_max": 7,
+            "checks": sides[side]["checks"], "blockers": blockers,
+            "primary_trend_aligned": primary == desired,
+            "primary_trend_opposed": primary == opposed,
+            "higher_timeframes_both_opposed": side_htf_conflict,
+            "structure_confirmed": side_structure_ok,
+            "structure_near": side_near,
+            "distance_to_structure_atr": st.get("distance_atr") if side_near else None,
+            "distance_to_structure_price": (
+                abs(float(st["range_high"] if side == "BUY" else st["range_low"]) - closes[-1])
+                if st.get("range_high") is not None and st.get("range_low") is not None else None
+            ),
+            "prealert_eligible_context": (
+                regime != "RANGE" and side_primary_ok and not side_htf_conflict
+                and sides[side]["score"] >= 3 and side_near
+            ),
+            "entry_eligible_context": (
+                side_structure_ok and side_primary_ok and not side_htf_conflict
+                and sides[side]["score"] >= 4
+            ),
+        }
     structure_ok = structure["direction"] == best_side and structure["type"] in ("BREAKOUT", "RETEST")
     primary_aligned = primary == ("BULL" if best_side == "BUY" else "BEAR")
     primary_not_opposed = primary in (("BULL", "NEUTRAL") if best_side == "BUY" else ("BEAR", "NEUTRAL"))
@@ -391,6 +436,18 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timefr
         "quality_score": round(score / 7 * 100), "quality_max": 100,
         "buy_score": sides["BUY"]["score"], "sell_score": sides["SELL"]["score"],
         "score_components": best["checks"],
+        "side_diagnostics": {"BUY": sides["BUY"]["diagnostic"], "SELL": sides["SELL"]["diagnostic"]},
+        "wait_diagnostics": {
+            "best_side": best_side,
+            "best_side_blockers": sides[best_side]["diagnostic"]["blockers"],
+            "summary": (
+                "Contexto favorable para prealerta; falta el disparador estructural."
+                if sides[best_side]["diagnostic"]["prealert_eligible_context"] and not structure_ok
+                else "Hay ruptura/retest y confluencia suficientes; revisar el riesgo estructural."
+                if sides[best_side]["diagnostic"]["entry_eligible_context"]
+                else "No se cumplen todavía las condiciones de prealerta o entrada."
+            ),
+        },
         "candle_time": candles[-1].get("time", candles[-1].get("timestamp")),
         "candles": len(bars),
         "data_warning": "Evaluación técnica; la puntuación no representa probabilidad de acierto.",

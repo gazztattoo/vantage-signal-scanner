@@ -1116,6 +1116,8 @@ def analysis():
             "structure": strategy.get("structure"),
             "structure_trigger": strategy.get("structure_trigger"),
             "score_components": strategy.get("score_components"),
+            "side_diagnostics": strategy.get("side_diagnostics"),
+            "wait_diagnostics": strategy.get("wait_diagnostics"),
             "status_code": strategy.get("status_code"),
             "candle_time": candle_time,
             "candle_age_minutes": candle_age_minutes,

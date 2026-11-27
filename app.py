@@ -36,6 +36,19 @@ CORS(app, resources={
 DATA_MODE = os.environ.get("TEST_DATA_MODE", "disabled").strip().lower()
 if DATA_MODE != "biquote":
     DATA_MODE = "disabled"
+# BiQuote feed configuration. This only enables fresh provider-reference data in TEST;
+# it never marks quotes as Vantage execution prices or enables automatic trading.
+BIQUOTE_RESEARCH_ENABLED = os.environ.get(
+    "BIQUOTE_RESEARCH_ENABLED",
+    "true" if DATA_MODE == "biquote" else "false",
+).strip().lower() in ("1", "true", "yes", "on")
+BIQUOTE_INTERVAL_MINUTES = {"5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240}
+BIQUOTE_INTERVAL_LIMITS = {"5m": 1200, "15m": 1200, "30m": 1200, "1h": 1200, "4h": 1200}
+BIQUOTE_RESEARCH_CACHE_TTL = {"5m": 20, "15m": 30, "30m": 45, "1h": 60, "4h": 90}
+BIQUOTE_RESEARCH_CACHE = {}
+BIQUOTE_TICK_RESEARCH_CACHE = {}
+BIQUOTE_TICK_RESEARCH_TTL_SECONDS = 5
+
 # MT5 ingestion is a separate shadow feed; it never changes DATA_MODE or signal inputs.
 MT5_INGEST_TOKEN = os.environ.get("MT5_INGEST_TOKEN", "")
 MT5_TEST_SUPABASE_URL = "https://viiraygjdqwiuawnzyrc.supabase.co"

@@ -214,23 +214,51 @@ def diagnose_dukascopy() -> dict[str, Any]:
         tick_path = f"/ticks/{SYMBOL_CODE}?from={hour_start_ms}"
         tick_payload = _get_json(tick_path)
         ticks = _decode_ticks(tick_payload)
+        tick_window = "current_hour"
+
+        # If the active hour has no ticks, inspect the immediately preceding
+        # completed hour for diagnostic context. Old ticks remain stale and
+        # can never qualify as live data.
         if not ticks:
-            raise DukascopyProbeError("dukascopy_no_ticks")
-        last_tick = ticks[-1]
-        age = (now_ms - int(last_tick["timestamp_ms"])) / 1000
-        bid, ask = float(last_tick["bid"]), float(last_tick["ask"])
-        tick_fresh = -1 <= age <= MAX_TICK_AGE_SECONDS
-        quote_valid = bid > 0 and ask >= bid
-        report["tick"] = {
-            "count": len(ticks),
-            "timestamp": last_tick["timestamp"],
-            "age_seconds": round(age, 1),
-            "bid": bid,
-            "ask": ask,
-            "spread": round(ask - bid, 6),
-            "fresh": bool(tick_fresh),
-            "bid_ask_valid": bool(quote_valid),
-        }
+            previous_hour_ms = hour_start_ms - 3600000
+            previous_hour = datetime.fromtimestamp(
+                previous_hour_ms / 1000, tz=timezone.utc
+            )
+            previous_path = (
+                f"/ticks/{SYMBOL_CODE}/{previous_hour.year}/"
+                f"{previous_hour.month}/{previous_hour.day}/{previous_hour.hour}"
+            )
+            ticks = _decode_ticks(_get_json(previous_path))
+            tick_window = "previous_completed_hour"
+
+        tick_fresh = False
+        quote_valid = False
+        if ticks:
+            last_tick = ticks[-1]
+            age = (now_ms - int(last_tick["timestamp_ms"])) / 1000
+            bid, ask = float(last_tick["bid"]), float(last_tick["ask"])
+            tick_fresh = -1 <= age <= MAX_TICK_AGE_SECONDS
+            quote_valid = bid > 0 and ask >= bid
+            report["tick"] = {
+                "count": len(ticks),
+                "window": tick_window,
+                "timestamp": last_tick["timestamp"],
+                "age_seconds": round(age, 1),
+                "bid": bid,
+                "ask": ask,
+                "spread": round(ask - bid, 6),
+                "fresh": bool(tick_fresh),
+                "bid_ask_valid": bool(quote_valid),
+            }
+        else:
+            report["tick"] = {
+                "count": 0,
+                "window": "current_and_previous_hour",
+                "timestamp": None,
+                "age_seconds": None,
+                "fresh": False,
+                "bid_ask_valid": False,
+            }
         report["tick_fresh"] = bool(tick_fresh and quote_valid)
 
         minute_path = (

@@ -1,7 +1,7 @@
 """Read-only SignalR connectivity probe for BiQuote TEST.
 
-This module never supplies market data to the trading engine. It only checks
-whether a fresh XAUUSD tick can be received over the documented free SignalR hub.
+This module never supplies market data to the trading engine. It checks whether
+a fresh XAUUSD tick can be received over the documented free SignalR hub.
 """
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ def _parse_timestamp(value: Any) -> datetime | None:
 
 
 async def _probe(timeout_seconds: int) -> dict:
-    received = asyncio.Event()
+    fresh_tick_received = asyncio.Event()
     report: dict[str, Any] = {
         "provider": "biquote",
         "transport": "signalr",
@@ -47,6 +47,7 @@ async def _probe(timeout_seconds: int) -> dict:
         "connected": False,
         "subscription_sent": False,
         "tick_received": False,
+        "tick_count": 0,
         "tick_fresh": False,
         "research_only": True,
         "signals_activated": False,
@@ -67,7 +68,9 @@ async def _probe(timeout_seconds: int) -> dict:
         tick = _unwrap(message)
         if not tick or str(tick.get("symbol", "")).upper() != SYMBOL:
             return
+
         report["tick_received"] = True
+        report["tick_count"] += 1
         stamp = _parse_timestamp(tick.get("timestamp"))
         now = datetime.now(timezone.utc)
         age = (now - stamp).total_seconds() if stamp else None
@@ -85,7 +88,11 @@ async def _probe(timeout_seconds: int) -> dict:
             "fresh": bool(fresh),
         }
         report["tick_fresh"] = bool(fresh and valid_prices)
-        received.set()
+
+        # Ignore cached/stale snapshots and keep listening for a genuinely
+        # current update until the probe deadline.
+        if report["tick_fresh"]:
+            fresh_tick_received.set()
 
     async def on_error(error: Any) -> None:
         report["client_error"] = type(error).__name__
@@ -96,10 +103,15 @@ async def _probe(timeout_seconds: int) -> dict:
 
     task = asyncio.create_task(client.run())
     try:
-        await asyncio.wait_for(received.wait(), timeout=timeout_seconds)
+        await asyncio.wait_for(fresh_tick_received.wait(), timeout=timeout_seconds)
     except asyncio.TimeoutError:
         report["timeout_seconds"] = timeout_seconds
-        report["verdict"] = "CONNECTED_NO_FRESH_XAUUSD_TICK" if report["connected"] else "SIGNALR_CONNECTION_TIMEOUT"
+        if not report["connected"]:
+            report["verdict"] = "SIGNALR_CONNECTION_TIMEOUT"
+        elif report["tick_received"]:
+            report["verdict"] = "CONNECTED_STALE_TICK_ONLY"
+        else:
+            report["verdict"] = "CONNECTED_NO_XAUUSD_TICK"
     finally:
         task.cancel()
         try:
@@ -109,15 +121,13 @@ async def _probe(timeout_seconds: int) -> dict:
 
     if report["tick_fresh"]:
         report["verdict"] = "LIVE_SIGNALR_TICK_VERIFIED"
-    elif report["tick_received"]:
-        report["verdict"] = "TICK_RECEIVED_BUT_REJECTED"
     report["signals_activated"] = False
     report["execution_price"] = False
     return report
 
 
 def probe_biquote_signalr(timeout_seconds: int = 20) -> dict:
-    """Open a short-lived SignalR connection and verify one fresh XAUUSD tick."""
+    """Open a short-lived SignalR connection and verify a fresh XAUUSD tick."""
     try:
         return asyncio.run(_probe(max(5, min(int(timeout_seconds), 30))))
     except Exception as exc:

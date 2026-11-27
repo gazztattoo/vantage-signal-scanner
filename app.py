@@ -13,6 +13,7 @@ import time
 from strategy_engine import analyze as analyze_strategy
 from mt5_ingest import normalize_mt5_batch
 from experimental_gate import evaluate_shadow_gate
+from biquote_diagnostics import diagnose_biquote
 from signal_lifecycle import (
     build_m15_prealert_context,
     encode_m15_prealert_context,
@@ -1427,6 +1428,25 @@ def signal_performance():
         })
     except (RuntimeError, requests.RequestException, ValueError, TypeError, KeyError):
         return jsonify({"error": "No se pudieron calcular las estadísticas."}), 502
+
+
+@app.route("/api/diagnostics/biquote", methods=["GET"])
+def biquote_feed_diagnostics():
+    """Read-only provider health/tick/history/OHLC probes; never feeds signals."""
+    if DATA_MODE != "biquote" or not BIQUOTE_RESEARCH_ENABLED:
+        return jsonify({
+            "enabled": False, "provider": "biquote",
+            "research_only": True, "signals_activated": False,
+        }), 503
+    try:
+        return jsonify(diagnose_biquote())
+    except Exception as exc:
+        app.logger.warning("BiQuote diagnostics failed: %s", type(exc).__name__)
+        return jsonify({
+            "provider": "biquote", "diagnostics_available": False,
+            "error": "diagnostic_probe_failed", "research_only": True,
+            "signals_activated": False,
+        }), 502
 
 
 @app.route("/api/lab-status", methods=["GET"])

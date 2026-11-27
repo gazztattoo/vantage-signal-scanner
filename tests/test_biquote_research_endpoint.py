@@ -38,9 +38,9 @@ class BiQuoteResearchEndpointTests(unittest.TestCase):
         response = Mock()
         response.status_code = 200
         response.json.return_value = self._payload()
-        with patch.object(app, "BIQUOTE_RESEARCH_ENABLED", True), patch(
-            "app.requests.get", return_value=response
-        ) as get:
+        with patch.object(app, "DATA_MODE", "disabled"), patch.object(
+            app, "BIQUOTE_RESEARCH_ENABLED", True
+        ), patch("app.requests.get", return_value=response) as get:
             result = self.client.get(
                 "/api/research/biquote/ohlc?symbol=XAU/USD&interval=5m"
             )
@@ -49,7 +49,7 @@ class BiQuoteResearchEndpointTests(unittest.TestCase):
         self.assertTrue(data["research_only"])
         self.assertFalse(data["signals_activated"])
         self.assertEqual(data["data_mode"], "provider_research")
-        self.assertEqual(data["operational_data_mode"], "mock")
+        self.assertEqual(data["operational_data_mode"], "disabled")
         self.assertEqual(data["closed_bars"], 60)
         self.assertTrue(all(not bar.get("isOpen", False) for bar in data["bars"]))
         self.assertIn("/api/XAUUSD/ohlc", get.call_args.args[0])
@@ -70,7 +70,7 @@ class BiQuoteResearchEndpointTests(unittest.TestCase):
             )
         self.assertEqual(first.status_code, 200)
         self.assertEqual(second.status_code, 200)
-        self.assertFalse(second.get_json()["cache"]["hit"] is False)
+        self.assertTrue(second.get_json()["cache"]["hit"])
         self.assertEqual(get.call_count, 1)
 
     def test_endpoint_rejects_unsupported_interval_without_network(self):
@@ -221,9 +221,9 @@ class BiQuoteResearchEndpointTests(unittest.TestCase):
                     "last_closed_close_time": "2026-11-23T02:00:00+00:00",
                     "last_closed_age_minutes": 2.0},
             "1h": {"bars": self._research_bars(60, 30), "closed_bars": 60,
-                    "last_closed_open_time": "2026-11-23T01:30:00+00:00",
-                    "last_closed_close_time": "2026-11-23T02:00:00+00:00",
-                    "last_closed_age_minutes": 2.0},
+                   "last_closed_open_time": "2026-11-23T01:30:00+00:00",
+                   "last_closed_close_time": "2026-11-23T02:00:00+00:00",
+                   "last_closed_age_minutes": 2.0},
         }
         strategy = {
             "signal": "WAIT", "pre_signal": False, "primary_bias": "BULL",
@@ -231,13 +231,13 @@ class BiQuoteResearchEndpointTests(unittest.TestCase):
             "ema20": 2655.0, "ema50": 2654.0, "rsi14": 55.0, "atr14": 1.0,
             "macd_histogram": 0.1, "adx14": 22.0,
         }
-        with patch.object(app, "DATA_MODE", "biquote"), patch(
+        with patch.object(app, "DATA_MODE", "biquote"), patch.object(
+            app, "BIQUOTE_RESEARCH_ENABLED", True
+        ), patch(
             "app.cached_biquote_research_ohlc",
             side_effect=lambda symbol, interval: datasets[interval],
         ), patch("app.analyze_strategy", return_value=strategy) as analyze:
-            response = self.client.get(
-                "/api/analysis?symbol=XAU/USD&interval=5min"
-            )
+            response = self.client.get("/api/analysis?symbol=XAU/USD&interval=5min")
         self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
         payload = response.get_json()
         self.assertEqual(payload["data_mode"], "biquote")
@@ -254,11 +254,11 @@ class BiQuoteResearchEndpointTests(unittest.TestCase):
 
     def test_operational_analysis_rejects_non_gold_when_biquote_mode_is_active(self):
         with patch.object(app, "DATA_MODE", "biquote"), patch.object(
-            app, "ALLOWED_SYMBOLS", {"XAU/USD"}
-        ), patch("app.cached_biquote_research_ohlc") as fetch:
-            response = self.client.get(
-                "/api/analysis?symbol=EUR/USD&interval=5min"
-            )
+            app, "BIQUOTE_RESEARCH_ENABLED", True
+        ), patch.object(app, "ALLOWED_SYMBOLS", {"XAU/USD"}), patch(
+            "app.cached_biquote_research_ohlc"
+        ) as fetch:
+            response = self.client.get("/api/analysis?symbol=EUR/USD&interval=5min")
         self.assertEqual(response.status_code, 400)
         fetch.assert_not_called()
 
@@ -266,9 +266,7 @@ class BiQuoteResearchEndpointTests(unittest.TestCase):
         with patch.object(app, "BIQUOTE_RESEARCH_ENABLED", False), patch(
             "app.requests.get"
         ) as get:
-            result = self.client.get(
-                "/api/research/biquote/ohlc?symbol=XAU/USD&interval=5m"
-            )
+            result = self.client.get("/api/research/biquote/ohlc?symbol=XAU/USD&interval=5m")
         self.assertEqual(result.status_code, 503)
         get.assert_not_called()
 

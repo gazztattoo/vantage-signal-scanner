@@ -60,7 +60,7 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_SECRET_KEY = os.environ.get("SUPABASE_SECRET_KEY", "")
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
-VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "mailto:admin@example.com")
+VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "").strip()
 
 def supabase_headers():
     if not SUPABASE_URL or not SUPABASE_SECRET_KEY:
@@ -71,8 +71,8 @@ def supabase_headers():
     }
 
 def send_web_push(subscription, payload):
-    if not VAPID_PUBLIC_KEY or not VAPID_PRIVATE_KEY:
-        raise RuntimeError("Las claves Web Push aún no están configuradas.")
+    if not VAPID_PUBLIC_KEY or not VAPID_PRIVATE_KEY or not VAPID_SUBJECT:
+        raise RuntimeError("La configuración VAPID está incompleta; falta una clave o el contacto VAPID_SUBJECT.")
     from pywebpush import webpush
     from py_vapid import Vapid
     # Render guarda la clave privada como PEM en una variable de entorno.

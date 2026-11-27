@@ -106,13 +106,17 @@ class MultiTimeframeEngineTests(unittest.TestCase):
             "range_high": close + 0.20 * atr_value,
             "range_low": close - 2.0 * atr_value,
         }
+        latest = len(bars) - 1
         with patch("strategy_engine._structure", return_value=near_structure):
-            with patch("strategy_engine.adx_di", return_value=(
-                [None] * (len(bars) - 1) + [10.0],
-                [None] * (len(bars) - 1) + [30.0],
-                [None] * (len(bars) - 1) + [10.0],
-            )):
-                result = analyze(bars, "5min", "XAU/USD")
+            with patch("strategy_engine._latest_bias", side_effect=["BULL", "BULL"]):
+                with patch("strategy_engine.rsi", return_value=[None] * latest + [60.0]):
+                    with patch("strategy_engine.macd_histogram", return_value=[None] * latest + [1.0]):
+                        with patch("strategy_engine.adx_di", return_value=(
+                            [None] * latest + [10.0],
+                            [None] * latest + [30.0],
+                            [None] * latest + [10.0],
+                        )):
+                            result = analyze(bars, "5min", "XAU/USD")
         self.assertEqual(result["regime"], "RANGE")
         self.assertTrue(result["pre_signal"])
         self.assertEqual(result["pre_signal_side"], "BUY")

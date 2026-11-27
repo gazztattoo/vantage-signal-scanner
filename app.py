@@ -43,7 +43,8 @@ BIQUOTE_RESEARCH_ENABLED = os.environ.get(
     "true" if DATA_MODE == "biquote" else "false",
 ).strip().lower() in ("1", "true", "yes", "on")
 BIQUOTE_INTERVAL_MINUTES = {"5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240}
-BIQUOTE_INTERVAL_LIMITS = {"5m": 1200, "15m": 1200, "30m": 1200, "1h": 1200, "4h": 1200}
+# Match BiQuote documented rolling windows; keep enough closed bars for MTF analysis.
+BIQUOTE_INTERVAL_LIMITS = {"5m": 288, "15m": 192, "30m": 192, "1h": 168, "4h": 180}
 BIQUOTE_RESEARCH_CACHE_TTL = {"5m": 20, "15m": 30, "30m": 45, "1h": 60, "4h": 90}
 BIQUOTE_RESEARCH_CACHE = {}
 BIQUOTE_TICK_RESEARCH_CACHE = {}

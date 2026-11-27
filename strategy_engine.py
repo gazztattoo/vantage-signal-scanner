@@ -354,8 +354,18 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timefr
             blockers.append("CONFLUENCIA_INSUFICIENTE_PARA_PREALERTA")
         if sides[side]["score"] < 4:
             blockers.append("CONFLUENCIA_INSUFICIENTE_PARA_ENTRADA")
-        if regime == "RANGE":
-            blockers.append("MERCADO_LATERAL_SIN_PREALERTA")
+        range_prealert_ok = (
+            regime != "RANGE"
+            or (
+                sides[side]["score"] >= 4
+                and side_near
+                and st.get("distance_atr") is not None
+                and st["distance_atr"] <= 0.25
+                and sides[side]["checks"]["directional_strength"]
+            )
+        )
+        if regime == "RANGE" and not range_prealert_ok:
+            blockers.append("MERCADO_LATERAL_REQUIERE_CONFLUENCIA_Y_PROXIMIDAD_EXTRA")
         if not side_structure_ok:
             blockers.append("FALTA_RUPTURA_O_RETEST")
         if not side_structure_ok and not side_near:
@@ -374,7 +384,7 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timefr
                 if st.get("range_high") is not None and st.get("range_low") is not None else None
             ),
             "prealert_eligible_context": (
-                regime != "RANGE" and side_primary_ok and not side_htf_conflict
+                range_prealert_ok and side_primary_ok and not side_htf_conflict
                 and sides[side]["score"] >= 3 and side_near
             ),
             "entry_eligible_context": (
@@ -485,7 +495,17 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timefr
             "structure_trigger": structure["type"],
         }
 
-    if regime != "RANGE" and primary_not_opposed and not higher_timeframes_both_opposed and score >= 3 and structure["near_direction"] == best_side:
+    range_prealert_ok = (
+        regime != "RANGE"
+        or (
+            score >= 4
+            and structure["near_direction"] == best_side
+            and structure.get("distance_atr") is not None
+            and structure["distance_atr"] <= 0.25
+            and best["checks"]["directional_strength"]
+        )
+    )
+    if range_prealert_ok and primary_not_opposed and not higher_timeframes_both_opposed and score >= 3 and structure["near_direction"] == best_side:
         # Provisional breakout plan for early preparation only. It is NOT a
         # confirmed entry: the stop order is placed beyond the nearby range
         # boundary, with an ATR-buffered invalidation and a 2R target.

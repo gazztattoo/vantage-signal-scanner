@@ -246,9 +246,12 @@ def _structure(bars: list[dict], atr_now: float, lookback: int = 20):
                     break
     dist_up = abs(upper - last["close"]) / atr_now if atr_now else float("inf")
     dist_dn = abs(last["close"] - lower) / atr_now if atr_now else float("inf")
+    # Wider preparation window: this is a prealert context, not an entry trigger.
+    # Final entry still requires a closed-candle breakout/retest and risk validation.
+    prealert_distance_atr = 0.75
     near_direction = (
-        "BUY" if last["close"] <= upper and dist_up <= 0.5
-        else "SELL" if last["close"] >= lower and dist_dn <= 0.5
+        "BUY" if last["close"] <= upper and dist_up <= prealert_distance_atr
+        else "SELL" if last["close"] >= lower and dist_dn <= prealert_distance_atr
         else "NONE"
     )
     near_distance = dist_up if near_direction == "BUY" else dist_dn if near_direction == "SELL" else None

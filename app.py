@@ -1464,6 +1464,21 @@ def lab_status():
             "automatic_push_symbols": ["XAU/USD"] if DATA_MODE == "biquote" else [],
             "automatic_execution": False,
             "storage_configured": bool(SUPABASE_URL and SUPABASE_SECRET_KEY),
+            # Safe diagnostics only: expose presence, never key material.
+            "push_configuration": {
+                "vapid_public_key_configured": bool(VAPID_PUBLIC_KEY),
+                "vapid_private_key_configured": bool(VAPID_PRIVATE_KEY),
+                "vapid_subject_configured": bool(
+                    os.environ.get("VAPID_SUBJECT", "").strip()
+                ),
+                "sender_ready": bool(
+                    VAPID_PUBLIC_KEY
+                    and VAPID_PRIVATE_KEY
+                    and os.environ.get("VAPID_SUBJECT", "").strip()
+                    and SUPABASE_URL
+                    and SUPABASE_SECRET_KEY
+                ),
+            },
             "engine": {
                 "trend": "EMA 20 / EMA 50",
                 "momentum": "RSI 14 + MACD 12/26/9",

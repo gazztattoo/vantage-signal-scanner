@@ -28,6 +28,10 @@ class TestMt5IngestEndpoint(unittest.TestCase):
     def setUp(self):
         self.client = app.app.test_client()
         self.patches = [
+            # Mock mode exists only inside this isolated unit-test process.
+            # The deployed TEST service accepts BiQuote or disables analysis; it
+            # never enables synthetic/mock market data operationally.
+            patch.object(app, "DATA_MODE", "mock"),
             patch.object(app, "MT5_INGEST_TOKEN", "test-only-mt5-token"),
             patch.object(app, "SUPABASE_URL", app.MT5_TEST_SUPABASE_URL),
             patch.object(app, "SUPABASE_SECRET_KEY", "test-only-supabase-key"),
@@ -61,7 +65,7 @@ class TestMt5IngestEndpoint(unittest.TestCase):
         db_post.assert_not_called()
 
     def test_ingestion_is_refused_outside_mock_test_mode(self):
-        with patch.object(app, "DATA_MODE", "live"):
+        with patch.object(app, "DATA_MODE", "biquote"):
             with patch.object(app.requests, "post") as db_post:
                 response = self.client.post(
                     "/api/mt5/ingest", json=valid_payload(),

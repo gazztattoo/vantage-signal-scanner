@@ -118,6 +118,18 @@ class MultiTimeframeEngineTests(unittest.TestCase):
         self.assertEqual(result["pre_signal_side"], "BUY")
         self.assertTrue(result["side_diagnostics"]["BUY"]["prealert_eligible_context"])
 
+    def test_closed_candle_liquidity_sweep_reclaim_is_detected(self):
+        bars = trend_bars(breakout=False)
+        prior_low = min(x["low"] for x in bars[-21:-1])
+        bars[-1]["close"] = prior_low + 0.15
+        bars[-1]["open"] = prior_low - 0.05
+        bars[-1]["low"] = prior_low - 0.30
+        bars[-1]["high"] = prior_low + 0.25
+        result = analyze(bars, "5min", "TEST")
+        self.assertEqual(result["structure"]["type"], "SWEEP_RECLAIM")
+        self.assertEqual(result["structure"]["direction"], "BUY")
+        self.assertLess(result["structure"]["level"], prior_low)
+
     def test_wait_diagnostics_explain_missing_structure_for_each_side(self):
         no_trigger = {
             "type": "NONE", "direction": "NONE", "level": None,

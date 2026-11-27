@@ -63,7 +63,7 @@ class TestMt5IngestEndpoint(unittest.TestCase):
         db_post.assert_not_called()
 
     def test_ingestion_is_refused_when_biquote_test_mode_is_disabled(self):
-        with patch.object(app, "DATA_MODE", "biquote"):
+        with patch.object(app, "DATA_MODE", "disabled"):
             with patch.object(app.requests, "post") as db_post:
                 response = self.client.post(
                     "/api/mt5/ingest", json=valid_payload(),

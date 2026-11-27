@@ -49,6 +49,8 @@ async def _probe(timeout_seconds: int) -> dict:
         "tick_received": False,
         "tick_count": 0,
         "tick_fresh": False,
+        "subscription_state_received": False,
+        "subscription_state": None,
         "research_only": True,
         "signals_activated": False,
         "execution_price": False,
@@ -94,11 +96,24 @@ async def _probe(timeout_seconds: int) -> dict:
         if report["tick_fresh"]:
             fresh_tick_received.set()
 
+    async def on_subscription_state(message: Any) -> None:
+        state = _unwrap(message)
+        report["subscription_state_received"] = True
+        if state is None:
+            report["subscription_state"] = str(message)[:300]
+            return
+        report["subscription_state"] = {
+            key: state.get(key)
+            for key in ("symbol", "state", "marketState", "status", "isOpen", "message")
+            if key in state
+        }
+
     async def on_error(error: Any) -> None:
         report["client_error"] = type(error).__name__
 
     client.on_open(on_open)
     client.on("ReceiveTick", on_tick)
+    client.on("ReceiveSubscriptionState", on_subscription_state)
     client.on_error(on_error)
 
     task = asyncio.create_task(client.run())

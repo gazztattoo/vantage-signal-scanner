@@ -343,7 +343,26 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timefr
             "mtf_aligned": bias1 == desired and bias2 == desired,
         }
 
-    best_side = max(("BUY", "SELL"), key=lambda s: sides[s]["score"])
+    buy_score, sell_score = sides["BUY"]["score"], sides["SELL"]["score"]
+    tie_unresolved = False
+    if buy_score > sell_score:
+        best_side = "BUY"
+    elif sell_score > buy_score:
+        best_side = "SELL"
+    elif structure["direction"] in ("BUY", "SELL") and structure["type"] in ("BREAKOUT", "RETEST", "SWEEP_RECLAIM"):
+        best_side = structure["direction"]
+    elif primary == "BULL":
+        best_side = "BUY"
+    elif primary == "BEAR":
+        best_side = "SELL"
+    elif pdi > mdi:
+        best_side = "BUY"
+    elif mdi > pdi:
+        best_side = "SELL"
+    else:
+        # A true directional tie is not an opportunity: expose it as WAIT.
+        best_side = "BUY"
+        tie_unresolved = True
     best = sides[best_side]
     score = int(best["score"])
     for side in ("BUY", "SELL"):
@@ -457,8 +476,12 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timefr
         "score_components": best["checks"],
         "side_diagnostics": {"BUY": sides["BUY"]["diagnostic"], "SELL": sides["SELL"]["diagnostic"]},
         "wait_diagnostics": {
-            "best_side": best_side,
-            "best_side_blockers": sides[best_side]["diagnostic"]["blockers"],
+            "best_side": None if tie_unresolved else best_side,
+            "directional_tie_unresolved": tie_unresolved,
+            "best_side_blockers": (
+                ["EMPATE_DIRECCIONAL_SIN_EVIDENCIA"] if tie_unresolved
+                else sides[best_side]["diagnostic"]["blockers"]
+            ),
             "summary": (
                 "Contexto favorable para prealerta; falta el disparador estructural."
                 if sides[best_side]["diagnostic"]["prealert_eligible_context"] and not structure_ok
@@ -472,7 +495,7 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timefr
         "data_warning": "Evaluación técnica; la puntuación no representa probabilidad de acierto.",
     }
 
-    if structure_ok and primary_not_opposed and not higher_timeframes_both_opposed and score >= 4:
+    if not tie_unresolved and structure_ok and primary_not_opposed and not higher_timeframes_both_opposed and score >= 4:
         level = float(structure["level"])
         # Stop anchored to the broken/retested structure with an ATR buffer.
         if best_side == "BUY":
@@ -514,7 +537,7 @@ def analyze(candles: list[dict], timeframe: str, symbol: str = "", higher_timefr
             and best["checks"]["directional_strength"]
         )
     )
-    if range_prealert_ok and primary_not_opposed and not higher_timeframes_both_opposed and score >= 3 and structure["near_direction"] == best_side:
+    if not tie_unresolved and range_prealert_ok and primary_not_opposed and not higher_timeframes_both_opposed and score >= 3 and structure["near_direction"] == best_side:
         # Provisional breakout plan for early preparation only. It is NOT a
         # confirmed entry: the stop order is placed beyond the nearby range
         # boundary, with an ATR-buffered invalidation and a 2R target.

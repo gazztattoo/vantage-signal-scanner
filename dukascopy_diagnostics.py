@@ -1,4 +1,4 @@
-"""Read-only Dukascopy diagnostics for the TEST branch.
+""""Read-only Dukascopy diagnostics for the TEST branch.
 
 This module ports only the public data decoding needed by dukascopy-node.
 It never supplies prices or candles to the trading engine.
@@ -12,7 +12,6 @@ from typing import Any
 import requests
 
 API_ROOT = "https://jetta.dukascopy.com/v1"
-REFERER = "https://widgets.dukascopy.com/en/historical-data-export"
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -209,9 +208,10 @@ def diagnose_dukascopy() -> dict[str, Any]:
     }
 
     try:
-        tick_path = (
-            f"/ticks/{SYMBOL_CODE}/{now.year}/{now.month}/{now.day}/{now.hour}"
-        )
+        # The active-period endpoint uses ?from=<UTC epoch milliseconds>.
+        # Date-segment URLs are only for completed periods and can return HTTP 400
+        # while the current hour/day is still in progress.
+        tick_path = f"/ticks/{SYMBOL_CODE}?from={hour_start_ms}"
         tick_payload = _get_json(tick_path)
         ticks = _decode_ticks(tick_payload)
         if not ticks:
@@ -234,8 +234,7 @@ def diagnose_dukascopy() -> dict[str, Any]:
         report["tick_fresh"] = bool(tick_fresh and quote_valid)
 
         minute_path = (
-            f"/candles/minute/{SYMBOL_CODE}/BID/"
-            f"{now.year}/{now.month}/{now.day}"
+            f"/candles/minute/{SYMBOL_CODE}/BID?from={day_start_ms}"
         )
         minute_payload = _get_json(minute_path)
         minutes = _decode_minutes(minute_payload)

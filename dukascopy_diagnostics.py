@@ -26,12 +26,13 @@ class DukascopyProbeError(RuntimeError):
     pass
 
 
-def _get_json(path: str, from_ms: int) -> dict[str, Any]:
+def _get_json(path: str) -> dict[str, Any]:
+    url = API_ROOT + path
     response = requests.get(
-        API_ROOT + path,
-        params={"from": str(from_ms)},
+        url,
         headers={
-            "Referer": REFERER,
+            # Dukascopy expects the Referer to match the requested data URL.
+            "Referer": url,
             "User-Agent": USER_AGENT,
             "Accept": "application/json, text/plain, */*",
         },
@@ -208,7 +209,10 @@ def diagnose_dukascopy() -> dict[str, Any]:
     }
 
     try:
-        tick_payload = _get_json("/ticks/" + SYMBOL_CODE, hour_start_ms)
+        tick_path = (
+            f"/ticks/{SYMBOL_CODE}/{now.year}/{now.month}/{now.day}/{now.hour}"
+        )
+        tick_payload = _get_json(tick_path)
         ticks = _decode_ticks(tick_payload)
         if not ticks:
             raise DukascopyProbeError("dukascopy_no_ticks")
@@ -229,9 +233,11 @@ def diagnose_dukascopy() -> dict[str, Any]:
         }
         report["tick_fresh"] = bool(tick_fresh and quote_valid)
 
-        minute_payload = _get_json(
-            "/candles/minute/" + SYMBOL_CODE + "/BID", day_start_ms
+        minute_path = (
+            f"/candles/minute/{SYMBOL_CODE}/BID/"
+            f"{now.year}/{now.month}/{now.day}"
         )
+        minute_payload = _get_json(minute_path)
         minutes = _decode_minutes(minute_payload)
         m5 = _aggregate_closed_minutes(minutes, 5, now_ms)
         m15 = _aggregate_closed_minutes(minutes, 15, now_ms)
